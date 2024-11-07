@@ -60,6 +60,23 @@
       height: 150px;
       margin-bottom: 20px;
     }
+    /* CSS لشاشة البداية */
+    #splash-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #673ab7; /* لون الخلفية */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+    #splash-screen img {
+      width: 150px; /* حجم الصورة */
+      height: auto;
+    }
   </style>
 
   <script src="install_prompt.js" defer></script>
@@ -93,5 +110,10 @@
   </div>
 
   <script src="install_prompt.js" defer></script>
+
+  <!-- شاشة البداية -->
+  <div id="splash-screen">
+    <img src="splash.png" alt="Splash Screen">
+  </div>
 </body>
 </html>

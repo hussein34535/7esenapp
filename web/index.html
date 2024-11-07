@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="7eSen TV - Watch Live TV and News">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="7eSen TV">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>7eSen TV</title>
+  <link rel="manifest" href="manifest.json">
+
+  <script>
+    // The value below is injected by flutter build, do not touch.
+    var serviceWorkerVersion = null;
+  </script>
+
+  <style>
+    #pwa-install-prompt {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #673ab7;
+      z-index: 9999;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      text-align: center;
+      padding: 20px;
+    }
+    .install-button {
+      background: white;
+      color: #673ab7;
+      border: none;
+      padding: 15px 30px;
+      border-radius: 5px;
+      font-size: 18px;
+      margin: 20px;
+      cursor: pointer;
+    }
+    #app-content {
+      display: none;
+      height: 100vh;
+      width: 100vw;
+    }
+    .logo {
+      width: 150px;
+      height: 150px;
+      margin-bottom: 20px;
+    }
+  </style>
+
+  <script src="install_prompt.js" defer></script>
+  <script src="flutter.js" defer></script>
+</head>
+<body>
+  <div id="pwa-install-prompt">
+    <img src="icons/Icon-192.png" alt="7eSen TV" class="logo">
+    <h2>مرحباً بك في تطبيق 7eSen TV</h2>
+    <p>لاستخدام التطبيق، يرجى تثبيته على جهازك</p>
+    <button class="install-button" onclick="installPWA()">تثبيت التطبيق</button>
+  </div>
+
+  <div id="app-content">
+    <!-- Flutter app content will be here -->
+    <script>
+      window.addEventListener('load', function(ev) {
+        // Download main.dart.js
+        _flutter.loader.loadEntrypoint({
+          serviceWorker: {
+            serviceWorkerVersion: serviceWorkerVersion,
+          },
+          onEntrypointLoaded: function(engineInitializer) {
+            engineInitializer.initializeEngine().then(function(appRunner) {
+              appRunner.runApp();
+            });
+          }
+        });
+      });
+    </script>
+  </div>
+
+  <script src="install_prompt.js" defer></script>
+</body>
+</html>

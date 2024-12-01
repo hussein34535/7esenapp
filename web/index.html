@@ -61,18 +61,15 @@
       margin-bottom: 20px;
     }
     /* CSS لشاشة البداية */
-    #splash-screen {
-      position: fixed;
-      top: 0;
-      left: 0;
+    /* #splash-screen {
+      position: absolute;
       width: 100%;
       height: 100%;
-      background-color: #673ab7; /* لون الخلفية */
+      background-color: white;
       display: flex;
-      justify-content: center;
       align-items: center;
-      z-index: 9999;
-    }
+      justify-content: center;
+    } */
     #splash-screen img {
       width: 150px; /* حجم الصورة */
       height: auto;
@@ -81,6 +78,8 @@
 
   <script src="install_prompt.js" defer></script>
   <script src="flutter.js" defer></script>
+  <link href="https://vjs.zencdn.net/7.20.3/video-js.css" rel="stylesheet" />
+  <script src="https://vjs.zencdn.net/7.20.3/video.min.js"></script>
 </head>
 <body>
   <div id="pwa-install-prompt">
@@ -112,8 +111,8 @@
   <script src="install_prompt.js" defer></script>
 
   <!-- شاشة البداية -->
-  <div id="splash-screen">
+  <!-- <div id="splash-screen">
     <img src="splash.png" alt="Splash Screen">
-  </div>
+  </div> -->
 </body>
 </html>

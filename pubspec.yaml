@@ -31,13 +31,12 @@ dependencies:
   flutter:
     sdk: flutter
   firebase_messaging: ^14.7.20
-  flutter_local_notifications: ^16.3.2
   firebase_analytics:
   firebase_core: ^2.32.0
   http:
-  video_player:
-  intl:
-  permission_handler:
+  video_player: ^2.4.5
+  intl: ^0.20.0
+  permission_handler: ^11.3.1
   url_launcher:
   font_awesome_flutter:
   flutter_chat_ui: ^1.6.15
@@ -45,8 +44,9 @@ dependencies:
   wakelock_plus: ^1.2.8
   win32: ^5.5.4
   flutter_vlc_player: ^7.4.2
-  chewie:
+  chewie: ^1.2.2
   cupertino_icons: ^1.0.8
+  flutter_local_notifications: ^18.0.1
 
 
 
@@ -105,8 +105,3 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
 
-  flutter_native_splash:
-    color: "#42a5f5" # Background color for the splash screen
-    image: assets/splash.png # Path to the splash image
-    android: true # Enable splash screen for Android
-    ios: true # Enable splash screen for iOS

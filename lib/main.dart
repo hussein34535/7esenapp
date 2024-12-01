@@ -13,40 +13,32 @@ import 'dart:async';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/services.dart'; // استيراد الحزمة المناسبة
 import 'package:chewie/chewie.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-// import 'news_section.dart';
+import 'package:hesen/services/api_service.dart';
+import 'package:hesen/models/match_model.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
-  if (!kIsWeb) {
-    await FirebaseApi().initNotification();
-  }
-
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await FirebaseApi().initNotification();
   runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: '7eSen TV',
       theme: ThemeData(
-        primaryColor: const Color(0xFF512da8),
-        scaffoldBackgroundColor: const Color(0xFF673ab7),
+        primaryColor: Color(0xFF512da8),
+        scaffoldBackgroundColor: Color(0xFF673ab7),
         cardColor: Colors.white,
-        appBarTheme: const AppBarTheme(
+        appBarTheme: AppBarTheme(
           backgroundColor: Color(0xFF512da8),
           foregroundColor: Colors.white,
         ),
-        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        bottomNavigationBarTheme: BottomNavigationBarThemeData(
           backgroundColor: Color(0xFF512da8),
           selectedItemColor: Colors.white,
           unselectedItemColor: Colors.white54,
@@ -62,23 +54,105 @@ class MyApp extends StatelessWidget {
 }
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
-
   @override
   _HomePageState createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
+  List<Match> matches = [];
+  List channels = [];
+  List news = [];
   int _selectedIndex = 0;
   late Future<List> channelCategories;
   late Future<List> newsArticles;
+  late Future<List<Match>> matchesFuture;
 
   @override
   void initState() {
     super.initState();
+    _initData();
     requestNotificationPermission();
+  }
+
+  Future<void> _initData() async {
     channelCategories = fetchChannelCategories();
     newsArticles = fetchNews();
+    matchesFuture = fetchMatches();
+    checkForUpdate();
+  }
+
+  Future<List<Match>> fetchMatches() async {
+    try {
+      final fetchedMatches = await ApiService.fetchMatches();
+      setState(() {
+        matches = fetchedMatches;
+      });
+      return fetchedMatches;
+    } catch (e) {
+      print('Error fetching matches: $e');
+      return [];
+    }
+  }
+
+  Future<List> fetchChannelCategories() async {
+    final fetchedChannels = await ApiService.fetchChannelCategories();
+    setState(() {
+      channels = fetchedChannels;
+    });
+    return fetchedChannels;
+  }
+
+  Future<List> fetchNews() async {
+    final fetchedNews = await ApiService.fetchNews();
+    setState(() {
+      news = fetchedNews;
+    });
+    return fetchedNews;
+  }
+
+  Future<void> checkForUpdate() async {
+    try {
+      final response = await http.get(Uri.parse(
+          'https://raw.githubusercontent.com/7essen/forceupdate/main/latestversion.json'));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final latestVersion = data['version'];
+        final updateUrl = data['update_url'];
+        const currentVersion = '1.0.0';
+        if (currentVersion != latestVersion) {
+          showUpdateDialog(updateUrl);
+        }
+      }
+    } catch (e) {
+      print("Error checking for update: $e");
+    }
+  }
+
+  void showUpdateDialog(String updateUrl) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text("Update Available"),
+          content: Text(
+              "A new version of the app is available. Please update to continue."),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text("Later"),
+            ),
+            TextButton(
+              onPressed: () async {
+                if (await canLaunch(updateUrl)) {
+                  await launch(updateUrl);
+                }
+              },
+              child: Text("Update"),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> requestNotificationPermission() async {
@@ -88,44 +162,11 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<List> fetchChannelCategories() async {
-    try {
-      final response = await http.get(Uri.parse(
-          'https://st9.onrender.com/api/channel-categories?populate=channels'));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        // Extract categories and include channels
-        return List.from(data['data'] ?? []);
-      } else {
-        return [];
-      }
-    } catch (e) {
-      print("Error fetching channel categories: $e");
-      return [];
-    }
-  }
-
-  Future<List> fetchNews() async {
-    try {
-      final response = await http
-          .get(Uri.parse('https://st9.onrender.com/api/news?populate=*'));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return List.from(data['data'] ?? []);
-      } else {
-        return [];
-      }
-    } catch (e) {
-      print("Error fetching news: $e");
-      return [];
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('7eSen TV'),
+        title: Text('7eSen TV'),
       ),
       body: IndexedStack(
         index: _selectedIndex,
@@ -133,11 +174,12 @@ class _HomePageState extends State<HomePage> {
           ChannelsSection(
               channelCategories: channelCategories, openVideo: openVideo),
           NewsSection(newsArticles: newsArticles),
-          // MatchesSection(matches: matches, openVideo: openVideo), // تم حذف هذا السطر
+          MatchesSection(
+              matches: matchesFuture, openVideo: openVideo),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
-        items: const [
+        items: [
           BottomNavigationBarItem(
             icon: FaIcon(FontAwesomeIcons.tv),
             label: 'القنوات',
@@ -161,34 +203,19 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void openVideo(
-      BuildContext context, String firstStreamLink, List<dynamic> streamLinks) {
-    // Extract the stream names and their URLs
-    List<Map<String, String>> streams = [];
-
-    for (var streamLink in streamLinks) {
-      var children = streamLink['children'];
-      if (children != null && children.isNotEmpty) {
-        var linkElement = children
-            .firstWhere((child) => child['type'] == 'link', orElse: () => null);
-        if (linkElement != null &&
-            linkElement['url'] != null &&
-            linkElement['children'] != null) {
-          var streamName =
-              linkElement['children'][0]['text'] ?? 'Unknown Stream';
-          var streamUrl = linkElement['url'];
-          streams.add({'name': streamName, 'url': streamUrl});
-        }
-      }
-    }
-
-    // Automatically open the video player with the first stream
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (context) => VideoPlayerScreen(
-        initialUrl: firstStreamLink,
-        streamLinks: streams, // Pass the list of streams
+  void openVideo(BuildContext context, String initialUrl, List<StreamLink> streamLinks) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => VideoPlayerScreen(
+          initialUrl: initialUrl,
+          streamLinks: streamLinks.map((link) => {
+            'name': link.quality,
+            'url': link.url,
+          }).toList(),
+        ),
       ),
-    ));
+    );
   }
 }
 
@@ -196,8 +223,7 @@ class ChannelsSection extends StatelessWidget {
   final Future<List> channelCategories;
   final Function openVideo;
 
-  const ChannelsSection(
-      {super.key, required this.channelCategories, required this.openVideo});
+  ChannelsSection({required this.channelCategories, required this.openVideo});
 
   @override
   Widget build(BuildContext context) {
@@ -205,11 +231,11 @@ class ChannelsSection extends StatelessWidget {
       future: channelCategories,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return Center(child: CircularProgressIndicator());
         } else if (snapshot.hasError) {
-          return const Center(child: Text('خطأ في استرجاع القنوات'));
+          return Center(child: Text('خطأ في استرجاع القنوات'));
         } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(child: Text('لا توجد قنوات لعرضها'));
+          return Center(child: Text('لا توجد قنوات لعرضها'));
         } else {
           final categories = snapshot.data!;
           categories.sort((a, b) => a['id'].compareTo(b['id']));
@@ -219,7 +245,7 @@ class ChannelsSection extends StatelessWidget {
               return ChannelBox(
                   category: categories[index], openVideo: openVideo);
             },
-            separatorBuilder: (context, index) => const SizedBox(height: 16),
+            separatorBuilder: (context, index) => SizedBox(height: 16),
           );
         }
       },
@@ -231,18 +257,17 @@ class ChannelBox extends StatelessWidget {
   final dynamic category;
   final Function openVideo;
 
-  const ChannelBox(
-      {super.key, required this.category, required this.openVideo});
+  ChannelBox({required this.category, required this.openVideo});
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      margin: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       child: ListTile(
         title: Center(
           child: Text(
             category['name'] ?? 'Unknown Category',
-            style: const TextStyle(
+            style: TextStyle(
               color: Color(0xFF673ab7),
               fontSize: 25,
               fontWeight: FontWeight.bold,
@@ -268,21 +293,20 @@ class CategoryChannelsScreen extends StatelessWidget {
   final List channels;
   final Function openVideo;
 
-  const CategoryChannelsScreen(
-      {super.key, required this.channels, required this.openVideo});
+  CategoryChannelsScreen({required this.channels, required this.openVideo});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('القنوات'),
+        title: Text('القنوات'),
       ),
       body: ListView.separated(
         itemCount: channels.length,
         itemBuilder: (context, index) {
           return ChannelTile(channel: channels[index], openVideo: openVideo);
         },
-        separatorBuilder: (context, index) => const SizedBox(height: 16),
+        separatorBuilder: (context, index) => SizedBox(height: 16),
       ),
     );
   }
@@ -292,17 +316,12 @@ class ChannelTile extends StatelessWidget {
   final dynamic channel;
   final Function openVideo;
 
-  const ChannelTile(
-      {super.key, required this.channel, required this.openVideo});
+  ChannelTile({required this.channel, required this.openVideo});
 
   @override
   Widget build(BuildContext context) {
-    // Print the channel data for debugging
-    print("Channel Data: $channel");
-
-    // Ensure that channel and its attributes are not null
     if (channel == null || channel['name'] == null) {
-      return const Card(
+      return Card(
         margin: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         child: ListTile(
           title: Center(
@@ -319,27 +338,27 @@ class ChannelTile extends StatelessWidget {
       );
     }
 
-    // Safely extract channel name
     String channelName = channel['name'] ?? 'Unknown Channel';
 
-    // Extract StreamLink names safely
     List<dynamic> streamLinks = channel['StreamLink'] ?? [];
 
-    // Automatically play the first available stream link when tapped
     String? firstStreamLink;
 
     if (streamLinks.isNotEmpty) {
-      firstStreamLink = streamLinks[0]['children']
-          .firstWhere((child) => child['url'] != null)['url'];
+      var firstLink = streamLinks[0]['children']?.firstWhere(
+        (child) => child['url'] != null,
+        orElse: () => null,
+      );
+      firstStreamLink = firstLink?['url'];
     }
 
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      margin: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       child: ListTile(
         title: Center(
           child: Text(
             channelName,
-            style: const TextStyle(
+            style: TextStyle(
               color: Color(0xFF673ab7),
               fontSize: 25,
               fontWeight: FontWeight.bold,
@@ -347,78 +366,45 @@ class ChannelTile extends StatelessWidget {
           ),
         ),
         onTap: () => openVideo(context, firstStreamLink!,
-            streamLinks), // Automatically play first stream link
+            streamLinks), 
       ),
     );
   }
 }
 
 class MatchesSection extends StatelessWidget {
-  final Future<List> matches;
+  final Future<List<Match>> matches;
   final Function openVideo;
 
-  const MatchesSection(
-      {super.key, required this.matches, required this.openVideo});
+  const MatchesSection({required this.matches, required this.openVideo});
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List>(
+    return FutureBuilder<List<Match>>(
       future: matches,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        } else if (snapshot.hasError) {
-          return const Center(child: Text('خطأ في استرجاع المباريات'));
-        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(child: Text('لا توجد مباريات لعرضها'));
-        } else {
-          final matches = snapshot.data!;
-
-          List liveMatches = [];
-          List upcomingMatches = [];
-          List finishedMatches = [];
-
-          for (var match in matches) {
-            // تحقق من أن match ليس null وأنه يحتوي على attributes
-            if (match == null || match['attributes'] == null) continue;
-
-            final matchDateTime =
-                DateFormat('HH:mm').parse(match['attributes']['matchTime']);
-            final now = DateTime.now();
-            final matchDateTimeWithToday = DateTime(now.year, now.month,
-                now.day, matchDateTime.hour, matchDateTime.minute);
-
-            if (matchDateTimeWithToday.isBefore(now) &&
-                now.isBefore(
-                    matchDateTimeWithToday.add(const Duration(minutes: 110)))) {
-              liveMatches.add(match);
-            } else if (matchDateTimeWithToday.isAfter(now)) {
-              upcomingMatches.add(match);
-            } else {
-              finishedMatches.add(match);
-            }
-          }
-
-          // ترتيب المباريات القادمة من الأقرب للأبعد
-          upcomingMatches.sort((a, b) {
-            final matchTimeA =
-                DateFormat('HH:mm').parse(a['attributes']['matchTime']);
-            final matchTimeB =
-                DateFormat('HH:mm').parse(b['attributes']['matchTime']);
-            return matchTimeA.compareTo(matchTimeB);
-          });
-
-          return ListView(
-            children: [
-              ...liveMatches
-                  .map((match) => MatchBox(match: match, openVideo: openVideo)),
-              ...upcomingMatches
-                  .map((match) => MatchBox(match: match, openVideo: openVideo)),
-              ...finishedMatches
-                  .map((match) => MatchBox(match: match, openVideo: openVideo)),
-            ],
-          );
+          return Center(child: CircularProgressIndicator());
         }
+
+        if (snapshot.hasError) {
+          return Center(child: Text('حدث خطأ في تحميل المباريات'));
+        }
+
+        final matchesList = snapshot.data ?? [];
+        if (matchesList.isEmpty) {
+          return Center(child: Text('لا توجد مباريات متاحة'));
+        }
+
+        return ListView.builder(
+          itemCount: matchesList.length,
+          itemBuilder: (context, index) {
+            return MatchBox(
+              match: matchesList[index],
+              openVideo: openVideo,
+            );
+          },
+        );
       },
     );
   }
@@ -428,67 +414,75 @@ class MatchBox extends StatelessWidget {
   final Match match;
   final Function openVideo;
 
-  const MatchBox({super.key, required this.match, required this.openVideo});
+  MatchBox({required this.match, required this.openVideo});
 
   @override
   Widget build(BuildContext context) {
+    if (match == null || match.streamLinks.isEmpty) {
+      return SizedBox.shrink();
+    }
+
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      child: ListTile(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${match.teamA} vs ${match.teamB}',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Match Time: ${match.matchTime}',
-              style: const TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(match.commentator,
-                    style: const TextStyle(color: Colors.grey)),
-                Text(match.channel, style: const TextStyle(color: Colors.grey)),
-              ],
-            ),
-          ],
+      margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: InkWell(
+        onTap: () {
+          openVideo(context, match.streamLinks.first.url, match.streamLinks);
+        },
+        child: Padding(
+          padding: EdgeInsets.all(8),
+          child: Row(
+            children: [
+              if (match.logoAUrl != null)
+                Image.network(
+                  match.logoAUrl!,
+                  width: 40,
+                  height: 40,
+                  errorBuilder: (context, error, stackTrace) =>
+                      Icon(Icons.sports_soccer, size: 40),
+                ),
+              SizedBox(width: 8),
+              if (match.logoBUrl != null)
+                Image.network(
+                  match.logoBUrl!,
+                  width: 40,
+                  height: 40,
+                  errorBuilder: (context, error, stackTrace) =>
+                      Icon(Icons.sports_soccer, size: 40),
+                ),
+              SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${match.teamA} vs ${match.teamB}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      '${match.matchTime} - ${match.commentator}',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 14,
+                      ),
+                    ),
+                    Text(
+                      '${match.channel} - ${match.champion}',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
-        onTap: () => openVideo(context, match.streamLink),
       ),
-    );
-  }
-}
-
-class Match {
-  final String teamA;
-  final String teamB;
-  final String matchTime;
-  final String commentator;
-  final String channel;
-  final String? streamLink;
-
-  Match({
-    required this.teamA,
-    required this.teamB,
-    required this.matchTime,
-    required this.commentator,
-    required this.channel,
-    this.streamLink,
-  });
-
-  factory Match.fromJson(Map<String, dynamic> json) {
-    return Match(
-      teamA: json['attributes']['teamA'],
-      teamB: json['attributes']['teamB'],
-      matchTime: json['attributes']['matchTime'],
-      commentator: json['attributes']['commentator'] ?? 'Unknown Commentator',
-      channel: json['attributes']['channel'] ?? 'Unknown Channel',
-      streamLink: json['attributes']['streamLink'],
     );
   }
 }
@@ -496,7 +490,7 @@ class Match {
 class NewsSection extends StatelessWidget {
   final Future<List> newsArticles;
 
-  const NewsSection({super.key, required this.newsArticles});
+  NewsSection({required this.newsArticles});
 
   @override
   Widget build(BuildContext context) {
@@ -504,20 +498,19 @@ class NewsSection extends StatelessWidget {
       future: newsArticles,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return Center(child: CircularProgressIndicator());
         } else if (snapshot.hasError) {
-          return const Center(child: Text('خطأ في استرجاع الأخبار'));
+          return Center(child: Text('خطأ ف استرجاع لأخبار'));
         } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(child: Text('لا توجد أخبار لعرضها'));
+          return Center(child: Text('لا وجد أر لعرضها'));
         } else {
           final articles = snapshot.data!;
-          return ListView.separated(
+          return ListView.builder(
             itemCount: articles.length,
             itemBuilder: (context, index) {
               final article = articles[index]['attributes'];
               return NewsBox(article: article);
             },
-            separatorBuilder: (context, index) => const SizedBox(height: 8),
           );
         }
       },
@@ -528,10 +521,40 @@ class NewsSection extends StatelessWidget {
 class NewsBox extends StatelessWidget {
   final dynamic article;
 
-  const NewsBox({super.key, required this.article});
+  NewsBox({required this.article});
 
   @override
   Widget build(BuildContext context) {
+    if (article == null || article['title'] == null) {
+      return Card(
+        margin: EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              height: 280,
+              color: Colors.grey, // Placeholder for missing image
+              child: Center(child: Text('No Image Available')),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Text(
+                'Unknown Title',
+                style: TextStyle(
+                  color: Color(0xFF673ab7),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    String title = article['title'] ?? 'Unknown Title';
+    String imageUrl = article['image']?['data']?['attributes']?['url'] ?? '';
+
     return GestureDetector(
       onTap: () {
         if (article['link'] != null && article['link'].isNotEmpty) {
@@ -539,37 +562,44 @@ class NewsBox extends StatelessWidget {
         }
       },
       child: Card(
-        margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+        margin: EdgeInsets.symmetric(horizontal: 5, vertical: 5),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Image.network(
-              article['image']['data']['attributes']['url'],
-              width: double.infinity,
-              height: 280,
-              fit: BoxFit.cover,
-            ),
+            if (imageUrl.isNotEmpty)
+              Image.network(
+                imageUrl,
+                width: double.infinity,
+                height: 280,
+                fit: BoxFit.cover,
+              )
+            else
+              Container(
+                height: 280,
+                color: Colors.grey, // Placeholder for missing image
+                child: Center(child: Text('No Image Available')),
+              ),
             Padding(
               padding: const EdgeInsets.all(10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    article['title'] ?? 'Unknown Title',
-                    style: const TextStyle(
+                    title,
+                    style: TextStyle(
                       color: Color(0xFF673ab7),
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8),
                   Text(
                     article['content'] ?? 'No content available',
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 14),
+                    style: TextStyle(fontSize: 14),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -578,8 +608,7 @@ class NewsBox extends StatelessWidget {
                             ? DateFormat('yyyy-MM-dd')
                                 .format(DateTime.parse(article['date']))
                             : 'No date available',
-                        style:
-                            const TextStyle(fontSize: 12, color: Colors.grey),
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                       GestureDetector(
                         onTap: () {
@@ -588,7 +617,7 @@ class NewsBox extends StatelessWidget {
                             _launchURL(article['link']);
                           }
                         },
-                        child: const Text(
+                        child: Text(
                           'المزيد',
                           style: TextStyle(
                             color: Color(0xFF673ab7),
@@ -612,8 +641,6 @@ class NewsBox extends StatelessWidget {
       await launch(url, forceSafariVC: false, forceWebView: false);
     } catch (e) {
       print('Could not launch $url: $e');
-      // يمكنك هنا إضافة كود لفتح المتصفح بشكل يدوي إذا لزم الأمر
-      // مثل استخدام launch('https://www.google.com') كبديل
     }
   }
 }
@@ -622,8 +649,7 @@ class VideoPlayerScreen extends StatefulWidget {
   final String initialUrl;
   final List<Map<String, String>> streamLinks;
 
-  const VideoPlayerScreen(
-      {super.key, required this.initialUrl, required this.streamLinks});
+  VideoPlayerScreen({required this.initialUrl, required this.streamLinks});
 
   @override
   _VideoPlayerScreenState createState() => _VideoPlayerScreenState();
@@ -638,13 +664,16 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   bool _isLiveStream = false;
   double _progress = 0.0;
   late AnimationController _bufferingController;
+  bool _isPlaying = false;
+  bool _isFullScreen = false;
+  VideoPlayerController? _controller;
 
   @override
   void initState() {
     super.initState();
     _bufferingController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 1),
+      duration: Duration(seconds: 1),
     )..repeat();
     _initializePlayer(widget.initialUrl);
   }
@@ -670,7 +699,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
           return Center(
             child: Text(
               errorMessage,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: Colors.white),
             ),
           );
         },
@@ -694,7 +723,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     if (!mounted) return;
 
     if (_isLiveStream) {
-      // For live streams, we don't update the progress
       return;
     }
 
@@ -707,7 +735,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       });
     }
 
-    // Debug log
     print(
         "Progress: $_progress, Position: ${position.inSeconds}s, Duration: ${duration.inSeconds}s, Is Live: $_isLiveStream");
   }
@@ -736,9 +763,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         animation: _bufferingController,
         builder: (context, child) {
           return LinearProgressIndicator(
-            value: null, // Indeterminate progress
+            value: null, 
             backgroundColor: Colors.grey.withOpacity(0.3),
-            valueColor: const AlwaysStoppedAnimation<Color>(Colors.red),
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
           );
         },
       );
@@ -746,9 +773,142 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       return LinearProgressIndicator(
         value: _progress,
         backgroundColor: Colors.grey.withOpacity(0.3),
-        valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
+        valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
       );
     }
+  }
+
+  Widget _buildControls(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // شريط التقدم
+          if (!_isLiveStream)
+            SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 2.0,
+                thumbShape: RoundSliderThumbShape(enabledThumbRadius: 6.0),
+                overlayShape: RoundSliderOverlayShape(overlayRadius: 12.0),
+              ),
+              child: Slider(
+                value: _progress,
+                onChanged: (value) {
+                  setState(() {
+                    _progress = value;
+                  });
+                  final duration = _controller?.value.duration;
+                  if (duration != null) {
+                    final position = duration * value;
+                    _controller?.seekTo(position);
+                  }
+                },
+                activeColor: Colors.red,
+                inactiveColor: Colors.grey[300],
+              ),
+            ),
+          
+          // أزرار التحكم
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // زر الجودات
+              if (widget.streamLinks.length > 1)
+                IconButton(
+                  icon: Icon(Icons.high_quality),
+                  color: Colors.white,
+                  onPressed: _showQualitySelector,
+                ),
+              
+              SizedBox(width: 32),
+              
+              // زر التشغيل/الإيقاف
+              IconButton(
+                icon: Icon(
+                  _isPlaying ? Icons.pause : Icons.play_arrow,
+                ),
+                color: Colors.white,
+                iconSize: 32.0,
+                onPressed: _togglePlay,
+              ),
+              
+              SizedBox(width: 32),
+              
+              // زر ملء الشاشة
+              IconButton(
+                icon: Icon(
+                  _isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen,
+                ),
+                color: Colors.white,
+                onPressed: _toggleFullScreen,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showQualitySelector() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.black87,
+      builder: (context) => Container(
+        child: ListView(
+          shrinkWrap: true,
+          children: widget.streamLinks.map((link) {
+            final streamUrl = link['url'];
+            return ListTile(
+              title: Text(
+                link['name'] ?? 'Unknown Quality',
+                style: TextStyle(color: Colors.white),
+              ),
+              onTap: () {
+                if (streamUrl != null && streamUrl.isNotEmpty) {
+                  _initializeVideo(streamUrl);
+                  Navigator.pop(context);
+                }
+              },
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  void _togglePlay() {
+    if (_controller != null) {
+      setState(() {
+        _isPlaying = !_isPlaying;
+        _isPlaying ? _controller!.play() : _controller!.pause();
+      });
+    }
+  }
+
+  void _toggleFullScreen() {
+    setState(() {
+      _isFullScreen = !_isFullScreen;
+      if (_isFullScreen) {
+        SystemChrome.setPreferredOrientations([
+          DeviceOrientation.landscapeLeft,
+          DeviceOrientation.landscapeRight,
+        ]);
+      } else {
+        SystemChrome.setPreferredOrientations([
+          DeviceOrientation.portraitUp,
+        ]);
+      }
+    });
+  }
+
+  void _initializeVideo(String url) async {
+    setState(() {
+      _isLoading = true;
+    });
+    await _videoPlayerController.pause();
+    await _videoPlayerController.dispose();
+    await _initializePlayer(url);
   }
 
   @override
@@ -759,36 +919,48 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         children: [
           Center(
             child: _hasError
-                ? const Text('Error loading video',
+                ? Text('Error loading video',
                     style: TextStyle(color: Colors.white))
                 : _isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
+                    ? CircularProgressIndicator(color: Colors.white)
                     : Chewie(controller: _chewieController!),
           ),
           Positioned(
             top: MediaQuery.of(context).padding.top,
             left: 0,
             right: 0,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: widget.streamLinks.map<Widget>((link) {
-                var streamName = link['name'] ?? 'Unknown Stream';
-                var streamUrl = link['url'] ?? '';
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: widget.streamLinks.map<Widget>((link) {
+                    final streamName = link['name'] ?? 'Unknown Stream';
+                    final streamUrl = link['url'];
 
-                return Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: TextButton(
-                    onPressed: () =>
-                        streamUrl.isNotEmpty ? _changeStream(streamUrl) : null,
-                    child: Text(streamName,
-                        style: const TextStyle(color: Colors.black)),
-                  ),
-                );
-              }).toList(),
+                    return Container(
+                      margin: EdgeInsets.symmetric(horizontal: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: TextButton(
+                        onPressed: () {
+                          if (streamUrl != null && streamUrl.isNotEmpty) {
+                            _changeStream(streamUrl);
+                          }
+                        },
+                        child: Text(streamName, 
+                          style: TextStyle(color: Colors.black),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
             ),
           ),
           Positioned(
@@ -802,23 +974,21 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8.0),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 4),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                       decoration: BoxDecoration(
                         color: Colors.red,
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: const Text(
+                      child: Text(
                         'LIVE',
                         style: TextStyle(
                             color: Colors.white, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
-                SizedBox(
-                  height: 4,
-                  child: _buildProgressIndicator(),
-                ),
+                _buildProgressIndicator(),
+                _buildControls(context),
               ],
             ),
           ),

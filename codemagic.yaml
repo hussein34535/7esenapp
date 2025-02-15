@@ -1,0 +1,5 @@
+workflows:
+  ios-workflow:
+    name: iOS Workflow
+    scripts:
+      - echo "This is a basic Codemagic workflow for iOS."

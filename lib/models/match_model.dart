@@ -29,10 +29,16 @@ class Match {
           for (var child in item['children']) {
             if (child['type'] == 'link' && child['url'] != null) {
               String quality = '';
-              if (child['children'] != null && child['children'].isNotEmpty) {
-                quality = child['children'][0]['text'] ?? '';
+              String name = '';
+              if (child['children'] != null && child['children'].length > 1) {
+                name = child['children'][0]['text'] ?? '';
+                quality = child['children'][1]['text'] ?? '';
+              } else if (child['children'] != null &&
+                  child['children'].isNotEmpty) {
+                name = child['children'][0]['text'] ?? '';
               }
-              links.add(StreamLink(url: child['url'], quality: quality));
+              links.add(
+                  StreamLink(url: child['url'], quality: quality, name: name));
             }
           }
         }
@@ -41,12 +47,16 @@ class Match {
     }
 
     String? extractLogoUrl(Map<String, dynamic>? logoData) {
-      if (logoData == null) return null;
-      return logoData['url'] as String?;
+      if (logoData == null ||
+          logoData['formats'] == null ||
+          logoData['formats']['thumbnail'] == null) {
+        return null;
+      }
+      return logoData['formats']['thumbnail']['url'] as String?;
     }
 
-    final data = json['data'] ?? json;
-    
+    final data = json['attributes'] ?? json;
+
     return Match(
       teamA: data['teamA'] ?? '',
       teamB: data['teamB'] ?? '',
@@ -56,7 +66,9 @@ class Match {
       champion: data['champion'] ?? '',
       logoAUrl: extractLogoUrl(data['logoA']),
       logoBUrl: extractLogoUrl(data['logoB']),
-      streamLinks: data['streamLink'] != null ? parseStreamLinks(data['streamLink']) : [],
+      streamLinks: data['streamLink'] != null
+          ? parseStreamLinks(data['streamLink'])
+          : [],
     );
   }
 }
@@ -64,16 +76,19 @@ class Match {
 class StreamLink {
   final String url;
   final String quality;
+  final String name;
 
   StreamLink({
     required this.url,
     required this.quality,
+    required this.name,
   });
 
   factory StreamLink.fromJson(Map<String, dynamic> json) {
     return StreamLink(
       url: json['url'] ?? '',
       quality: json['quality'] ?? '',
+      name: json['name'] ?? '',
     );
   }
 
@@ -81,6 +96,7 @@ class StreamLink {
     return {
       'url': url,
       'quality': quality,
+      'name': name,
     };
   }
 }

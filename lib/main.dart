@@ -21,13 +21,22 @@ import 'package:hesen/widgets.dart'; // Your custom widgets
 import 'dart:async';
 import 'package:share_plus/share_plus.dart';
 import 'package:hesen/privacy_policy_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:hesen/password_entry_screen.dart'; // Import the new file
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-void main() async {
+// Global variable to hold the SharedPreferences instance.  Make nullable.
+SharedPreferences? prefs;
+
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await FirebaseApi().initNotification();
+
+  // Pre-load SharedPreferences *before* running the app
+  prefs = await SharedPreferences.getInstance(); // Loading
+
   runApp(MyApp());
 }
 
@@ -38,55 +47,93 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   ThemeMode _themeMode = ThemeMode.dark;
+  bool _isFirstTime = true;
+  bool _isLoading = true; // Flag to track loading state
+
+  @override
+  void initState() {
+    super.initState();
+    _checkFirstTime();
+  }
+
+  Future<void> _checkFirstTime() async {
+    // No need to load prefs here; it's already loaded in main()
+    bool? isFirstTime = prefs?.getBool('isFirstTime');
+
+    // Simulate a short delay (optional, for demonstration)
+
+    setState(() {
+      _isFirstTime = isFirstTime == null || isFirstTime;
+      _isLoading = false; // Set loading to false after checking
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: '7eSen TV',
       theme: ThemeData(
-        brightness: Brightness.light,
-        primaryColor: Color(0xFF512da8),
-        scaffoldBackgroundColor: Color(0xFFf0f0f0),
-        cardColor: Colors.white,
-        appBarTheme: AppBarTheme(
-          backgroundColor: Color(0xFF512da8),
-          foregroundColor: Colors.white,
-          iconTheme: IconThemeData(color: Colors.white),
-          titleTextStyle: TextStyle(
-              color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-        textTheme: TextTheme(
-          bodyLarge: TextStyle(color: Colors.black),
-          bodyMedium: TextStyle(color: Colors.black),
-          bodySmall: TextStyle(color: Colors.black),
-        ),
-      ),
+          brightness: Brightness.light,
+          primaryColor: const Color(0xFF512da8),
+          scaffoldBackgroundColor: const Color(0xFFf0f0f0),
+          cardColor: Colors.white,
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Color(0xFF512da8),
+            foregroundColor: Colors.white,
+            iconTheme: IconThemeData(color: Colors.white),
+            titleTextStyle: TextStyle(
+                color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          textTheme: const TextTheme(
+            bodyLarge: TextStyle(color: Colors.black),
+            bodyMedium: TextStyle(color: Colors.black),
+            bodySmall: TextStyle(color: Colors.black),
+          )),
       darkTheme: ThemeData(
-        brightness: Brightness.dark,
-        primaryColor: Color(0xFFE50914), // Example dark primary color
-        scaffoldBackgroundColor: Color(0xFF0a0a0a),
-        cardColor: Color(0xFF221f1f),
-        appBarTheme: AppBarTheme(
-          backgroundColor: Color(0xFF141414),
-          foregroundColor: Colors.white,
-          iconTheme: IconThemeData(color: Colors.white),
-          titleTextStyle: TextStyle(
-              color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-        textTheme: TextTheme(
-          bodyLarge: TextStyle(color: Colors.white),
-          bodyMedium: TextStyle(color: Colors.white),
-          bodySmall: TextStyle(color: Colors.white),
-        ),
-      ),
+          brightness: Brightness.dark,
+          primaryColor: const Color(0xFF512da8),
+          scaffoldBackgroundColor: const Color(0xFF0a0a0a),
+          cardColor: const Color(0xFF221f1f),
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Color(0xFF141414),
+            foregroundColor: Colors.white,
+            iconTheme: IconThemeData(color: Colors.white),
+            titleTextStyle: TextStyle(
+                color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          textTheme: const TextTheme(
+            bodyLarge: TextStyle(color: Colors.white),
+            bodyMedium: TextStyle(color: Colors.white),
+            bodySmall: TextStyle(color: Colors.white),
+          )),
       themeMode: _themeMode,
-      home: HomePage(
-        onThemeChanged: (isDarkMode) {
-          setState(() {
-            _themeMode = isDarkMode ? ThemeMode.dark : ThemeMode.light;
-          });
-        },
-        themeMode: _themeMode,
+      // home: PasswordEntryScreen(),
+      home: AnimatedSwitcher(
+        duration: Duration(milliseconds: 300), // Short and smooth
+        child: _isLoading
+            ? Scaffold(
+                body: Center(
+                    child: CircularProgressIndicator())) // Improved loading UI
+            : _isFirstTime
+                ? PasswordEntryScreen(
+                    key: ValueKey('password'),
+                    onCorrectInput: () {
+                      setState(() {
+                        _isFirstTime = false;
+                      });
+                    },
+                    prefs: prefs!,
+                  )
+                : HomePage(
+                    key: ValueKey('home'),
+                    onThemeChanged: (isDarkMode) {
+                      setState(() {
+                        _themeMode =
+                            isDarkMode ? ThemeMode.dark : ThemeMode.light;
+                      });
+                    },
+                    themeMode: _themeMode,
+                  ),
       ),
       navigatorKey: navigatorKey,
       routes: {
@@ -100,7 +147,8 @@ class HomePage extends StatefulWidget {
   final Function(bool) onThemeChanged;
   final ThemeMode themeMode;
 
-  HomePage({required this.onThemeChanged, required this.themeMode});
+  HomePage({Key? key, required this.onThemeChanged, required this.themeMode})
+      : super(key: key);
 
   @override
   _HomePageState createState() => _HomePageState();
@@ -264,25 +312,22 @@ class _HomePageState extends State<HomePage> {
     }
 
     actions.add(
-      Padding(
-        padding: EdgeInsets.only(right: 2), // Adjust padding as needed
-        child: Transform.scale(
-          scale: 0.4, // Adjust scale as needed
-          child: DayNightSwitch(
-            value: _isDarkMode,
-            moonImage: AssetImage('assets/moon.png'),
-            sunImage: AssetImage('assets/sun.png'),
-            onChanged: (value) {
-              setState(() {
-                _isDarkMode = value;
-              });
-              widget.onThemeChanged(value);
-            },
-            dayColor: Color(0xFFf0f0f0),
-            nightColor: Color(0xFF141414),
-            sunColor: Color(0xFFf0f0f0),
-            moonColor: Color(0xFF141414),
-          ),
+      Transform.scale(
+        scale: 0.4,
+        child: DayNightSwitch(
+          value: _isDarkMode,
+          moonImage: AssetImage('assets/moon.png'),
+          sunImage: AssetImage('assets/sun.png'),
+          onChanged: (value) {
+            setState(() {
+              _isDarkMode = value;
+            });
+            widget.onThemeChanged(value);
+          },
+          dayColor: Color(0xFFf0f0f0),
+          nightColor: Color(0xFF141414),
+          sunColor: Color(0xFFf0f0f0),
+          moonColor: Color(0xFF141414),
         ),
       ),
     );

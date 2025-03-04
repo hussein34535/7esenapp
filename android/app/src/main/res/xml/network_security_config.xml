@@ -1,12 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <base-config cleartextTrafficPermitted="true">
-        <trust-anchors>
-            <certificates src="system" />
-            <certificates src="user" />
-        </trust-anchors>
-    </base-config>
     <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">megakomo.xyz</domain>
+        <domain includeSubdomains="true">62.210.124.184</domain>
+        <domain includeSubdomains="true">xtream-ie.com</domain>
+        <domain includeSubdomains="true">mo3ad.xyz</domain>
     </domain-config>
 </network-security-config>

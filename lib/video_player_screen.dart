@@ -5,6 +5,7 @@ import 'package:chewie/chewie.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 enum VideoSize {
   small,
@@ -32,7 +33,8 @@ class VideoPlayerScreen extends StatefulWidget {
     this.controlsHideDelay = const Duration(seconds: 5),
     this.playbackTimeoutDuration = const Duration(seconds: 10),
     this.maxRetries = 5, // Not used, but good to keep as an option
-    this.streamSwitchDelay = const Duration(seconds: 3), // Default to 3 seconds - try adjusting this value
+    this.streamSwitchDelay = const Duration(
+        seconds: 3), // Default to 3 seconds - try adjusting this value
   });
 
   @override
@@ -55,9 +57,56 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   int _currentAspectRatioIndex = 0;
   bool _isTryingNextStream = false;
 
+  // AdMob variables
+  InterstitialAd? _interstitialAd;
+  bool _isAdLoading = false;
+  final String _adUnitId = 'ca-app-pub-2393153600924393~8385972075';
+
   Timer? _hideControlsTimer;
   Timer? _playbackTimeoutTimer;
   Timer? _bufferingTimer;
+
+  void _loadAd() {
+    _isAdLoading = true;
+    InterstitialAd.load(
+      adUnitId: _adUnitId,
+      request: const AdRequest(),
+      adLoadCallback: InterstitialAdLoadCallback(
+        onAdLoaded: (InterstitialAd ad) {
+          _interstitialAd = ad;
+          _isAdLoading = false;
+        },
+        onAdFailedToLoad: (LoadAdError error) {
+          print('InterstitialAd failed to load: $error');
+          _isAdLoading = false;
+        },
+      ),
+    );
+  }
+
+  void _showAd({required VoidCallback onAdDismissed}) {
+    if (_interstitialAd != null) {
+      _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
+        onAdShowedFullScreenContent: (InterstitialAd ad) =>
+            print('%ad onAdShowedFullScreenContent.'),
+        onAdDismissedFullScreenContent: (InterstitialAd ad) {
+          print('$ad onAdDismissedFullScreenContent.');
+          ad.dispose();
+          onAdDismissed();
+        },
+        onAdFailedToShowFullScreenContent: (InterstitialAd ad, AdError error) {
+          print('$ad onAdFailedToShowFullScreenContent: $error');
+          ad.dispose();
+          onAdDismissed();
+        },
+        onAdImpression: (InterstitialAd ad) =>
+            print('$ad impression occurred.'),
+      );
+      _interstitialAd!.show();
+    } else {
+      onAdDismissed();
+    }
+  }
 
   final List<double> aspectRatios = [16 / 9, 4 / 3, 18 / 9, 21 / 9, 1];
 
@@ -74,6 +123,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
     _currentUrl = widget.initialUrl;
     _selectedQualityIndex = _findInitialStreamIndex();
+    _loadAd();
     _initializePlayer(_currentUrl!);
 
     _enableFullscreenMode();
@@ -99,6 +149,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     _releaseControllers();
     _disableFullscreenMode();
     _animationController.dispose();
+    _interstitialAd?.dispose();
 
     super.dispose();
   }
@@ -111,7 +162,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
   void _checkIfLive() {
     _isLive = widget.streamLinks.any((link) =>
-    link['url'] == _currentUrl &&
+        link['url'] == _currentUrl &&
         link.containsKey('isLive') &&
         link['isLive'] == true);
   }
@@ -162,71 +213,73 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       return;
     }
 
-    setState(() {
-      _isLoading = true; // Loading starts NOW
-      _hasError = false;
-    });
+    _showAd(onAdDismissed: () async {
+      setState(() {
+        _isLoading = true;
+        _hasError = false;
+      });
 
-    if (_videoPlayerController != null) {
-      _videoPlayerController!.removeListener(_videoPlayerListener);
-      await _videoPlayerController!.dispose();
-      _videoPlayerController = null;
-    }
-    if (_chewieController != null) {
-      _chewieController!.pause();
-      _chewieController!.dispose();
-      _chewieController = null;
-    }
-
-    _videoPlayerController = VideoPlayerController.networkUrl(
-      Uri.parse(url),
-      httpHeaders: {
-        'Accept':
-        'application/vnd.apple.mpegurl,application/x-mpegurl,video/mp4,application/mp4,video/MP2T,*/*',
-        'User-Agent': 'MyFlutterApp/1.0',
-      },
-    );
-
-    _videoPlayerController!.addListener(_videoPlayerListener);
-
-    try {
-      await _videoPlayerController!.initialize();
-
-      if (initializeAspectRatio) {
-        final aspectRatio = _videoPlayerController!.value.aspectRatio;
-        _currentAspectRatioIndex = _findClosestAspectRatioIndex(aspectRatio);
+      if (_videoPlayerController != null) {
+        _videoPlayerController!.removeListener(_videoPlayerListener);
+        await _videoPlayerController!.dispose();
+        _videoPlayerController = null;
+      }
+      if (_chewieController != null) {
+        _chewieController!.pause();
+        _chewieController!.dispose();
+        _chewieController = null;
       }
 
-      _chewieController = ChewieController(
-        videoPlayerController: _videoPlayerController!,
-        autoPlay: true,
-        looping: false,
-        aspectRatio: aspectRatios[_currentAspectRatioIndex],
-        showControls: false,
-        showOptions: false,
-        errorBuilder: (context, errorMessage) =>
-            _buildErrorWidget(errorMessage),
-        autoInitialize: true,
+      _videoPlayerController = VideoPlayerController.networkUrl(
+        Uri.parse(url),
+        httpHeaders: {
+          'Accept':
+              'application/vnd.apple.mpegurl,application/x-mpegurl,video/mp4,application/mp4,video/MP2T,*/*',
+          'User-Agent': 'MyFlutterApp/1.0',
+        },
       );
 
-      _startPlaybackTimeoutTimer();
-      _startBufferingTimer();
+      _videoPlayerController!.addListener(_videoPlayerListener);
 
-      if (mounted) {
-        setState(() {
-          _isLoading = false; // Loading ENDS on successful initialization
-        });
+      try {
+        await _videoPlayerController!.initialize();
+
+        if (initializeAspectRatio) {
+          final aspectRatio = _videoPlayerController!.value.aspectRatio;
+          _currentAspectRatioIndex = _findClosestAspectRatioIndex(aspectRatio);
+        }
+
+        _chewieController = ChewieController(
+          videoPlayerController: _videoPlayerController!,
+          autoPlay: true,
+          looping: false,
+          aspectRatio: aspectRatios[_currentAspectRatioIndex],
+          showControls: false,
+          showOptions: false,
+          errorBuilder: (context, errorMessage) =>
+              _buildErrorWidget(errorMessage),
+          autoInitialize: true,
+        );
+
+        _startPlaybackTimeoutTimer();
+        _startBufferingTimer();
+
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+        print("_initializePlayer: SUCCESS for url: $url");
+      } catch (e) {
+        print("Error initializing player: $e for url: $url");
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+        _tryNextStream();
       }
-      print("_initializePlayer: SUCCESS for url: $url");
-    } catch (e) {
-      print("Error initializing player: $e for url: $url");
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-      _tryNextStream();
-    }
+    });
   }
 
   void _startPlaybackTimeoutTimer() {
@@ -310,7 +363,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       if (nextUrl != null && nextUrl.isNotEmpty) {
         print(
             "_tryNextStream: Changing stream to index: $nextIndex, URL: $nextUrl after delay");
-        await Future.delayed(widget.streamSwitchDelay); // Consider reducing or removing this delay
+        await Future.delayed(widget
+            .streamSwitchDelay); // Consider reducing or removing this delay
         if (!mounted) return;
         _changeStream(nextUrl, nextIndex);
       } else {
@@ -319,8 +373,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         _handleNoMoreStreams();
       }
     } else {
-      print(
-          "_tryNextStream: No next viable stream found or same index.");
+      print("_tryNextStream: No next viable stream found or same index.");
       _handleNoMoreStreams();
     }
   }
@@ -339,8 +392,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     print(
         "_findNextViableStreamIndex: Searching from index: $_selectedQualityIndex");
     for (int i = _selectedQualityIndex + 1;
-    i < widget.streamLinks.length;
-    i++) {
+        i < widget.streamLinks.length;
+        i++) {
       if (widget.streamLinks[i]['url'] != null &&
           widget.streamLinks[i]['url'].isNotEmpty) {
         print(
@@ -375,7 +428,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       Uri.parse(url),
       httpHeaders: {
         'Accept':
-        'application/vnd.apple.mpegurl,application/x-mpegurl,video/mp4,application/mp4,video/MP2T,*/*',
+            'application/vnd.apple.mpegurl,application/x-mpegurl,video/mp4,application/mp4,video/MP2T,*/*',
         'User-Agent': 'MyFlutterApp/1.0',
       },
     );
@@ -409,13 +462,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       print("Error initializing player: $e for url: $url");
       if (mounted) {
         setState(() {
-          _isLoading = false; // Stop loading even if initialization fails to show error UI or try next stream
+          _isLoading =
+              false; // Stop loading even if initialization fails to show error UI or try next stream
         });
       }
       _tryNextStream();
     }
   }
-
 
   void _startHideControlsTimer() {
     _setControlsVisibility(true);
@@ -441,6 +494,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   void _hideControls({bool animate = true}) {
     _setControlsVisibility(false);
   }
+
   void _onTap() {
     if (_isControlsVisible) {
       _hideControls();
@@ -448,6 +502,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       _startHideControlsTimer();
     }
   }
+
   String _formatDuration(Duration? duration) {
     if (duration == null) return "00:00";
     String twoDigits(int n) => n.toString().padLeft(2, '0');
@@ -493,7 +548,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                 borderRadius: BorderRadius.circular(20),
                 child: Container(
                   padding:
-                  const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                      const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                   decoration: BoxDecoration(
                     color: isActive
                         ? widget.progressBarColor
@@ -508,7 +563,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                     style: TextStyle(
                       color: isActive ? Colors.white : Colors.white70,
                       fontWeight:
-                      isActive ? FontWeight.bold : FontWeight.normal,
+                          isActive ? FontWeight.bold : FontWeight.normal,
                       fontSize: 14,
                     ),
                   ),
@@ -548,7 +603,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
               ),
               child: const Text("Retry"),
             ),
-
           ],
         ),
       ),
@@ -625,26 +679,28 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                 Center(
                   child: _isLoading && !_hasError
                       ? CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(widget.progressBarColor),
-                  )
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                              widget.progressBarColor),
+                        )
                       : IconButton(
-                    icon: Icon(
-                      _videoPlayerController?.value.isPlaying ?? false
-                          ? Icons.pause_circle_filled
-                          : Icons.play_circle_filled,
-                      color: Colors.white,
-                      size: 64,
-                    ),
-                    onPressed: () {
-                      if (!mounted) return;
-                      if (_videoPlayerController?.value.isPlaying ?? false) {
-                        _videoPlayerController?.pause();
-                      } else {
-                        _videoPlayerController?.play();
-                      }
-                      _startHideControlsTimer();
-                    },
-                  ),
+                          icon: Icon(
+                            _videoPlayerController?.value.isPlaying ?? false
+                                ? Icons.pause_circle_filled
+                                : Icons.play_circle_filled,
+                            color: Colors.white,
+                            size: 64,
+                          ),
+                          onPressed: () {
+                            if (!mounted) return;
+                            if (_videoPlayerController?.value.isPlaying ??
+                                false) {
+                              _videoPlayerController?.pause();
+                            } else {
+                              _videoPlayerController?.play();
+                            }
+                            _startHideControlsTimer();
+                          },
+                        ),
                 ),
                 Positioned(
                   bottom: 0,
@@ -663,7 +719,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       ],
     );
   }
-
 
   Widget _buildBottomControls(BuildContext context) {
     return Container(
@@ -709,57 +764,60 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                     }
                     _startHideControlsTimer();
                   },
-                  onHorizontalDragUpdate:
-                  !_isLive && _videoPlayerController != null
+                  onHorizontalDragUpdate: !_isLive &&
+                          _videoPlayerController != null
                       ? (details) {
-                    if (!mounted) return;
-                    final duration = _videoPlayerController!.value.duration;
-                    final position =
-                        _videoPlayerController!.value.position;
+                          if (!mounted) return;
+                          final duration =
+                              _videoPlayerController!.value.duration;
+                          final position =
+                              _videoPlayerController!.value.position;
 
-                    final dragDistance = details.primaryDelta ?? 0;
-                    final dragPercentage = dragDistance / context.size!.width;
-                    final durationOffset =
-                        duration.inMilliseconds * dragPercentage;
+                          final dragDistance = details.primaryDelta ?? 0;
+                          final dragPercentage =
+                              dragDistance / context.size!.width;
+                          final durationOffset =
+                              duration.inMilliseconds * dragPercentage;
 
-                    final newPosition =
-                        position + Duration(milliseconds: durationOffset.toInt());
-                    if (newPosition <= duration && newPosition >= Duration.zero) {
-                      _videoPlayerController!.seekTo(newPosition);
-                    }
+                          final newPosition = position +
+                              Duration(milliseconds: durationOffset.toInt());
+                          if (newPosition <= duration &&
+                              newPosition >= Duration.zero) {
+                            _videoPlayerController!.seekTo(newPosition);
+                          }
 
-                    _startHideControlsTimer();
-                  }
+                          _startHideControlsTimer();
+                        }
                       : null,
                   child: _isLive
                       ? Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        "LIVE",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  )
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              "LIVE",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        )
                       : _videoPlayerController != null
-                      ? VideoProgressIndicator(
-                    _videoPlayerController!,
-                    allowScrubbing: true,
-                    colors: VideoProgressColors(
-                      playedColor: widget.progressBarColor,
-                      bufferedColor: widget.progressBarBufferedColor,
-                      backgroundColor: Colors.white30,
-                    ),
-                  )
-                      : const SizedBox.shrink(),
+                          ? VideoProgressIndicator(
+                              _videoPlayerController!,
+                              allowScrubbing: true,
+                              colors: VideoProgressColors(
+                                playedColor: widget.progressBarColor,
+                                bufferedColor: widget.progressBarBufferedColor,
+                                backgroundColor: Colors.white30,
+                              ),
+                            )
+                          : const SizedBox.shrink(),
                 ),
               ),
               IconButton(
@@ -804,6 +862,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       ),
     );
   }
+
   Widget _buildVideoPlayer() {
     if (_isLoading && !_hasError) {
       return Center(

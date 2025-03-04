@@ -443,9 +443,11 @@ class MatchBox extends StatelessWidget {
                 ],
               ),
               SizedBox(height: 10),
+              // Details Row (Commentator, Channel)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
+                  // Commentator
                   Row(
                     children: [
                       Icon(Icons.mic, size: 20, color: Colors.grey),
@@ -453,16 +455,7 @@ class MatchBox extends StatelessWidget {
                       Text(commentator, style: TextStyle(color: Colors.grey)),
                     ],
                   ),
-                  SizedBox(width: 10),
-                  Row(
-                    children: [
-                      Icon(Icons.stars, size: 20, color: Colors.grey),
-                      SizedBox(width: 5),
-                      Text(champion,
-                          style: TextStyle(fontSize: 12, color: Colors.grey)),
-                    ],
-                  ),
-                  SizedBox(width: 10),
+                  // Channel
                   Row(
                     children: [
                       Icon(Icons.tv, size: 20, color: Colors.grey),
@@ -471,6 +464,20 @@ class MatchBox extends StatelessWidget {
                     ],
                   ),
                 ],
+              ),
+              // Champion (moved below)
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Row(
+                  mainAxisAlignment:
+                      MainAxisAlignment.center, // Center the champion
+                  children: [
+                    Icon(Icons.stars, size: 20, color: Colors.grey),
+                    SizedBox(width: 5),
+                    Text(champion,
+                        style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  ],
+                ),
               ),
             ],
           ),
@@ -506,8 +513,9 @@ class MatchBox extends StatelessWidget {
 
 class NewsSection extends StatelessWidget {
   final Future<List> newsArticles;
+  final Function openVideo;
 
-  NewsSection({required this.newsArticles});
+  NewsSection({required this.newsArticles, required this.openVideo});
 
   @override
   Widget build(BuildContext context) {
@@ -532,7 +540,7 @@ class NewsSection extends StatelessWidget {
             itemCount: articles.length,
             itemBuilder: (context, index) {
               final article = articles[index];
-              return NewsBox(article: article);
+              return NewsBox(article: article, openVideo: openVideo);
             },
           );
         }
@@ -543,8 +551,9 @@ class NewsSection extends StatelessWidget {
 
 class NewsBox extends StatelessWidget {
   final dynamic article;
+  final Function openVideo;
 
-  NewsBox({required this.article});
+  NewsBox({required this.article, required this.openVideo});
 
   @override
   Widget build(BuildContext context) {
@@ -569,83 +578,70 @@ class NewsBox extends StatelessWidget {
       }
     }
 
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      margin: EdgeInsets.all(10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          imageUrl != null
-              ? CachedNetworkImage(
-                  imageUrl: imageUrl,
-                  placeholder: (context, url) =>
-                      Center(child: CircularProgressIndicator()),
-                  errorWidget: (context, url, error) =>
-                      Icon(Icons.image, size: 50, color: Colors.grey),
-                  height: 250,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                )
-              : SizedBox.shrink(),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
-                    color: Theme.of(context).primaryColor,
-                  ),
-                ),
-                SizedBox(height: 10),
-                Text(
-                  content,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey,
-                  ),
-                ),
-                SizedBox(height: 10),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      date,
-                      style: TextStyle(
-                        color: Colors.grey,
-                      ),
+    return GestureDetector(
+      onTap: () {
+        if (link != null) {
+          openVideo(context, link, <Map<String, dynamic>>[]);
+        }
+      },
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        margin: EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            imageUrl != null
+                ? CachedNetworkImage(
+                    imageUrl: imageUrl,
+                    placeholder: (context, url) =>
+                        Center(child: CircularProgressIndicator()),
+                    errorWidget: (context, url, error) =>
+                        Icon(Icons.image, size: 50, color: Colors.grey),
+                    height: 250,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  )
+                : SizedBox.shrink(),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                      color: Theme.of(context).primaryColor,
                     ),
-                    link != null
-                        ? InkWell(
-                            onTap: () async {
-                              if (await canLaunchUrl(Uri.parse(link))) {
-                                await launchUrl(Uri.parse(link));
-                              } else {
-                                throw 'Could not launch $link';
-                              }
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: Text(
-                                'المزيد',
-                                style: TextStyle(
-                                  color: Theme.of(context).primaryColor,
-                                ),
-                              ),
-                            ),
-                          )
-                        : SizedBox.shrink(),
-                  ],
-                ),
-              ],
+                  ),
+                  SizedBox(height: 10),
+                  Text(
+                    content,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        date,
+                        style: TextStyle(
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

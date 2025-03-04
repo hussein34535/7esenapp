@@ -23,6 +23,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:hesen/privacy_policy_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hesen/password_entry_screen.dart'; // Import the new file
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -33,6 +34,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await FirebaseApi().initNotification();
+  await MobileAds.instance.initialize();
 
   // Pre-load SharedPreferences *before* running the app
   prefs = await SharedPreferences.getInstance(); // Loading
@@ -491,7 +493,7 @@ class _HomePageState extends State<HomePage> {
                   ChannelsSection(
                       channelCategories: _filteredChannels,
                       openVideo: openVideo),
-                  NewsSection(newsArticles: newsArticles),
+                  NewsSection(newsArticles: newsArticles, openVideo: openVideo),
                   MatchesSection(matches: matchesFuture, openVideo: openVideo),
                 ],
               ),

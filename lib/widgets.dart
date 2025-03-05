@@ -32,7 +32,7 @@ class _ChannelsSectionState extends State<ChannelsSection> {
                 builder: (context, constraints) {
                   // Calculate item height *only* once
                   if (_itemHeight == null) {
-                    _itemHeight = 72;
+                    _itemHeight = 72; // Keep this consistent
                   }
 
                   return GridView.builder(
@@ -123,6 +123,8 @@ class CategoryChannelsScreen extends StatefulWidget {
 
 class _CategoryChannelsScreenState extends State<CategoryChannelsScreen> {
   String? _selectedChannel;
+  Key _gridKey = UniqueKey(); // Use GridView
+  double? _itemHeight; // Store the height
 
   @override
   Widget build(BuildContext context) {
@@ -130,28 +132,62 @@ class _CategoryChannelsScreenState extends State<CategoryChannelsScreen> {
       appBar: AppBar(
         title: Text('القنوات'),
       ),
-      body: ListView.separated(
-        itemCount: widget.channels.length,
-        itemBuilder: (context, index) {
-          return ChannelTile(
-            key: ValueKey(widget.channels[index]['id']),
-            channel: widget.channels[index],
-            openVideo: widget.openVideo,
-            isSelected: _selectedChannel == widget.channels[index]['id'],
-            onChannelTap: (channelId) {
-              setState(() {
-                if (_selectedChannel == channelId) {
-                  _selectedChannel = null;
-                } else {
-                  _selectedChannel = channelId;
-                }
-              });
-            },
-          );
+      body: OrientationBuilder(
+        builder: (context, orientation) {
+          _gridKey = UniqueKey(); // Regenerate the key
+          return LayoutBuilder(builder: (context, constraints) {
+            //  Calculate the item height *only* once.  VERY IMPORTANT.
+            if (_itemHeight == null) {
+              _itemHeight = 72; // Or get it from your original ChannelBox
+            }
+
+            return GridView.builder(
+              key: _gridKey,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: orientation == Orientation.portrait ? 1 : 2,
+                childAspectRatio: _calculateAspectRatio(
+                    orientation, constraints), // Calculate dynamically
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+              ),
+              itemCount: widget.channels.length,
+              padding: EdgeInsets.all(8),
+              itemBuilder: (context, index) {
+                return SizedBox(
+                  // Enforce the height
+                  height: _itemHeight,
+                  child: ChannelTile(
+                    key: ValueKey(widget.channels[index]['id']),
+                    channel: widget.channels[index],
+                    openVideo: widget.openVideo,
+                    isSelected:
+                        _selectedChannel == widget.channels[index]['id'],
+                    onChannelTap: (channelId) {
+                      setState(() {
+                        _selectedChannel =
+                            (_selectedChannel == channelId) ? null : channelId;
+                      });
+                    },
+                  ),
+                );
+              },
+            );
+          });
         },
-        separatorBuilder: (context, index) => SizedBox(height: 16),
       ),
     );
+  }
+
+  double _calculateAspectRatio(
+      Orientation orientation, BoxConstraints constraints) {
+    // Calculate aspect ratio based on orientation and available width
+    if (orientation == Orientation.portrait) {
+      // In portrait mode, use the full width and the desired height
+      return constraints.maxWidth / _itemHeight!;
+    } else {
+      // In landscape mode, use half the width and the desired height
+      return (constraints.maxWidth / 2) / _itemHeight!;
+    }
   }
 }
 
@@ -172,7 +208,7 @@ class ChannelTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (channel == null || channel['name'] == null) {
-      return SizedBox.shrink();
+      return SizedBox.shrink(); // Good practice for null checks
     }
 
     String channelName = channel['name'] ?? 'Unknown Channel';
@@ -180,106 +216,70 @@ class ChannelTile extends StatelessWidget {
     List<dynamic> streamLinks = channel['StreamLink'] ?? [];
 
     return Card(
-      margin: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      child: Column(
-        children: [
-          ListTile(
-            title: Center(
-              child: Text(
-                channelName,
-                style: TextStyle(
-                  color: Color(0xFF673ab7),
-                  fontSize: 25,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            onTap: () {
-              final scaffoldMessenger = ScaffoldMessenger.of(context);
-              onChannelTap(channelId);
+      margin: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      child: InkWell(
+        // Make the entire card tappable
+        onTap: () {
+          final scaffoldMessenger = ScaffoldMessenger.of(context);
+          onChannelTap(channelId);
 
-              List<Map<String, String>> streams = [];
-              for (var streamLink in streamLinks) {
-                var children = streamLink['children'];
-                if (children != null && children.isNotEmpty) {
-                  var linkElement = children.firstWhere(
-                      (child) => child['type'] == 'link',
-                      orElse: () => {});
-                  if (linkElement != null &&
-                      linkElement['url'] != null &&
-                      linkElement['children'] != null) {
-                    var streamName =
-                        linkElement['children'][0]['text']?.toString() ??
-                            'Unknown Stream';
-                    var streamUrl = linkElement['url']?.toString() ?? '';
-
-                    if (streamUrl.isNotEmpty) {
-                      streams.add({'name': streamName, 'url': streamUrl});
-                    }
-                  }
-                }
-              }
-
-              if (streams.isNotEmpty) {
-                if (streams[0]['url'] is String) {
-                  openVideo(
-                      context,
-                      streams[0]['url']!,
-                      streams
-                          .map((e) => Map<String, dynamic>.from(e))
-                          .toList());
-                } else {
-                  scaffoldMessenger.showSnackBar(
-                      SnackBar(content: Text('Invalid Stream Format')));
-                }
-              } else {
-                scaffoldMessenger.showSnackBar(
-                    SnackBar(content: Text("No stream available.")));
-              }
-            },
-          ),
-          if (isSelected)
-            ...streamLinks.map((streamLink) {
-              var linkElement = streamLink['children'].firstWhere(
+          List<Map<String, String>> streams = [];
+          for (var streamLink in streamLinks) {
+            var children = streamLink['children'];
+            if (children != null && children.isNotEmpty) {
+              var linkElement = children.firstWhere(
                   (child) => child['type'] == 'link',
                   orElse: () => {});
               if (linkElement != null &&
                   linkElement['url'] != null &&
                   linkElement['children'] != null) {
                 var streamName =
-                    linkElement['children'][0]['text'] ?? 'Unknown Stream';
-                var streamUrl = linkElement['url'];
+                    linkElement['children'][0]['text']?.toString() ??
+                        'Unknown Stream';
+                var streamUrl = linkElement['url']?.toString() ?? '';
 
-                return ListTile(
-                  title: Text(
-                    streamName,
-                    style: TextStyle(
-                        color: Theme.of(context).textTheme.bodyLarge!.color),
-                  ),
-                  onTap: () {
-                    final scaffoldMessenger = ScaffoldMessenger.of(context);
-                    openVideo(
-                        context,
-                        streamUrl,
-                        streamLinks
-                            .map((link) => {
-                                  'name': link['children'].firstWhere(
-                                      (child) => child['type'] == 'link',
-                                      orElse: () => null)?['url'],
-                                })
-                            .toList());
-                  },
-                );
-              } else {
-                return SizedBox.shrink();
+                if (streamUrl.isNotEmpty) {
+                  streams.add({'name': streamName, 'url': streamUrl});
+                }
               }
-            }).toList(),
-        ],
+            }
+          }
+
+          if (streams.isNotEmpty) {
+            if (streams[0]['url'] is String) {
+              openVideo(context, streams[0]['url']!,
+                  streams.map((e) => Map<String, dynamic>.from(e)).toList());
+            } else {
+              scaffoldMessenger.showSnackBar(
+                  SnackBar(content: Text('Invalid Stream Format')));
+            }
+          } else {
+            scaffoldMessenger
+                .showSnackBar(SnackBar(content: Text("No stream available.")));
+          }
+        },
+        child: Padding(
+          // Add padding here
+          padding: const EdgeInsets.all(8.0),
+          child: Center(
+            // Center the text
+            child: Text(
+              channelName,
+              style: TextStyle(
+                color: Color(0xFF673ab7),
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center, // Ensure text is centered
+            ),
+          ),
+        ),
       ),
     );
   }
 }
 
+//other classes no changes
 class MatchesSection extends StatelessWidget {
   final Future<List<Match>> matches;
   final Function openVideo;

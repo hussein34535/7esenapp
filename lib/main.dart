@@ -27,7 +27,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-// Global variable to hold the SharedPreferences instance.  Make nullable.
+// Global variable to hold the SharedPreferences instance. Make nullable.
 SharedPreferences? prefs;
 
 Future<void> main() async {
@@ -37,7 +37,7 @@ Future<void> main() async {
   await MobileAds.instance.initialize();
 
   // Pre-load SharedPreferences *before* running the app
-  prefs = await SharedPreferences.getInstance(); // Loading
+  prefs = await SharedPreferences.getInstance();
 
   runApp(MyApp());
 }
@@ -48,9 +48,9 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  ThemeMode _themeMode = ThemeMode.dark;
+  ThemeMode _themeMode = ThemeMode.dark; // أو ThemeMode.light حسب الرغبة
   bool _isFirstTime = true;
-  bool _isLoading = true; // Flag to track loading state
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -59,14 +59,11 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _checkFirstTime() async {
-    // No need to load prefs here; it's already loaded in main()
     bool? isFirstTime = prefs?.getBool('isFirstTime');
-
-    // Simulate a short delay (optional, for demonstration)
 
     setState(() {
       _isFirstTime = isFirstTime == null || isFirstTime;
-      _isLoading = false; // Set loading to false after checking
+      _isLoading = false;
     });
   }
 
@@ -75,47 +72,81 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       title: '7eSen TV',
       theme: ThemeData(
+        // Light Mode
+        brightness: Brightness.light,
+        primaryColor: const Color(0xFF673AB7),
+        scaffoldBackgroundColor:
+            const Color(0xFF673AB7), // <---  لون الخلفية نفس لون AppBar
+        cardColor: const Color(0xFF673AB7),
+        colorScheme: const ColorScheme.light(
+          primary: Color(0xFF673AB7),
+          secondary: Color.fromARGB(255, 184, 28, 176),
+          surface: Colors.white,
+          background: Color(0xFF673AB7), // <--- لون الخلفية في ColorScheme
+          error: Colors.red,
+          onPrimary: Colors.white,
+          onSecondary: Colors.white,
+          onSurface: Colors.black,
+          onBackground: Colors.black,
+          onError: Colors.white,
           brightness: Brightness.light,
-          primaryColor: const Color(0xFF512da8),
-          scaffoldBackgroundColor: const Color(0xFFf0f0f0),
-          cardColor: Colors.white,
-          appBarTheme: const AppBarTheme(
-            backgroundColor: Color(0xFF512da8),
-            foregroundColor: Colors.white,
-            iconTheme: IconThemeData(color: Colors.white),
-            titleTextStyle: TextStyle(
-                color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF673AB7),
+          foregroundColor: Colors.white,
+          iconTheme: IconThemeData(color: Colors.white),
+          titleTextStyle: TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
           ),
-          textTheme: const TextTheme(
-            bodyLarge: TextStyle(color: Colors.black),
-            bodyMedium: TextStyle(color: Colors.black),
-            bodySmall: TextStyle(color: Colors.black),
-          )),
+        ),
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(color: Colors.black),
+          bodyMedium: TextStyle(color: Colors.black),
+          bodySmall: TextStyle(color: Colors.black),
+        ),
+      ),
       darkTheme: ThemeData(
+        // Dark Mode
+        brightness: Brightness.dark,
+        primaryColor: const Color(0xFF673AB7),
+        scaffoldBackgroundColor: const Color(0xFF0A0A0A),
+        cardColor: const Color(0xFF0A0A0A),
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFF1C1C1C),
+          secondary: Color.fromARGB(255, 184, 28, 176),
+          surface: Color(0xFF1C1C1C),
+          background: Color(0xFF0A0A0A),
+          error: Colors.red,
+          onPrimary: Colors.white,
+          onSecondary: Colors.white,
+          onSurface: Colors.white,
+          onBackground: Colors.white,
+          onError: Colors.white,
           brightness: Brightness.dark,
-          primaryColor: const Color(0xFF512da8),
-          scaffoldBackgroundColor: const Color(0xFF0a0a0a),
-          cardColor: const Color(0xFF221f1f),
-          appBarTheme: const AppBarTheme(
-            backgroundColor: Color(0xFF141414),
-            foregroundColor: Colors.white,
-            iconTheme: IconThemeData(color: Colors.white),
-            titleTextStyle: TextStyle(
-                color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color.fromARGB(255, 0, 0, 0),
+          foregroundColor: Colors.white,
+          iconTheme: IconThemeData(color: Colors.white),
+          titleTextStyle: TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
           ),
-          textTheme: const TextTheme(
-            bodyLarge: TextStyle(color: Colors.white),
-            bodyMedium: TextStyle(color: Colors.white),
-            bodySmall: TextStyle(color: Colors.white),
-          )),
+        ),
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(color: Colors.white),
+          bodyMedium: TextStyle(color: Colors.white),
+          bodySmall: TextStyle(color: Colors.white),
+        ),
+      ),
       themeMode: _themeMode,
-      // home: PasswordEntryScreen(),
       home: AnimatedSwitcher(
-        duration: Duration(milliseconds: 300), // Short and smooth
+        duration: Duration(milliseconds: 300),
         child: _isLoading
-            ? Scaffold(
-                body: Center(
-                    child: CircularProgressIndicator())) // Improved loading UI
+            ? Scaffold(body: Center(child: CircularProgressIndicator()))
             : _isFirstTime
                 ? PasswordEntryScreen(
                     key: ValueKey('password'),
@@ -268,13 +299,27 @@ class _HomePageState extends State<HomePage> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text("تحديث متاح"),
-          content:
-              Text("هناك تحديث جديد متاح للتطبيق, الرجاء التحديث للاستمرار."),
+          titleTextStyle: TextStyle(
+              color: Theme.of(context).textTheme.bodyLarge!.color,
+              fontWeight: FontWeight.bold,
+              fontSize: 20), // Bold Title
+          contentTextStyle: TextStyle(
+              color: Theme.of(context)
+                  .textTheme
+                  .bodyLarge!
+                  .color), // Consistent Content Text
+          title: const Text("تحديث متاح"),
+          content: const Text(
+              "هناك تحديث جديد متاح للتطبيق, الرجاء التحديث للاستمرار."),
+          backgroundColor:
+              Theme.of(context).cardColor, // Dialog background color from theme
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: Text("لاحقاً"),
+              child: Text("لاحقاً",
+                  style: TextStyle(
+                      color: Theme.of(context).colorScheme.secondary,
+                      fontWeight: FontWeight.bold)), // Bold Button Text
             ),
             TextButton(
               onPressed: () async {
@@ -282,7 +327,10 @@ class _HomePageState extends State<HomePage> {
                   await launchUrl(Uri.parse(updateUrl));
                 }
               },
-              child: Text("تحديث"),
+              child: Text("تحديث",
+                  style: TextStyle(
+                      color: Theme.of(context).colorScheme.secondary,
+                      fontWeight: FontWeight.bold)), // Bold Button Text
             ),
           ],
         );
@@ -300,22 +348,10 @@ class _HomePageState extends State<HomePage> {
   List<Widget> _buildAppBarActions() {
     List<Widget> actions = [];
 
-    if (_selectedIndex == 0) {
-      actions.add(
-        IconButton(
-          icon: Icon(Icons.search),
-          onPressed: () {
-            setState(() {
-              _isSearchBarVisible = !_isSearchBarVisible;
-            });
-          },
-        ),
-      );
-    }
-
+    // <---  تمت إزالة الشرط من هنا
     actions.add(
       Transform.scale(
-        scale: 0.4,
+        scale: 0.35,
         child: DayNightSwitch(
           value: _isDarkMode,
           moonImage: AssetImage('assets/moon.png'),
@@ -326,10 +362,12 @@ class _HomePageState extends State<HomePage> {
             });
             widget.onThemeChanged(value);
           },
-          dayColor: Color(0xFFf0f0f0),
-          nightColor: Color(0xFF141414),
-          sunColor: Color(0xFFf0f0f0),
-          moonColor: Color(0xFF141414),
+          dayColor: Color.fromARGB(
+              255, 223, 223, 223), // Light Grey - Match Light Background
+          nightColor: Color.fromARGB(
+              255, 17, 17, 17), // Near Black - Match Dark Background
+          sunColor: Color(0xFFF8F8F8),
+          moonColor: Color(0xFF0A0A0A),
         ),
       ),
     );
@@ -344,6 +382,9 @@ class _HomePageState extends State<HomePage> {
         MediaQuery.of(context).padding.top + 2.0; // Add 2.0 to the top padding
     final totalOffset = appBarHeight + additionalOffset;
 
+    // لون أفتح قليلاً من البنفسجي الأساسي
+    final navBarBackgroundColor = Color(0xFF7C52D8);
+
     return Scaffold(
       appBar: PreferredSize(
         preferredSize: Size.fromHeight(appBarHeight),
@@ -352,10 +393,10 @@ class _HomePageState extends State<HomePage> {
           decoration: BoxDecoration(
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.2), // Shadow color
-                spreadRadius: 2,
-                blurRadius: 4,
-                offset: Offset(0, 2), // Shadow position
+                color: Colors.black.withOpacity(0.1), // Subtle Shadow
+                spreadRadius: 1,
+                blurRadius: 3,
+                offset: Offset(0, 1), // Slightly shifted shadow
               ),
             ],
             color: Theme.of(context)
@@ -367,33 +408,55 @@ class _HomePageState extends State<HomePage> {
             leading: IconButton(
               // IconButton for the drawer
               icon: Icon(Icons.menu_rounded,
-                  color: Colors.white), // Rounded menu icon
+                  color: Colors.white), // Rounded menu icon, white color
               onPressed: () {
                 showModalBottomSheet(
                   // Show BottomSheet on icon press
                   context: context,
                   backgroundColor: Theme.of(context)
-                      .cardColor, // Background color from theme
+                      .cardColor, // Background color from theme card color
                   shape: RoundedRectangleBorder(
                     // Rounded edges for the BottomSheet
-                    borderRadius:
-                        BorderRadius.vertical(top: Radius.circular(20)),
+                    borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(16)), // Slightly less rounded
                   ),
                   builder: (BuildContext context) {
                     return Padding(
                       // Padding for the list from all sides
-                      padding: const EdgeInsets.symmetric(vertical: 20.0),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 16.0), // Reduced padding
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
                           ListTile(
+                            // <---  العنصر الجديد الخاص بالبحث
+                            leading: Icon(Icons.search,
+                                color: Theme.of(context).colorScheme.secondary),
+                            title: Text('بحث',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(context)
+                                        .textTheme
+                                        .bodyLarge!
+                                        .color)),
+                            onTap: () {
+                              // إغلاق الـ BottomSheet عند الضغط
+                              Navigator.pop(context);
+                              // إظهار شريط البحث
+                              setState(() {
+                                _isSearchBarVisible = true;
+                              });
+                            },
+                          ),
+                          ListTile(
                             leading: Icon(FontAwesomeIcons.telegram,
                                 color: Theme.of(context)
-                                    .textTheme
-                                    .bodyLarge!
-                                    .color),
+                                    .colorScheme
+                                    .secondary), // Use secondary color for icons
                             title: Text('Telegram',
                                 style: TextStyle(
+                                    fontWeight:
+                                        FontWeight.bold, // Bold Menu Items
                                     color: Theme.of(context)
                                         .textTheme
                                         .bodyLarge!
@@ -422,11 +485,12 @@ class _HomePageState extends State<HomePage> {
                           ListTile(
                             leading: Icon(Icons.privacy_tip_rounded,
                                 color: Theme.of(context)
-                                    .textTheme
-                                    .bodyLarge!
-                                    .color),
+                                    .colorScheme
+                                    .secondary), // Use secondary color for icons
                             title: Text('سياسة الخصوصية',
                                 style: TextStyle(
+                                    fontWeight:
+                                        FontWeight.bold, // Bold Menu Items
                                     color: Theme.of(context)
                                         .textTheme
                                         .bodyLarge!
@@ -444,11 +508,12 @@ class _HomePageState extends State<HomePage> {
                           ListTile(
                             leading: Icon(Icons.share_rounded,
                                 color: Theme.of(context)
-                                    .textTheme
-                                    .bodyLarge!
-                                    .color),
+                                    .colorScheme
+                                    .secondary), // Use secondary color for icons
                             title: Text('مشاركه التطبيق',
                                 style: TextStyle(
+                                    fontWeight:
+                                        FontWeight.bold, // Bold Menu Items
                                     color: Theme.of(context)
                                         .textTheme
                                         .bodyLarge!
@@ -467,7 +532,9 @@ class _HomePageState extends State<HomePage> {
             ),
             title: _selectedIndex == 0 && _isSearchBarVisible
                 ? _buildSearchBar()
-                : Text('7eSen TV'),
+                : Text('7eSen TV',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold)), // Bold App Title
             actions: _buildAppBarActions(),
           ),
         ),
@@ -494,13 +561,34 @@ class _HomePageState extends State<HomePage> {
                     channelCategories: _filteredChannels,
                     openVideo: openVideo,
                   ),
-                  NewsSection(
-                    newsArticles: newsArticles,
-                    openVideo: openVideo,
+                  GestureDetector(
+                    // <-- قسم الأخبار مع GestureDetector
+                    onTap: () {
+                      if (_isSearchBarVisible) {
+                        setState(() {
+                          _isSearchBarVisible =
+                              false; // إخفاء شريط البحث عند الضغط في أي مكان فارغ
+                        });
+                      }
+                    },
+                    child: NewsSection(
+                      newsArticles: newsArticles,
+                      openVideo: openVideo,
+                    ),
                   ),
-                  MatchesSection(
-                    matches: matchesFuture,
-                    openVideo: openVideo,
+                  GestureDetector(
+                    // <-- قسم المباريات مع GestureDetector
+                    onTap: () {
+                      if (_isSearchBarVisible) {
+                        setState(() {
+                          _isSearchBarVisible = false;
+                        });
+                      }
+                    },
+                    child: MatchesSection(
+                      matches: matchesFuture,
+                      openVideo: openVideo,
+                    ),
                   ),
                 ],
               ),
@@ -509,13 +597,19 @@ class _HomePageState extends State<HomePage> {
         },
       ),
       bottomNavigationBar: CurvedNavigationBar(
-        backgroundColor: Colors.transparent,
-        color: widget.themeMode == ThemeMode.light
-            ? Color(0xFF512da8)
-            : Color(0xFF221f1f),
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? Colors.black // Black color in dark mode
+            : const Color(0xFF673AB7),
+        color: Theme.of(context).brightness == Brightness.dark
+            ? Theme.of(context).colorScheme.primary
+            : navBarBackgroundColor,
+        buttonBackgroundColor:
+            Theme.of(context).cardColor, // Card color for button background
+        animationDuration:
+            const Duration(milliseconds: 300), // Smooth animation
         items: [
           Image.asset('assets/tv.png',
-              width: 30, height: 30, color: Colors.white), // Example icon
+              width: 30, height: 30, color: Colors.white), // White icons
           Image.asset('assets/replay.png',
               width: 30, height: 30, color: Colors.white),
           Image.asset('assets/ball.png',
@@ -534,6 +628,10 @@ class _HomePageState extends State<HomePage> {
 
   void openVideo(BuildContext context, String initialUrl,
       List<Map<String, dynamic>> streamLinks) {
+    // إخفاء شريط البحث هنا
+    setState(() {
+      _isSearchBarVisible = false;
+    });
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -550,22 +648,37 @@ class _HomePageState extends State<HomePage> {
       width: double.infinity,
       height: 40,
       decoration: BoxDecoration(
-        color: Colors.grey.shade800, // Darker grey for search bar
+        color:
+            Theme.of(context).cardColor, // Card color for search bar background
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+            color: Theme.of(context)
+                .colorScheme
+                .secondary
+                .withOpacity(0.6)), // Slightly transparent secondary border
       ),
       child: TextField(
         controller: _searchController,
         decoration: InputDecoration(
           hintText: 'بحث عن قناة',
-          hintStyle: TextStyle(color: Colors.grey),
-          prefixIcon: Icon(Icons.search, color: Colors.grey),
+          hintStyle:
+              TextStyle(color: Colors.grey.shade500), // Lighter grey hint
+          prefixIcon: Icon(Icons.search,
+              color: Theme.of(context)
+                  .colorScheme
+                  .secondary), // Secondary color search icon
           border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(vertical: 5), // Adjust padding
+          contentPadding:
+              EdgeInsets.symmetric(horizontal: 16), // Horizontal padding
         ),
         onChanged: (query) {
           _filterChannels(query);
         },
-        style: TextStyle(color: Colors.white), // Text color in search bar
+        style: TextStyle(
+            color: Theme.of(context)
+                .textTheme
+                .bodyLarge!
+                .color), // Text color from theme
       ),
     );
   }

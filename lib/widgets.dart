@@ -239,6 +239,9 @@ class ChannelTile extends StatelessWidget {
                 var streamUrl = linkElement['url']?.toString() ?? '';
 
                 if (streamUrl.isNotEmpty) {
+                  if (!streamUrl.startsWith('http')) {
+                    streamUrl = 'https://st9.onrender.com' + streamUrl;
+                  }
                   streams.add({'name': streamName, 'url': streamUrl});
                 }
               }
@@ -624,6 +627,9 @@ class NewsBox extends StatelessWidget {
         article['image'].isNotEmpty) {
       final imageData = article['image'][0];
       imageUrl = imageData['url'];
+      if (imageUrl != null && !imageUrl.startsWith('http')) {
+        imageUrl = 'https://st9.onrender.com' + imageUrl;
+      }
     }
 
     // Extract the URL from the links, similar to how it's done in ChannelTile.

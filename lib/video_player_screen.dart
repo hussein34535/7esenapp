@@ -58,7 +58,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   // AdMob variables
   InterstitialAd? _interstitialAd;
   bool _isAdLoading = false;
-  final String _adUnitId = 'ca-app-pub-2393153600924393~8385972075';
+  final String _adUnitId = 'ca-app-pub-2393153600924393/4147344165';
 
   Timer? _hideControlsTimer;
   Timer? _playbackTimeoutTimer;
@@ -77,6 +77,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         onAdFailedToLoad: (LoadAdError error) {
           print('InterstitialAd failed to load: $error');
           _isAdLoading = false;
+          // Show a message to the user (optional)
+          _showError('Failed to load ad.'); // Or any other appropriate action
         },
       ),
     );
@@ -102,6 +104,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       );
       _interstitialAd!.show();
     } else {
+      // Proceed even if no ad is shown
       onAdDismissed();
     }
   }

@@ -205,10 +205,43 @@ class ChannelTile extends StatelessWidget {
     required this.onChannelTap,
   }) : super(key: key);
 
+  List<Map<String, String>> _extractStreamLinks(List<dynamic>? streamLinks) {
+    List<Map<String, String>> streams = [];
+    if (streamLinks == null) return streams;
+
+    for (var streamLink in streamLinks) {
+      // Use a more robust way to get URL and name
+      if (streamLink is Map && streamLink.containsKey('children')) {
+        for (var child in streamLink['children']) {
+          if (child is Map &&
+              child.containsKey('type') &&
+              child['type'] == 'link' &&
+              child.containsKey('url') &&
+              child.containsKey('children')) {
+            for (var textChild in child['children']) {
+              if (textChild is Map && textChild.containsKey('text')) {
+                String? streamUrl = child['url']?.toString();
+                String? streamName =
+                    textChild['text']?.toString() ?? 'Unknown Stream';
+                if (streamUrl != null && streamUrl.isNotEmpty) {
+                  if (!streamUrl.startsWith('http')) {
+                    streamUrl = 'https://st9.onrender.com' + streamUrl;
+                  }
+                  streams.add({'name': streamName, 'url': streamUrl});
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    return streams;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (channel == null || channel['name'] == null) {
-      return SizedBox.shrink(); // Good practice for null checks
+      return SizedBox.shrink();
     }
 
     String channelName = channel['name'] ?? 'Unknown Channel';
@@ -218,35 +251,11 @@ class ChannelTile extends StatelessWidget {
     return Card(
       margin: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: InkWell(
-        // Make the entire card tappable
         onTap: () {
           final scaffoldMessenger = ScaffoldMessenger.of(context);
           onChannelTap(channelId);
 
-          List<Map<String, String>> streams = [];
-          for (var streamLink in streamLinks) {
-            var children = streamLink['children'];
-            if (children != null && children.isNotEmpty) {
-              var linkElement = children.firstWhere(
-                  (child) => child['type'] == 'link',
-                  orElse: () => {});
-              if (linkElement != null &&
-                  linkElement['url'] != null &&
-                  linkElement['children'] != null) {
-                var streamName =
-                    linkElement['children'][0]['text']?.toString() ??
-                        'Unknown Stream';
-                var streamUrl = linkElement['url']?.toString() ?? '';
-
-                if (streamUrl.isNotEmpty) {
-                  if (!streamUrl.startsWith('http')) {
-                    streamUrl = 'https://st9.onrender.com' + streamUrl;
-                  }
-                  streams.add({'name': streamName, 'url': streamUrl});
-                }
-              }
-            }
-          }
+          List<Map<String, String>> streams = _extractStreamLinks(streamLinks);
 
           if (streams.isNotEmpty) {
             if (streams[0]['url'] is String) {
@@ -262,10 +271,8 @@ class ChannelTile extends StatelessWidget {
           }
         },
         child: Padding(
-          // Add padding here
           padding: const EdgeInsets.all(8.0),
           child: Center(
-            // Center the text
             child: Text(
               channelName,
               style: TextStyle(
@@ -273,7 +280,7 @@ class ChannelTile extends StatelessWidget {
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
-              textAlign: TextAlign.center, // Ensure text is centered
+              textAlign: TextAlign.center,
             ),
           ),
         ),
@@ -593,7 +600,8 @@ class NewsSection extends StatelessWidget {
                   style: TextStyle(
                       color: Theme.of(context).textTheme.bodyLarge!.color)));
         } else {
-          final articles = snapshot.data!;
+          final articles =
+              snapshot.data!.reversed.toList(); // Reverse the list here
           return ListView.builder(
             itemCount: articles.length,
             itemBuilder: (context, index) {
@@ -612,6 +620,34 @@ class NewsBox extends StatelessWidget {
   final Function openVideo;
 
   NewsBox({required this.article, required this.openVideo});
+  List<Map<String, String>> _extractStreamLinks(List<dynamic>? links) {
+    List<Map<String, String>> extractedLinks = [];
+    if (links == null) return extractedLinks;
+
+    for (var link in links) {
+      if (link is Map && link.containsKey('children')) {
+        for (var child in link['children']) {
+          if (child is Map &&
+              child.containsKey('type') &&
+              child['type'] == 'link' &&
+              child.containsKey('url') &&
+              child.containsKey('children')) {
+            for (var textChild in child['children']) {
+              if (textChild is Map && textChild.containsKey('text')) {
+                String? streamUrl = child['url']?.toString();
+                String? streamName =
+                    textChild['text']?.toString() ?? 'Unknown Stream';
+                if (streamUrl != null && streamUrl.isNotEmpty) {
+                  extractedLinks.add({'name': streamName, 'url': streamUrl});
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    return extractedLinks;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -632,31 +668,17 @@ class NewsBox extends StatelessWidget {
       }
     }
 
-    // Extract the URL from the links, similar to how it's done in ChannelTile.
-    List<Map<String, String>> extractedLinks = [];
-    for (var link in links) {
-      if (link['children'] != null && link['children'] is List) {
-        for (var child in link['children']) {
-          if (child['type'] == 'link' && child['url'] != null) {
-            extractedLinks.add({
-              'name': child['text'] ?? 'video',
-              'url': child['url']
-            }); // Correctly add to the list
-          }
-        }
-      }
-    }
-
     return GestureDetector(
       onTap: () {
         final scaffoldMessenger = ScaffoldMessenger.of(context);
-        if (extractedLinks.isNotEmpty) {
+        List<Map<String, String>> streams = _extractStreamLinks(links);
+        if (streams.isNotEmpty) {
           String firstStreamUrl =
-              extractedLinks[0]['url'] ?? ''; // Access the first link
+              streams[0]['url'] ?? ''; // Access the first link
           openVideo(
             context,
             firstStreamUrl, // Pass the URL
-            extractedLinks
+            streams
                 .map((e) => Map<String, dynamic>.from(e))
                 .toList(), // Pass all links (in the correct format)
           );

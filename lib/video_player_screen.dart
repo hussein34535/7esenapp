@@ -8,9 +8,10 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 enum VideoSize {
-  fit, // NEW:  Fit within the screen (original aspect ratio)
-  stretch, // NEW:  Stretch to fill the screen (may distort)
-  fullScreen,
+  fit, // Keep original aspect ratio, letterboxed/pillarboxed
+  stretch, // Stretch to fill, may distort
+  cover, // Fill the screen, cropping if necessary
+  fullScreen, // Use device's full screen size
 }
 
 class VideoPlayerScreen extends StatefulWidget {
@@ -53,7 +54,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   bool _isLive = false;
   int _selectedQualityIndex = 0;
   bool _isTryingNextStream = false;
-  VideoSize _currentVideoSize = VideoSize.fit; // Start with 'fit'
+  VideoSize _currentVideoSize = VideoSize.fit;
+  double? _initialAspectRatio; // Store initial aspect ratio
 
   // AdMob variables
   InterstitialAd? _interstitialAd;
@@ -77,8 +79,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         onAdFailedToLoad: (LoadAdError error) {
           print('InterstitialAd failed to load: $error');
           _isAdLoading = false;
-          // Show a message to the user (optional)
-          _showError('Failed to load ad.'); // Or any other appropriate action
+          _showError('Failed to load ad.');
         },
       ),
     );
@@ -104,7 +105,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       );
       _interstitialAd!.show();
     } else {
-      // Proceed even if no ad is shown
       onAdDismissed();
     }
   }
@@ -120,8 +120,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     _opacityAnimation =
         Tween<double>(begin: 1.0, end: 0.0).animate(_animationController);
 
-    _currentUrl = widget.initialUrl;
-    _selectedQualityIndex = _findInitialStreamIndex();
+    if (widget.streamLinks.isNotEmpty) {
+      _currentUrl = widget.streamLinks[0]['url'];
+      _selectedQualityIndex = 0;
+    } else {
+      _currentUrl = widget.initialUrl;
+      _selectedQualityIndex = _findInitialStreamIndex();
+    }
     _loadAd();
     _initializePlayer(_currentUrl!);
 
@@ -133,10 +138,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   @override
   void didUpdateWidget(covariant VideoPlayerScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.initialUrl != oldWidget.initialUrl) {
+    if (widget.initialUrl != oldWidget.initialUrl ||
+        widget.streamLinks != oldWidget.streamLinks) {
       _cancelAllTimers();
       _videoPlayerController?.removeListener(_videoPlayerListener);
-      _changeStream(widget.initialUrl, _findInitialStreamIndex());
+      if (widget.streamLinks.isNotEmpty) {
+        _changeStream(widget.streamLinks[0]['url'], 0);
+      } else {
+        _changeStream(widget.initialUrl, _findInitialStreamIndex());
+      }
     }
   }
 
@@ -242,11 +252,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       try {
         await _videoPlayerController!.initialize();
 
+        _initialAspectRatio = _videoPlayerController!.value.aspectRatio;
+
         _chewieController = ChewieController(
           videoPlayerController: _videoPlayerController!,
           autoPlay: true,
           looping: false,
-          aspectRatio: _getAspectRatioForSize(_currentVideoSize), // Use helper
+          aspectRatio: _getAspectRatioForSize(_currentVideoSize),
           showControls: false,
           showOptions: false,
           errorBuilder: (context, errorMessage) =>
@@ -390,7 +402,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
     setState(() {
       _hasError = false;
-      _isLoading = true; // Show loading indicator as stream is changing
+      _isLoading = true;
       _selectedQualityIndex = index;
       _currentUrl = url;
     });
@@ -414,11 +426,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     try {
       await _videoPlayerController!.initialize();
 
+      _initialAspectRatio = _videoPlayerController!.value.aspectRatio;
+
       _chewieController = ChewieController(
         videoPlayerController: _videoPlayerController!,
         autoPlay: true,
         looping: false,
-        aspectRatio: _getAspectRatioForSize(_currentVideoSize), // Use helper
+        aspectRatio: _getAspectRatioForSize(_currentVideoSize),
         showControls: false,
         showOptions: false,
         errorBuilder: (context, errorMessage) =>
@@ -431,7 +445,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
       if (mounted) {
         setState(() {
-          _isLoading = false; // Loading ends when initialization is successful
+          _isLoading = false;
         });
       }
       print("_changeStream: SUCCESS for url: $url");
@@ -439,7 +453,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       print("Error initializing player: $e for url: $url");
       if (mounted) {
         setState(() {
-          _isLoading = false; // Stop loading even if initialization fails
+          _isLoading = false;
         });
       }
       _tryNextStream();
@@ -593,12 +607,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         final wasPlaying = _videoPlayerController?.value.isPlaying ?? false;
 
         setState(() {
-          // Cycle through the available VideoSize options
           switch (_currentVideoSize) {
             case VideoSize.fit:
               _currentVideoSize = VideoSize.stretch;
               break;
             case VideoSize.stretch:
+              _currentVideoSize = VideoSize.cover;
+              break;
+            case VideoSize.cover:
               _currentVideoSize = VideoSize.fullScreen;
               break;
             case VideoSize.fullScreen:
@@ -607,21 +623,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
           }
         });
 
-        _cancelAllTimers();
-        _chewieController?.dispose();
-        _chewieController = ChewieController(
-          videoPlayerController: _videoPlayerController!,
-          autoPlay: wasPlaying,
-          looping: false,
-          aspectRatio:
-              _getAspectRatioForSize(_currentVideoSize), // VERY IMPORTANT
-          showControls: false,
-          showOptions: false,
-          errorBuilder: (context, errorMessage) =>
-              _buildErrorWidget(errorMessage),
-          autoInitialize: true,
-        );
-        _startHideControlsTimer();
+        _rebuildChewieController(wasPlaying);
       },
       child: Container(
         padding: const EdgeInsets.all(8.0),
@@ -633,14 +635,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
           mainAxisSize: MainAxisSize.min,
           children: [
             Image.asset(
-              'assets/maximize.png', // Make sure this asset exists
+              'assets/maximize.png',
               width: 24,
               height: 24,
               color: Colors.white,
             ),
             const SizedBox(width: 4),
             Text(
-              _getSizeName(_currentVideoSize), // Display size name
+              _getSizeName(_currentVideoSize),
               style: const TextStyle(color: Colors.white, fontSize: 10),
             ),
           ],
@@ -649,34 +651,52 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     );
   }
 
-  // Helper function to get aspect ratio based on VideoSize
+  void _rebuildChewieController(bool wasPlaying) {
+    if (!mounted) return;
+
+    _chewieController?.dispose();
+    _chewieController = ChewieController(
+      videoPlayerController: _videoPlayerController!,
+      autoPlay: wasPlaying,
+      looping: false,
+      aspectRatio: _getAspectRatioForSize(_currentVideoSize),
+      showControls: false,
+      showOptions: false,
+      errorBuilder: (context, errorMessage) => _buildErrorWidget(errorMessage),
+      autoInitialize: true,
+    );
+
+    _startHideControlsTimer();
+  }
+
   double? _getAspectRatioForSize(VideoSize size) {
     switch (size) {
       case VideoSize.fit:
-        // Return the video's original aspect ratio.  If the video hasn't
-        // loaded yet, return a default (e.g., 16/9).
-        return _videoPlayerController?.value.aspectRatio ?? (16 / 9);
+        return _initialAspectRatio;
       case VideoSize.stretch:
-        // No aspect ratio constraint.  The video will stretch to fill.
+        return null;
+      case VideoSize.cover:
         return null;
       case VideoSize.fullScreen:
-        return null; // Let Chewie handle the aspect ratio
+        final size = MediaQuery.of(context).size;
+        return size.width / size.height;
       default:
-        return 16 / 9; // Default to 16:9
+        return _initialAspectRatio;
     }
   }
 
-  // Helper function to display names
   String _getSizeName(VideoSize size) {
     switch (size) {
       case VideoSize.fit:
         return "Fit";
       case VideoSize.stretch:
         return "Stretch";
+      case VideoSize.cover:
+        return "Cover";
       case VideoSize.fullScreen:
         return "Full";
       default:
-        return "Fit"; // Default
+        return "Fit";
     }
   }
 
@@ -886,18 +906,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     if (_isLoading && !_hasError) {
       return const Center(
         child: CircularProgressIndicator(
-          valueColor:
-              AlwaysStoppedAnimation<Color>(Colors.red), // Customize color
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
         ),
       );
     }
 
     if (_hasError || _chewieController == null) {
-      return const SizedBox.shrink(); // Or a more specific error widget
+      return const SizedBox.shrink();
     }
 
     return Chewie(
-      key: ValueKey("$_currentUrl$_currentVideoSize"), // Important for rebuilds
+      key: ValueKey("$_currentUrl$_currentVideoSize"),
       controller: _chewieController!,
     );
   }

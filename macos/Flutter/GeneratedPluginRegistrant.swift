@@ -21,7 +21,7 @@ import wakelock_plus
 import webview_flutter_wkwebview
 
 func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
-  ConnectivityPlusPlugin.register(with: registry.registrar(forPlugin: "ConnectivityPlusPlugin"))
+  ConnectivityPlugin.register(with: registry.registrar(forPlugin: "ConnectivityPlugin"))
   FLTFirebaseAnalyticsPlugin.register(with: registry.registrar(forPlugin: "FLTFirebaseAnalyticsPlugin"))
   FLTFirebaseCorePlugin.register(with: registry.registrar(forPlugin: "FLTFirebaseCorePlugin"))
   FLTFirebaseMessagingPlugin.register(with: registry.registrar(forPlugin: "FLTFirebaseMessagingPlugin"))

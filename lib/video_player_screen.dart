@@ -4,14 +4,14 @@ import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'dart:async';
-import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:connectivity_plus/connectivity_plus.dart'; // تأكد من وجود هذا الاستيراد
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 enum VideoSize {
-  fit, // Keep original aspect ratio, letterboxed/pillarboxed
-  stretch, // Stretch to fill, may distort
-  cover, // Fill the screen, cropping if necessary
   fullScreen, // Use device's full screen size
+  ratio16_9, // 16:9 aspect ratio
+  ratio4_3, // 4:3 aspect ratio
+  ratio1_1, // 1:1 aspect ratio
 }
 
 class VideoPlayerScreen extends StatefulWidget {
@@ -54,7 +54,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   bool _isLive = false;
   int _selectedQualityIndex = 0;
   bool _isTryingNextStream = false;
-  VideoSize _currentVideoSize = VideoSize.fit;
+  VideoSize _currentVideoSize = VideoSize.ratio16_9; // Start with 16:9
   double? _initialAspectRatio; // Store initial aspect ratio
 
   // AdMob variables
@@ -65,6 +65,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   Timer? _hideControlsTimer;
   Timer? _playbackTimeoutTimer;
   Timer? _bufferingTimer;
+  StreamSubscription<ConnectivityResult>?
+      _connectivitySubscription; // التصحيح هنا
 
   void _loadAd() {
     _isAdLoading = true;
@@ -128,10 +130,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       _selectedQualityIndex = _findInitialStreamIndex();
     }
     _loadAd();
-    _initializePlayer(_currentUrl!);
 
     _enableFullscreenMode();
     _startHideControlsTimer();
+
+    // **تغيير الترتيب:** تهيئة _connectivitySubscription *قبل* _checkIfLive()
+    _connectivitySubscription = Connectivity()
+        .onConnectivityChanged
+        .listen(_handleConnectivityChange); // التصحيح هنا
     _checkIfLive();
   }
 
@@ -159,6 +165,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     _disableFullscreenMode();
     _animationController.dispose();
     _interstitialAd?.dispose();
+    _connectivitySubscription?.cancel(); // ✅ إلغاء الاشتراك
 
     super.dispose();
   }
@@ -207,19 +214,27 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     _chewieController?.dispose();
   }
 
+  void _handleConnectivityChange(ConnectivityResult result) {
+    // التصحيح هنا
+    if (!mounted) return;
+
+    if (result == ConnectivityResult.none) {
+      _showNetworkError();
+      _chewieController?.pause(); // Pause, don't dispose
+    } else {
+      // Connection restored.  Try to re-initialize.
+      if (mounted) {
+        // ✅ فحص mounted مهم
+        _initializePlayer(_currentUrl!);
+      }
+    }
+  }
+
   Future<void> _initializePlayer(String url) async {
     if (!mounted) return;
     print("_initializePlayer: START for url: $url");
 
-    var connectivityResult = await (Connectivity().checkConnectivity());
-    if (connectivityResult == ConnectivityResult.none) {
-      setState(() {
-        _hasError = true;
-        _isLoading = false;
-      });
-      _showNetworkError();
-      return;
-    }
+    // No need to check connectivity *here* anymore. The listener handles it.
 
     _showAd(onAdDismissed: () async {
       setState(() {
@@ -607,23 +622,24 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         final wasPlaying = _videoPlayerController?.value.isPlaying ?? false;
 
         setState(() {
+          // Cycle through the available VideoSize options, updated order.
           switch (_currentVideoSize) {
-            case VideoSize.fit:
-              _currentVideoSize = VideoSize.stretch;
-              break;
-            case VideoSize.stretch:
-              _currentVideoSize = VideoSize.cover;
-              break;
-            case VideoSize.cover:
-              _currentVideoSize = VideoSize.fullScreen;
-              break;
             case VideoSize.fullScreen:
-              _currentVideoSize = VideoSize.fit;
+              _currentVideoSize = VideoSize.ratio16_9;
+              break;
+            case VideoSize.ratio16_9:
+              _currentVideoSize = VideoSize.ratio4_3;
+              break;
+            case VideoSize.ratio4_3:
+              _currentVideoSize = VideoSize.ratio1_1;
+              break;
+            case VideoSize.ratio1_1:
+              _currentVideoSize = VideoSize.fullScreen;
               break;
           }
         });
 
-        _rebuildChewieController(wasPlaying);
+        _rebuildChewieController(wasPlaying); // Rebuild with new aspect ratio
       },
       child: Container(
         padding: const EdgeInsets.all(8.0),
@@ -635,14 +651,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
           mainAxisSize: MainAxisSize.min,
           children: [
             Image.asset(
-              'assets/maximize.png',
+              'assets/maximize.png', // Ensure this asset exists
               width: 24,
               height: 24,
               color: Colors.white,
             ),
             const SizedBox(width: 4),
             Text(
-              _getSizeName(_currentVideoSize),
+              _getSizeName(_currentVideoSize), // Display size name
               style: const TextStyle(color: Colors.white, fontSize: 10),
             ),
           ],
@@ -671,32 +687,32 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
   double? _getAspectRatioForSize(VideoSize size) {
     switch (size) {
-      case VideoSize.fit:
-        return _initialAspectRatio;
-      case VideoSize.stretch:
-        return null;
-      case VideoSize.cover:
-        return null;
       case VideoSize.fullScreen:
         final size = MediaQuery.of(context).size;
         return size.width / size.height;
+      case VideoSize.ratio16_9:
+        return 16 / 9;
+      case VideoSize.ratio4_3:
+        return 4 / 3;
+      case VideoSize.ratio1_1:
+        return 1;
       default:
-        return _initialAspectRatio;
+        return 16 / 9; // Default to 16:9
     }
   }
 
   String _getSizeName(VideoSize size) {
     switch (size) {
-      case VideoSize.fit:
-        return "Fit";
-      case VideoSize.stretch:
-        return "Stretch";
-      case VideoSize.cover:
-        return "Cover";
       case VideoSize.fullScreen:
         return "Full";
+      case VideoSize.ratio16_9:
+        return "16:9";
+      case VideoSize.ratio4_3:
+        return "4:3";
+      case VideoSize.ratio1_1:
+        return "1:1";
       default:
-        return "Fit";
+        return "16:9"; // Default
     }
   }
 

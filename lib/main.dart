@@ -146,7 +146,20 @@ class _MyAppState extends State<MyApp> {
       home: AnimatedSwitcher(
         duration: Duration(milliseconds: 300),
         child: _isLoading
-            ? Scaffold(body: Center(child: CircularProgressIndicator()))
+            ? Scaffold(
+                body: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Image.asset('assets/icon/icon.png',
+                          width: 100,
+                          height: 100), // Adjust width/height as needed
+                      SizedBox(height: 20), // Add some spacing
+                      CircularProgressIndicator(),
+                    ],
+                  ),
+                ),
+              )
             : _isFirstTime
                 ? PasswordEntryScreen(
                     key: ValueKey('password'),

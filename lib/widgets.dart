@@ -4,27 +4,68 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-class ChannelsSection extends StatelessWidget {
+class ChannelsSection extends StatefulWidget {
   final List channelCategories;
   final Function openVideo;
 
   ChannelsSection({required this.channelCategories, required this.openVideo});
 
   @override
+  _ChannelsSectionState createState() => _ChannelsSectionState();
+}
+
+class _ChannelsSectionState extends State<ChannelsSection> {
+  Key _gridKey = UniqueKey(); // Key for the GridView
+  double? _itemHeight;
+
+  @override
   Widget build(BuildContext context) {
-    return channelCategories.isEmpty
+    return widget.channelCategories.isEmpty
         ? Center(
             child: Text('لا توجد قنوات لعرضها',
                 style: TextStyle(
                     color: Theme.of(context).textTheme.bodyLarge!.color)))
-        : ListView.separated(
-            itemCount: channelCategories.length,
-            itemBuilder: (context, index) {
-              return ChannelBox(
-                  category: channelCategories[index], openVideo: openVideo);
+        : OrientationBuilder(
+            builder: (context, orientation) {
+              _gridKey = UniqueKey(); // New key on rotation
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  // Calculate item height *only* once
+                  if (_itemHeight == null) {
+                    _itemHeight = 72;
+                  }
+
+                  return GridView.builder(
+                    key: _gridKey,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount:
+                          orientation == Orientation.portrait ? 1 : 2,
+                      childAspectRatio: _calculateAspectRatio(
+                          orientation, constraints), //Dynamic
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                    ),
+                    itemCount: widget.channelCategories.length,
+                    padding: EdgeInsets.all(10),
+                    itemBuilder: (context, index) {
+                      return ChannelBox(
+                          category: widget.channelCategories[index],
+                          openVideo: widget.openVideo);
+                    },
+                  );
+                },
+              );
             },
-            separatorBuilder: (context, index) => SizedBox(height: 16),
           );
+  }
+
+  double _calculateAspectRatio(
+      Orientation orientation, BoxConstraints constraints) {
+    if (orientation == Orientation.portrait) {
+      return constraints.maxWidth / _itemHeight!;
+    } else {
+      return (constraints.maxWidth / 2) / _itemHeight!;
+    }
   }
 }
 
@@ -37,18 +78,9 @@ class ChannelBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      child: ListTile(
-        title: Center(
-          child: Text(
-            category['name'] ?? 'Unknown Category',
-            style: TextStyle(
-              color: Color(0xFF673ab7),
-              fontSize: 25,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      child: InkWell(
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -59,6 +91,21 @@ class ChannelBox extends StatelessWidget {
             ),
           );
         },
+        borderRadius: BorderRadius.circular(10),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text(
+              category['name'] ?? 'Unknown Category',
+              style: TextStyle(
+                color: Color(0xFF673ab7),
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -148,6 +195,7 @@ class ChannelTile extends StatelessWidget {
               ),
             ),
             onTap: () {
+              final scaffoldMessenger = ScaffoldMessenger.of(context);
               onChannelTap(channelId);
 
               List<Map<String, String>> streams = [];
@@ -181,9 +229,12 @@ class ChannelTile extends StatelessWidget {
                           .map((e) => Map<String, dynamic>.from(e))
                           .toList());
                 } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  scaffoldMessenger.showSnackBar(
                       SnackBar(content: Text('Invalid Stream Format')));
                 }
+              } else {
+                scaffoldMessenger.showSnackBar(
+                    SnackBar(content: Text("No stream available.")));
               }
             },
           ),
@@ -206,6 +257,7 @@ class ChannelTile extends StatelessWidget {
                         color: Theme.of(context).textTheme.bodyLarge!.color),
                   ),
                   onTap: () {
+                    final scaffoldMessenger = ScaffoldMessenger.of(context);
                     openVideo(
                         context,
                         streamUrl,
@@ -237,8 +289,10 @@ class MatchesSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<Match>>(
+      // Start FutureBuilder
       future: matches,
       builder: (context, snapshot) {
+        // Start builder method
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(child: CircularProgressIndicator());
         } else if (snapshot.hasError) {
@@ -331,8 +385,8 @@ class MatchesSection extends StatelessWidget {
             ],
           );
         }
-      },
-    );
+      }, // End builder method
+    ); // End FutureBuilder
   }
 }
 
@@ -390,11 +444,12 @@ class MatchBox extends StatelessWidget {
     }
     return GestureDetector(
       onTap: () {
+        final scaffoldMessenger = ScaffoldMessenger.of(context);
         if (streams.isNotEmpty) {
           openVideo(context, firstStreamUrl,
               streams.map((e) => Map<String, dynamic>.from(e)).toList());
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
+          scaffoldMessenger.showSnackBar(
               SnackBar(content: Text('لا يوجد رابط للبث المباشر')));
         }
       },
@@ -512,14 +567,14 @@ class MatchBox extends StatelessWidget {
 }
 
 class NewsSection extends StatelessWidget {
-  final Future<List> newsArticles;
+  final Future<List<dynamic>> newsArticles;
   final Function openVideo;
 
   NewsSection({required this.newsArticles, required this.openVideo});
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List>(
+    return FutureBuilder<List<dynamic>>(
       future: newsArticles,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -557,31 +612,53 @@ class NewsBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (article == null || article['title'] == null) {
-      return SizedBox.shrink();
-    }
-
     final title = article['title'];
-    final content = article['content'] ?? '';
     final date = article['date'] != null
         ? DateFormat('dd-MM-yyyy').format(DateTime.parse(article['date']))
         : '';
-    final link = article['link'];
+    final links = article['link'] as List? ?? [];
 
     String? imageUrl;
-    if (article['image'] != null && article['image'].isNotEmpty) {
+    if (article['image'] != null &&
+        article['image'] is List &&
+        article['image'].isNotEmpty) {
       final imageData = article['image'][0];
-      if (imageData != null &&
-          imageData['formats'] != null &&
-          imageData['formats']['small'] != null) {
-        imageUrl = imageData['formats']['small']['url'];
+      imageUrl = imageData['url'];
+    }
+
+    // Extract the URL from the links, similar to how it's done in ChannelTile.
+    List<Map<String, String>> extractedLinks = [];
+    for (var link in links) {
+      if (link['children'] != null && link['children'] is List) {
+        for (var child in link['children']) {
+          if (child['type'] == 'link' && child['url'] != null) {
+            extractedLinks.add({
+              'name': child['text'] ?? 'video',
+              'url': child['url']
+            }); // Correctly add to the list
+          }
+        }
       }
     }
 
     return GestureDetector(
       onTap: () {
-        if (link != null) {
-          openVideo(context, link, <Map<String, dynamic>>[]);
+        final scaffoldMessenger = ScaffoldMessenger.of(context);
+        if (extractedLinks.isNotEmpty) {
+          String firstStreamUrl =
+              extractedLinks[0]['url'] ?? ''; // Access the first link
+          openVideo(
+            context,
+            firstStreamUrl, // Pass the URL
+            extractedLinks
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList(), // Pass all links (in the correct format)
+          );
+        } else {
+          scaffoldMessenger.showSnackBar(
+            SnackBar(
+                content: Text('No video link found for this news article.')),
+          );
         }
       },
       child: Card(
@@ -597,7 +674,7 @@ class NewsBox extends StatelessWidget {
                         Center(child: CircularProgressIndicator()),
                     errorWidget: (context, url, error) =>
                         Icon(Icons.image, size: 50, color: Colors.grey),
-                    height: 250,
+                    height: 200,
                     width: double.infinity,
                     fit: BoxFit.cover,
                   )
@@ -609,20 +686,12 @@ class NewsBox extends StatelessWidget {
                 children: [
                   Text(
                     title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 20,
                       color: Theme.of(context).primaryColor,
-                    ),
-                  ),
-                  SizedBox(height: 10),
-                  Text(
-                    content,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey,
                     ),
                   ),
                   SizedBox(height: 10),

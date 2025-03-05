@@ -17,12 +17,12 @@ import 'package:day_night_switch/day_night_switch.dart';
 import 'package:lottie/lottie.dart';
 import 'package:hesen/video_player_screen.dart';
 import 'package:intl/intl.dart';
-import 'package:hesen/widgets.dart'; // Your custom widgets
+import 'package:hesen/widgets.dart';
 import 'dart:async';
 import 'package:share_plus/share_plus.dart';
 import 'package:hesen/privacy_policy_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:hesen/password_entry_screen.dart'; // Import the new file
+import 'package:hesen/password_entry_screen.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -491,10 +491,17 @@ class _HomePageState extends State<HomePage> {
                 index: _selectedIndex,
                 children: [
                   ChannelsSection(
-                      channelCategories: _filteredChannels,
-                      openVideo: openVideo),
-                  NewsSection(newsArticles: newsArticles, openVideo: openVideo),
-                  MatchesSection(matches: matchesFuture, openVideo: openVideo),
+                    channelCategories: _filteredChannels,
+                    openVideo: openVideo,
+                  ),
+                  NewsSection(
+                    newsArticles: newsArticles,
+                    openVideo: openVideo,
+                  ),
+                  MatchesSection(
+                    matches: matchesFuture,
+                    openVideo: openVideo,
+                  ),
                 ],
               ),
             );

@@ -27,7 +27,6 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-// Global variable to hold the SharedPreferences instance. Make nullable.
 SharedPreferences? prefs;
 
 Future<void> main() async {
@@ -35,10 +34,7 @@ Future<void> main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await FirebaseApi().initNotification();
   await MobileAds.instance.initialize();
-
-  // Pre-load SharedPreferences *before* running the app
   prefs = await SharedPreferences.getInstance();
-
   runApp(MyApp());
 }
 
@@ -49,32 +45,21 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   ThemeMode _themeMode = ThemeMode.dark;
-//  bool _isFirstTime = true; // No longer needed
-//  bool _showSplash = true; // No longer needed
-  Future<SharedPreferences>? _prefsFuture; // No longer needed
+  bool _isFirstTime = true; // Keep this for first-time logic.
 
   @override
   void initState() {
     super.initState();
-    _prefsFuture =
-        SharedPreferences.getInstance(); // Keep this for potential future use
-//    _checkFirstTime(); // No longer needed
-
-    // Delay for 3 seconds, then hide the splash screen - NO, we handle this in the splash screen itself
-    // Future.delayed(Duration(seconds: 3), () {
-    //   setState(() {
-    //     _showSplash = false;
-    //   });
-    // });
+    _checkFirstTime(); // Check first-time status in initState
   }
 
-//   Future<void> _checkFirstTime() async {  // No longer needed
-//     SharedPreferences prefs = await _prefsFuture!;
-//     bool? isFirstTime = prefs.getBool('isFirstTime');
-//     setState(() {
-//       _isFirstTime = isFirstTime ?? true;
-//     });
-//   }
+//Added this to check if user need to inter the password or not
+  Future<void> _checkFirstTime() async {
+    bool? isFirstTime = prefs?.getBool('isFirstTime');
+    setState(() {
+      _isFirstTime = isFirstTime == null || isFirstTime;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -87,7 +72,7 @@ class _MyAppState extends State<MyApp> {
         cardColor: const Color(0xFF673AB7),
         colorScheme: const ColorScheme.light(
           primary: Color(0xFF673AB7),
-          secondary: Color.fromARGB(255, 184, 28, 176),
+          secondary: Color(0xFF00BCD4),
           surface: Colors.white,
           background: Color(0xFF673AB7),
           error: Colors.red,
@@ -149,17 +134,42 @@ class _MyAppState extends State<MyApp> {
         ),
       ),
       themeMode: _themeMode,
-      home: MySplashScreen(), // Use the custom splash screen
-      navigatorKey: navigatorKey,
+      // Use named routes for navigation
+      initialRoute: '/', // Start with the splash screen
       routes: {
+        '/': (context) =>
+            MySplashScreen(), // Splash screen is the absolute first screen
+        '/home': (context) => _isFirstTime
+            ? PasswordEntryScreen(
+                key: ValueKey('password'),
+                onCorrectInput: () {
+                  setState(() {
+                    _isFirstTime = false; // Correctly set _isFirstTime
+                  });
+                },
+                prefs: prefs!,
+              )
+            : HomePage(
+                key: ValueKey('home'),
+                onThemeChanged: (isDarkMode) {
+                  setState(() {
+                    _themeMode = isDarkMode ? ThemeMode.dark : ThemeMode.light;
+                  });
+                },
+                themeMode: _themeMode,
+              ),
+        // Other routes
         '/Notification_screen': (context) => const NotificationPage(),
       },
+      navigatorKey: navigatorKey,
     );
   }
 }
 
-// Custom Splash Screen Widget
+// --- Splash Screen ---
 class MySplashScreen extends StatefulWidget {
+  const MySplashScreen({super.key});
+
   @override
   _MySplashScreenState createState() => _MySplashScreenState();
 }
@@ -170,14 +180,8 @@ class _MySplashScreenState extends State<MySplashScreen> {
     super.initState();
     // Start the timer to navigate to the main screen after 3 seconds
     Timer(Duration(seconds: 3), () {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-            builder: (context) => PasswordEntryScreen(
-                  prefs: prefs!,
-                  onCorrectInput: () {},
-                )),
-      );
+      Navigator.pushReplacementNamed(
+          context, '/home'); // Navigate using named route
     });
   }
 
@@ -192,7 +196,10 @@ class _MySplashScreenState extends State<MySplashScreen> {
             height: double.infinity,
           ),
           Center(
-            child: Image.asset('assets/icon/icon.png'), // Centered image
+            child: SizedBox(
+              width: MediaQuery.of(context).size.width / 2,
+              child: Image.asset('assets/icon/icon.png'),
+            ), // Centered image
           ),
         ],
       ),
@@ -372,10 +379,9 @@ class _HomePageState extends State<HomePage> {
   List<Widget> _buildAppBarActions() {
     List<Widget> actions = [];
 
-    // <---  تمت إزالة الشرط من هنا
     actions.add(
       Transform.scale(
-        scale: 0.35,
+        scale: 0.3,
         child: DayNightSwitch(
           value: _isDarkMode,
           moonImage: AssetImage('assets/moon.png'),
@@ -386,10 +392,8 @@ class _HomePageState extends State<HomePage> {
             });
             widget.onThemeChanged(value);
           },
-          dayColor: Color.fromARGB(
-              255, 223, 223, 223), // Light Grey - Match Light Background
-          nightColor: Color.fromARGB(
-              255, 17, 17, 17), // Near Black - Match Dark Background
+          dayColor: Color(0xFFF8F8F8), // Light Grey - Match Light Background
+          nightColor: Color(0xFF0A0A0A), // Near Black - Match Dark Background
           sunColor: Color(0xFFF8F8F8),
           moonColor: Color(0xFF0A0A0A),
         ),
@@ -453,26 +457,6 @@ class _HomePageState extends State<HomePage> {
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
                           ListTile(
-                            // <---  العنصر الجديد الخاص بالبحث
-                            leading: Icon(Icons.search,
-                                color: Theme.of(context).colorScheme.secondary),
-                            title: Text('بحث',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Theme.of(context)
-                                        .textTheme
-                                        .bodyLarge!
-                                        .color)),
-                            onTap: () {
-                              // إغلاق الـ BottomSheet عند الضغط
-                              Navigator.pop(context);
-                              // إظهار شريط البحث
-                              setState(() {
-                                _isSearchBarVisible = true;
-                              });
-                            },
-                          ),
-                          ListTile(
                             leading: Icon(FontAwesomeIcons.telegram,
                                 color: Theme.of(context)
                                     .colorScheme
@@ -504,6 +488,25 @@ class _HomePageState extends State<HomePage> {
                                   // Handle the error (e.g., show a message to the user)
                                 }
                               }
+                            },
+                          ),
+                          ListTile(
+                            leading: Icon(Icons.search,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .secondary), // Use secondary color for icons
+                            title: Text('البحث',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(context)
+                                        .textTheme
+                                        .bodyLarge!
+                                        .color)),
+                            onTap: () {
+                              Navigator.pop(context);
+                              setState(() {
+                                _isSearchBarVisible = true;
+                              });
                             },
                           ),
                           ListTile(
@@ -554,86 +557,65 @@ class _HomePageState extends State<HomePage> {
                 );
               },
             ),
-            title: _selectedIndex == 0 && _isSearchBarVisible
-                ? _buildSearchBar()
-                : Text('7eSen TV',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold)), // Bold App Title
+            title: Text(
+              '7eSen TV',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             actions: _buildAppBarActions(),
           ),
         ),
       ),
-      body: FutureBuilder<void>(
-        future: _dataFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(
-                child: Text('Error loading data',
-                    style: TextStyle(
-                        color: Theme.of(context).textTheme.bodyLarge!.color)));
-          } else {
-            return Padding(
-              // Add Padding here to create space below AppBar
-              padding: const EdgeInsets.only(
-                  top: 10.0), // Adjust the top padding as needed
-              child: IndexedStack(
-                index: _selectedIndex,
-                children: [
-                  ChannelsSection(
-                    channelCategories: _filteredChannels,
-                    openVideo: openVideo,
-                  ),
-                  GestureDetector(
-                    // <-- قسم الأخبار مع GestureDetector
-                    onTap: () {
-                      if (_isSearchBarVisible) {
-                        setState(() {
-                          _isSearchBarVisible =
-                              false; // إخفاء شريط البحث عند الضغط في أي مكان فارغ
-                        });
-                      }
-                    },
-                    child: NewsSection(
-                      newsArticles: newsArticles,
-                      openVideo: openVideo,
+      body: _isSearchBarVisible
+          ? _buildSearchBar()
+          : FutureBuilder<void>(
+              future: _dataFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(child: CircularProgressIndicator());
+                } else if (snapshot.hasError) {
+                  return Center(
+                      child: Text('Error loading data',
+                          style: TextStyle(
+                              color: Theme.of(context)
+                                  .textTheme
+                                  .bodyLarge!
+                                  .color)));
+                } else {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 10.0),
+                    child: IndexedStack(
+                      index: _selectedIndex,
+                      children: [
+                        ChannelsSection(
+                          channelCategories: _filteredChannels,
+                          openVideo: openVideo,
+                        ),
+                        NewsSection(
+                          newsArticles: newsArticles,
+                          openVideo: openVideo,
+                        ),
+                        MatchesSection(
+                          matches: matchesFuture,
+                          openVideo: openVideo,
+                        ),
+                      ],
                     ),
-                  ),
-                  GestureDetector(
-                    // <-- قسم المباريات مع GestureDetector
-                    onTap: () {
-                      if (_isSearchBarVisible) {
-                        setState(() {
-                          _isSearchBarVisible = false;
-                        });
-                      }
-                    },
-                    child: MatchesSection(
-                      matches: matchesFuture,
-                      openVideo: openVideo,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
-        },
-      ),
+                  );
+                }
+              },
+            ),
       bottomNavigationBar: CurvedNavigationBar(
         backgroundColor: Theme.of(context).brightness == Brightness.dark
-            ? Colors.black // Black color in dark mode
+            ? Colors.black
             : const Color(0xFF673AB7),
         color: Theme.of(context).brightness == Brightness.dark
             ? Theme.of(context).colorScheme.primary
             : navBarBackgroundColor,
-        buttonBackgroundColor:
-            Theme.of(context).cardColor, // Card color for button background
-        animationDuration:
-            const Duration(milliseconds: 300), // Smooth animation
+        buttonBackgroundColor: Theme.of(context).cardColor,
+        animationDuration: const Duration(milliseconds: 300),
         items: [
           Image.asset('assets/tv.png',
-              width: 30, height: 30, color: Colors.white), // White icons
+              width: 30, height: 30, color: Colors.white),
           Image.asset('assets/replay.png',
               width: 30, height: 30, color: Colors.white),
           Image.asset('assets/ball.png',
@@ -652,10 +634,6 @@ class _HomePageState extends State<HomePage> {
 
   void openVideo(BuildContext context, String initialUrl,
       List<Map<String, dynamic>> streamLinks) {
-    // إخفاء شريط البحث هنا
-    setState(() {
-      _isSearchBarVisible = false;
-    });
     Navigator.push(
       context,
       MaterialPageRoute(

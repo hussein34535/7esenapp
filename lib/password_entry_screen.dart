@@ -101,7 +101,7 @@ class _PasswordEntryScreenState extends State<PasswordEntryScreen> {
                       ),
                       SizedBox(height: 30),
                       Text(
-                        'Enter IPTV URL',
+                        'Enter URL Code',
                         style: TextStyle(
                             fontSize: 18,
                             color:

@@ -48,41 +48,48 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  ThemeMode _themeMode = ThemeMode.dark; // أو ThemeMode.light حسب الرغبة
-  bool _isFirstTime = true;
-  bool _isLoading = true;
+  ThemeMode _themeMode = ThemeMode.dark;
+//  bool _isFirstTime = true; // No longer needed
+//  bool _showSplash = true; // No longer needed
+  Future<SharedPreferences>? _prefsFuture; // No longer needed
 
   @override
   void initState() {
     super.initState();
-    _checkFirstTime();
+    _prefsFuture =
+        SharedPreferences.getInstance(); // Keep this for potential future use
+//    _checkFirstTime(); // No longer needed
+
+    // Delay for 3 seconds, then hide the splash screen - NO, we handle this in the splash screen itself
+    // Future.delayed(Duration(seconds: 3), () {
+    //   setState(() {
+    //     _showSplash = false;
+    //   });
+    // });
   }
 
-  Future<void> _checkFirstTime() async {
-    bool? isFirstTime = prefs?.getBool('isFirstTime');
-
-    setState(() {
-      _isFirstTime = isFirstTime == null || isFirstTime;
-      _isLoading = false;
-    });
-  }
+//   Future<void> _checkFirstTime() async {  // No longer needed
+//     SharedPreferences prefs = await _prefsFuture!;
+//     bool? isFirstTime = prefs.getBool('isFirstTime');
+//     setState(() {
+//       _isFirstTime = isFirstTime ?? true;
+//     });
+//   }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: '7eSen TV',
       theme: ThemeData(
-        // Light Mode
         brightness: Brightness.light,
         primaryColor: const Color(0xFF673AB7),
-        scaffoldBackgroundColor:
-            const Color(0xFF673AB7), // <---  لون الخلفية نفس لون AppBar
+        scaffoldBackgroundColor: const Color(0xFF673AB7),
         cardColor: const Color(0xFF673AB7),
         colorScheme: const ColorScheme.light(
           primary: Color(0xFF673AB7),
           secondary: Color.fromARGB(255, 184, 28, 176),
           surface: Colors.white,
-          background: Color(0xFF673AB7), // <--- لون الخلفية في ColorScheme
+          background: Color(0xFF673AB7),
           error: Colors.red,
           onPrimary: Colors.white,
           onSecondary: Colors.white,
@@ -108,7 +115,6 @@ class _MyAppState extends State<MyApp> {
         ),
       ),
       darkTheme: ThemeData(
-        // Dark Mode
         brightness: Brightness.dark,
         primaryColor: const Color(0xFF673AB7),
         scaffoldBackgroundColor: const Color(0xFF0A0A0A),
@@ -143,48 +149,53 @@ class _MyAppState extends State<MyApp> {
         ),
       ),
       themeMode: _themeMode,
-      home: AnimatedSwitcher(
-        duration: Duration(milliseconds: 300),
-        child: _isLoading
-            ? Scaffold(
-                body: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Image.asset('assets/icon/icon.png',
-                          width: 100,
-                          height: 100), // Adjust width/height as needed
-                      SizedBox(height: 20), // Add some spacing
-                      CircularProgressIndicator(),
-                    ],
-                  ),
-                ),
-              )
-            : _isFirstTime
-                ? PasswordEntryScreen(
-                    key: ValueKey('password'),
-                    onCorrectInput: () {
-                      setState(() {
-                        _isFirstTime = false;
-                      });
-                    },
-                    prefs: prefs!,
-                  )
-                : HomePage(
-                    key: ValueKey('home'),
-                    onThemeChanged: (isDarkMode) {
-                      setState(() {
-                        _themeMode =
-                            isDarkMode ? ThemeMode.dark : ThemeMode.light;
-                      });
-                    },
-                    themeMode: _themeMode,
-                  ),
-      ),
+      home: MySplashScreen(), // Use the custom splash screen
       navigatorKey: navigatorKey,
       routes: {
         '/Notification_screen': (context) => const NotificationPage(),
       },
+    );
+  }
+}
+
+// Custom Splash Screen Widget
+class MySplashScreen extends StatefulWidget {
+  @override
+  _MySplashScreenState createState() => _MySplashScreenState();
+}
+
+class _MySplashScreenState extends State<MySplashScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Start the timer to navigate to the main screen after 3 seconds
+    Timer(Duration(seconds: 3), () {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+            builder: (context) => PasswordEntryScreen(
+                  prefs: prefs!,
+                  onCorrectInput: () {},
+                )),
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Stack(
+        children: [
+          Container(
+            color: Colors.black, // Black background
+            width: double.infinity,
+            height: double.infinity,
+          ),
+          Center(
+            child: Image.asset('assets/icon/icon.png'), // Centered image
+          ),
+        ],
+      ),
     );
   }
 }

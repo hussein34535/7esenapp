@@ -3,11 +3,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hesen/privacy_policy_page.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:hesen/main.dart'; // Import main.dart to access HomePage
+import 'package:hesen/main.dart';
 
 class PasswordEntryScreen extends StatefulWidget {
   final SharedPreferences prefs;
-  final VoidCallback? onCorrectInput; // Callback for correct input
+  final VoidCallback? onCorrectInput;
 
   PasswordEntryScreen({Key? key, required this.prefs, this.onCorrectInput})
       : super(key: key);
@@ -18,10 +18,10 @@ class PasswordEntryScreen extends StatefulWidget {
 
 class _PasswordEntryScreenState extends State<PasswordEntryScreen> {
   final TextEditingController _inputController = TextEditingController();
-  final String correctInput = "0127"; // Keep the correct input here
+  final String correctInput = "0127";
   final _focusNode = FocusNode();
   bool _showError = false;
-  bool _obscureText = true; // Added for password visibility toggle
+  bool _obscureText = true;
 
   @override
   void initState() {
@@ -33,19 +33,10 @@ class _PasswordEntryScreenState extends State<PasswordEntryScreen> {
     String input = _inputController.text.trim();
     if (input == correctInput) {
       await widget.prefs.setBool('isFirstTime', false);
-      widget.onCorrectInput
-          ?.call(); // Use null-aware call.  IMPORTANT for integration with MyApp.
-      // Check if the route is still mounted before navigating
+      widget.onCorrectInput?.call();
       if (mounted) {
-        // Use mounted check
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-              builder: (context) => HomePage(
-                    onThemeChanged: (bool) {},
-                    themeMode: ThemeMode.system,
-                  )),
-        );
+        Navigator.pushReplacementNamed(
+            context, '/home'); // Navigate using named route
       }
     } else {
       setState(() => _showError = input.isNotEmpty);
@@ -58,12 +49,10 @@ class _PasswordEntryScreenState extends State<PasswordEntryScreen> {
       appBar: AppBar(
         title: Text('7eSen TV'),
         backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
-        automaticallyImplyLeading: false, // Remove the back button
+        automaticallyImplyLeading: false,
       ),
       body: Container(
-        // Wrap the Column with a Container
-        color:
-            Theme.of(context).scaffoldBackgroundColor, // Set background color
+        color: Theme.of(context).scaffoldBackgroundColor,
         child: Column(
           children: [
             Expanded(
@@ -83,7 +72,7 @@ class _PasswordEntryScreenState extends State<PasswordEntryScreen> {
                       ),
                       SizedBox(height: 30),
                       Text(
-                        'Enter URL Code', // Or 'Enter Password', as appropriate
+                        'Enter URL Code',
                         style: TextStyle(
                             fontSize: 18,
                             color:
@@ -93,22 +82,18 @@ class _PasswordEntryScreenState extends State<PasswordEntryScreen> {
                       TextField(
                         controller: _inputController,
                         focusNode: _focusNode,
-                        obscureText:
-                            _obscureText, // Use the obscureText variable
+                        obscureText: _obscureText,
                         decoration: InputDecoration(
-                          labelText: _focusNode.hasFocus
-                              ? null
-                              : 'URL', // Hide when focused
+                          labelText: _focusNode.hasFocus ? null : 'URL',
                           labelStyle: TextStyle(
                               color:
                                   Theme.of(context).textTheme.bodyLarge!.color),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12.0),
                           ),
-                          prefixIcon: Icon(Icons.lock, // Changed to a lock icon
+                          prefixIcon: Icon(Icons.lock,
                               color: Theme.of(context).iconTheme.color),
                           suffixIcon: IconButton(
-                            // Added suffixIcon for visibility toggle
                             icon: Icon(
                               _obscureText
                                   ? Icons.visibility
@@ -117,18 +102,15 @@ class _PasswordEntryScreenState extends State<PasswordEntryScreen> {
                             ),
                             onPressed: () {
                               setState(() {
-                                _obscureText =
-                                    !_obscureText; // Toggle visibility
+                                _obscureText = !_obscureText;
                               });
                             },
                           ),
                           filled: true,
                           fillColor:
                               Theme.of(context).brightness == Brightness.dark
-                                  ? Colors.grey
-                                      .shade800 // Darker fill for dark mode
-                                  : Colors.grey
-                                      .shade200, // Lighter fill for light mode
+                                  ? Colors.grey.shade800
+                                  : Colors.grey.shade200,
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12.0),
                             borderSide: BorderSide(
@@ -136,14 +118,12 @@ class _PasswordEntryScreenState extends State<PasswordEntryScreen> {
                                 width: 2.0),
                           ),
                           errorText: _showError ? 'Invalid input' : null,
-                          errorStyle: TextStyle(
-                              color: Colors.red), // Style the error text
+                          errorStyle: TextStyle(color: Colors.red),
                         ),
                         style: TextStyle(
                             color:
                                 Theme.of(context).textTheme.bodyLarge!.color),
-                        keyboardType:
-                            TextInputType.text, // Changed to TextInputType.text
+                        keyboardType: TextInputType.text,
                       ),
                       SizedBox(height: 20),
                       ElevatedButton(
@@ -173,7 +153,6 @@ class _PasswordEntryScreenState extends State<PasswordEntryScreen> {
                                 mode: LaunchMode.externalApplication);
                           } else {
                             print('Could not launch $telegramUri');
-                            // Optionally show an error message to the user.
                           }
                         },
                         style: ElevatedButton.styleFrom(

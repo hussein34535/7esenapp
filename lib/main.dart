@@ -45,15 +45,30 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   ThemeMode _themeMode = ThemeMode.dark;
-  bool _isFirstTime = true; // Keep this for first-time logic.
+  bool _isFirstTime = true;
 
   @override
   void initState() {
     super.initState();
-    _checkFirstTime(); // Check first-time status in initState
+    _loadThemeMode(); // Load theme mode from SharedPreferences
+    _checkFirstTime();
   }
 
-//Added this to check if user need to inter the password or not
+  Future<void> _loadThemeMode() async {
+    final savedThemeMode = prefs?.getString('themeMode');
+    if (savedThemeMode != null) {
+      setState(() {
+        _themeMode =
+            savedThemeMode == 'dark' ? ThemeMode.dark : ThemeMode.light;
+      });
+    }
+  }
+
+  Future<void> _saveThemeMode(ThemeMode themeMode) async {
+    await prefs?.setString(
+        'themeMode', themeMode == ThemeMode.dark ? 'dark' : 'light');
+  }
+
   Future<void> _checkFirstTime() async {
     bool? isFirstTime = prefs?.getBool('isFirstTime');
     setState(() {
@@ -134,18 +149,18 @@ class _MyAppState extends State<MyApp> {
         ),
       ),
       themeMode: _themeMode,
-      // Use named routes for navigation
-      initialRoute: '/', // Start with the splash screen
+      initialRoute: '/',
       routes: {
-        '/': (context) =>
-            MySplashScreen(), // Splash screen is the absolute first screen
+        '/': (context) => MySplashScreen(),
         '/home': (context) => _isFirstTime
             ? PasswordEntryScreen(
                 key: ValueKey('password'),
                 onCorrectInput: () {
                   setState(() {
-                    _isFirstTime = false; // Correctly set _isFirstTime
+                    _isFirstTime = false;
                   });
+                  Navigator.pushReplacementNamed(
+                      context, '/home'); // Re-navigate to home after password
                 },
                 prefs: prefs!,
               )
@@ -154,11 +169,12 @@ class _MyAppState extends State<MyApp> {
                 onThemeChanged: (isDarkMode) {
                   setState(() {
                     _themeMode = isDarkMode ? ThemeMode.dark : ThemeMode.light;
+                    _saveThemeMode(
+                        _themeMode); // Save theme mode to SharedPreferences
                   });
                 },
                 themeMode: _themeMode,
               ),
-        // Other routes
         '/Notification_screen': (context) => const NotificationPage(),
       },
       navigatorKey: navigatorKey,
@@ -166,7 +182,6 @@ class _MyAppState extends State<MyApp> {
   }
 }
 
-// --- Splash Screen ---
 class MySplashScreen extends StatefulWidget {
   const MySplashScreen({super.key});
 
@@ -178,10 +193,8 @@ class _MySplashScreenState extends State<MySplashScreen> {
   @override
   void initState() {
     super.initState();
-    // Start the timer to navigate to the main screen after 3 seconds
     Timer(Duration(seconds: 3), () {
-      Navigator.pushReplacementNamed(
-          context, '/home'); // Navigate using named route
+      Navigator.pushReplacementNamed(context, '/home');
     });
   }
 
@@ -191,7 +204,7 @@ class _MySplashScreenState extends State<MySplashScreen> {
       body: Stack(
         children: [
           Container(
-            color: Colors.black, // Black background
+            color: Colors.black,
             width: double.infinity,
             height: double.infinity,
           ),
@@ -199,7 +212,7 @@ class _MySplashScreenState extends State<MySplashScreen> {
             child: SizedBox(
               width: MediaQuery.of(context).size.width / 2,
               child: Image.asset('assets/icon/icon.png'),
-            ), // Centered image
+            ),
           ),
         ],
       ),
@@ -230,16 +243,17 @@ class _HomePageState extends State<HomePage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   List _filteredChannels = [];
-  bool _isDarkMode = true;
+  late bool _isDarkMode; // Initialize in initState based on themeMode
   bool _isSearchBarVisible = false;
   Completer<void>? _drawerCloseCompleter;
 
   @override
   void initState() {
     super.initState();
+    _isDarkMode =
+        widget.themeMode == ThemeMode.dark; // Initialize _isDarkMode here
     _dataFuture = _initData();
     requestNotificationPermission();
-    _isDarkMode = widget.themeMode == ThemeMode.dark;
   }
 
   @override
@@ -263,8 +277,7 @@ class _HomePageState extends State<HomePage> {
       matches = fetchedMatches;
       return fetchedMatches;
     } catch (e) {
-      // Handle errors appropriately, maybe log them
-      return []; // Return an empty list on error
+      return [];
     }
   }
 
@@ -314,15 +327,13 @@ class _HomePageState extends State<HomePage> {
         final data = json.decode(response.body);
         final latestVersion = data['version'];
         final updateUrl = data['update_url'];
-        const currentVersion = '1.0.0'; // Replace with your app's version
+        const currentVersion = '1.0.0';
 
         if (currentVersion != latestVersion) {
           showUpdateDialog(updateUrl);
         }
       }
-    } catch (e) {
-      // Handle errors, e.g., no internet connection
-    }
+    } catch (e) {}
   }
 
   void showUpdateDialog(String updateUrl) {
@@ -333,24 +344,20 @@ class _HomePageState extends State<HomePage> {
           titleTextStyle: TextStyle(
               color: Theme.of(context).textTheme.bodyLarge!.color,
               fontWeight: FontWeight.bold,
-              fontSize: 20), // Bold Title
-          contentTextStyle: TextStyle(
-              color: Theme.of(context)
-                  .textTheme
-                  .bodyLarge!
-                  .color), // Consistent Content Text
+              fontSize: 20),
+          contentTextStyle:
+              TextStyle(color: Theme.of(context).textTheme.bodyLarge!.color),
           title: const Text("تحديث متاح"),
           content: const Text(
               "هناك تحديث جديد متاح للتطبيق, الرجاء التحديث للاستمرار."),
-          backgroundColor:
-              Theme.of(context).cardColor, // Dialog background color from theme
+          backgroundColor: Theme.of(context).cardColor,
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: Text("لاحقاً",
                   style: TextStyle(
                       color: Theme.of(context).colorScheme.secondary,
-                      fontWeight: FontWeight.bold)), // Bold Button Text
+                      fontWeight: FontWeight.bold)),
             ),
             TextButton(
               onPressed: () async {
@@ -361,7 +368,7 @@ class _HomePageState extends State<HomePage> {
               child: Text("تحديث",
                   style: TextStyle(
                       color: Theme.of(context).colorScheme.secondary,
-                      fontWeight: FontWeight.bold)), // Bold Button Text
+                      fontWeight: FontWeight.bold)),
             ),
           ],
         );
@@ -392,8 +399,8 @@ class _HomePageState extends State<HomePage> {
             });
             widget.onThemeChanged(value);
           },
-          dayColor: Color(0xFFF8F8F8), // Light Grey - Match Light Background
-          nightColor: Color(0xFF0A0A0A), // Near Black - Match Dark Background
+          dayColor: Color(0xFFF8F8F8),
+          nightColor: Color(0xFF0A0A0A),
           sunColor: Color(0xFFF8F8F8),
           moonColor: Color(0xFF0A0A0A),
         ),
@@ -406,65 +413,51 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final appBarHeight = AppBar().preferredSize.height;
-    final additionalOffset =
-        MediaQuery.of(context).padding.top + 2.0; // Add 2.0 to the top padding
+    final additionalOffset = MediaQuery.of(context).padding.top + 2.0;
     final totalOffset = appBarHeight + additionalOffset;
 
-    // لون أفتح قليلاً من البنفسجي الأساسي
     final navBarBackgroundColor = Color(0xFF7C52D8);
 
     return Scaffold(
       appBar: PreferredSize(
         preferredSize: Size.fromHeight(appBarHeight),
         child: AnimatedContainer(
-          duration: Duration(milliseconds: 300), // Smooth transition
+          duration: Duration(milliseconds: 300),
           decoration: BoxDecoration(
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1), // Subtle Shadow
+                color: Colors.black.withOpacity(0.1),
                 spreadRadius: 1,
                 blurRadius: 3,
-                offset: Offset(0, 1), // Slightly shifted shadow
+                offset: Offset(0, 1),
               ),
             ],
-            color: Theme.of(context)
-                .appBarTheme
-                .backgroundColor, // Use theme's AppBar color
+            color: Theme.of(context).appBarTheme.backgroundColor,
           ),
           child: AppBar(
-            elevation: 0, // Remove default elevation
+            elevation: 0,
             leading: IconButton(
-              // IconButton for the drawer
-              icon: Icon(Icons.menu_rounded,
-                  color: Colors.white), // Rounded menu icon, white color
+              icon: Icon(Icons.menu_rounded, color: Colors.white),
               onPressed: () {
                 showModalBottomSheet(
-                  // Show BottomSheet on icon press
                   context: context,
-                  backgroundColor: Theme.of(context)
-                      .cardColor, // Background color from theme card color
+                  backgroundColor: Theme.of(context).cardColor,
                   shape: RoundedRectangleBorder(
-                    // Rounded edges for the BottomSheet
-                    borderRadius: BorderRadius.vertical(
-                        top: Radius.circular(16)), // Slightly less rounded
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(16)),
                   ),
                   builder: (BuildContext context) {
                     return Padding(
-                      // Padding for the list from all sides
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 16.0), // Reduced padding
+                      padding: const EdgeInsets.symmetric(vertical: 16.0),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
                           ListTile(
                             leading: Icon(FontAwesomeIcons.telegram,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .secondary), // Use secondary color for icons
+                                color: Theme.of(context).colorScheme.secondary),
                             title: Text('Telegram',
                                 style: TextStyle(
-                                    fontWeight:
-                                        FontWeight.bold, // Bold Menu Items
+                                    fontWeight: FontWeight.bold,
                                     color: Theme.of(context)
                                         .textTheme
                                         .bodyLarge!
@@ -479,22 +472,18 @@ class _HomePageState extends State<HomePage> {
                               } catch (e) {
                                 print(
                                     'Error launching URL in external app: $e');
-                                // Fallback: Try launching in the in-app browser
                                 try {
                                   await launchUrl(telegramUri,
                                       mode: LaunchMode.inAppWebView);
                                 } catch (e) {
                                   print('Error launching URL in browser: $e');
-                                  // Handle the error (e.g., show a message to the user)
                                 }
                               }
                             },
                           ),
                           ListTile(
                             leading: Icon(Icons.search,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .secondary), // Use secondary color for icons
+                                color: Theme.of(context).colorScheme.secondary),
                             title: Text('البحث',
                                 style: TextStyle(
                                     fontWeight: FontWeight.bold,
@@ -511,13 +500,10 @@ class _HomePageState extends State<HomePage> {
                           ),
                           ListTile(
                             leading: Icon(Icons.privacy_tip_rounded,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .secondary), // Use secondary color for icons
+                                color: Theme.of(context).colorScheme.secondary),
                             title: Text('سياسة الخصوصية',
                                 style: TextStyle(
-                                    fontWeight:
-                                        FontWeight.bold, // Bold Menu Items
+                                    fontWeight: FontWeight.bold,
                                     color: Theme.of(context)
                                         .textTheme
                                         .bodyLarge!
@@ -534,13 +520,10 @@ class _HomePageState extends State<HomePage> {
                           ),
                           ListTile(
                             leading: Icon(Icons.share_rounded,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .secondary), // Use secondary color for icons
+                                color: Theme.of(context).colorScheme.secondary),
                             title: Text('مشاركه التطبيق',
                                 style: TextStyle(
-                                    fontWeight:
-                                        FontWeight.bold, // Bold Menu Items
+                                    fontWeight: FontWeight.bold,
                                     color: Theme.of(context)
                                         .textTheme
                                         .bodyLarge!
@@ -650,37 +633,25 @@ class _HomePageState extends State<HomePage> {
       width: double.infinity,
       height: 40,
       decoration: BoxDecoration(
-        color:
-            Theme.of(context).cardColor, // Card color for search bar background
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-            color: Theme.of(context)
-                .colorScheme
-                .secondary
-                .withOpacity(0.6)), // Slightly transparent secondary border
+            color: Theme.of(context).colorScheme.secondary.withOpacity(0.6)),
       ),
       child: TextField(
         controller: _searchController,
         decoration: InputDecoration(
           hintText: 'بحث عن قناة',
-          hintStyle:
-              TextStyle(color: Colors.grey.shade500), // Lighter grey hint
+          hintStyle: TextStyle(color: Colors.grey.shade500),
           prefixIcon: Icon(Icons.search,
-              color: Theme.of(context)
-                  .colorScheme
-                  .secondary), // Secondary color search icon
+              color: Theme.of(context).colorScheme.secondary),
           border: InputBorder.none,
-          contentPadding:
-              EdgeInsets.symmetric(horizontal: 16), // Horizontal padding
+          contentPadding: EdgeInsets.symmetric(horizontal: 16),
         ),
         onChanged: (query) {
           _filterChannels(query);
         },
-        style: TextStyle(
-            color: Theme.of(context)
-                .textTheme
-                .bodyLarge!
-                .color), // Text color from theme
+        style: TextStyle(color: Theme.of(context).textTheme.bodyLarge!.color),
       ),
     );
   }

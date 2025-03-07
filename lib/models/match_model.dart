@@ -47,12 +47,17 @@ class Match {
     }
 
     String? extractLogoUrl(Map<String, dynamic>? logoData) {
-      if (logoData == null ||
-          logoData['formats'] == null ||
-          logoData['formats']['thumbnail'] == null) {
+      if (logoData == null) {
         return null;
       }
-      return logoData['formats']['thumbnail']['url'] as String?;
+
+      final url = logoData['url'];
+
+      if (url is String) {
+        return url;
+      } else {
+        return null;
+      }
     }
 
     final data = json['attributes'] ?? json;

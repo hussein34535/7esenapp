@@ -414,13 +414,21 @@ class MatchBox extends StatelessWidget {
 
     final teamA = match.teamA;
     final teamB = match.teamB;
-    final logoA = match.logoAUrl ?? '';
-    final logoB = match.logoBUrl ?? '';
+    String logoA = match.logoAUrl ?? ''; //  قد تكون فارغة
+    String logoB = match.logoBUrl ?? ''; //  قد تكون فارغة
     final matchTime = match.matchTime;
     final commentator = match.commentator;
     final channel = match.channel;
     final champion = match.champion;
     final streamLink = match.streamLinks;
+
+    // إضافة البادئة إذا لزم الأمر
+    if (logoA.isNotEmpty && !logoA.startsWith('http')) {
+      logoA = 'https://st9.onrender.com' + logoA;
+    }
+    if (logoB.isNotEmpty && !logoB.startsWith('http')) {
+      logoB = 'https://st9.onrender.com' + logoB;
+    }
 
     DateTime now = DateTime.now().toUtc().add(Duration(hours: 0));
     final matchDateTime = DateFormat('HH:mm').parse(matchTime);
@@ -555,9 +563,9 @@ class MatchBox extends StatelessWidget {
     return Container(
       width: 60,
       height: 60,
-      child: logoUrl.isNotEmpty
+      child: logoUrl.isNotEmpty // تأكد من أن الرابط ليس فارغًا
           ? CachedNetworkImage(
-              imageUrl: logoUrl,
+              imageUrl: logoUrl, // استخدم الرابط المعدل هنا
               fit: BoxFit.contain,
               errorWidget: (context, url, error) => Image.asset(
                 'assets/ball.png', // Use the correct path
@@ -565,6 +573,8 @@ class MatchBox extends StatelessWidget {
                 height: 40,
                 color: Colors.grey, // Optional: if you want to tint the image
               ),
+              placeholder: (context, url) =>
+                  Center(child: CircularProgressIndicator()),
             )
           : Image.asset(
               'assets/ball.png', // Use the correct path
@@ -620,6 +630,7 @@ class NewsBox extends StatelessWidget {
   final Function openVideo;
 
   NewsBox({required this.article, required this.openVideo});
+
   List<Map<String, String>> _extractStreamLinks(List<dynamic>? links) {
     List<Map<String, String>> extractedLinks = [];
     if (links == null) return extractedLinks;
@@ -695,18 +706,19 @@ class NewsBox extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Conditional rendering for image or icon container
             imageUrl != null
                 ? CachedNetworkImage(
                     imageUrl: imageUrl,
                     placeholder: (context, url) =>
                         Center(child: CircularProgressIndicator()),
                     errorWidget: (context, url, error) =>
-                        Icon(Icons.image, size: 50, color: Colors.grey),
+                        _buildPlaceholder(), // Use the placeholder widget
                     height: 200,
                     width: double.infinity,
                     fit: BoxFit.cover,
                   )
-                : SizedBox.shrink(),
+                : _buildPlaceholder(), // Use the placeholder widget
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -739,6 +751,19 @@ class NewsBox extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+//  إنشاء عنصر نائب للصورة
+  Widget _buildPlaceholder() {
+    return Container(
+      height: 200, // Same height as CachedNetworkImage
+      width: double.infinity,
+      color: Colors.grey[300], // Light grey color
+      child: Center(
+        child: Icon(Icons.image,
+            size: 50, color: Colors.grey[600]), // Darker grey icon
       ),
     );
   }

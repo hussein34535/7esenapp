@@ -319,6 +319,20 @@ class _HomePageState extends State<HomePage> {
     return fetchedNews;
   }
 
+  // Helper function to compare version strings
+  int compareVersions(String version1, String version2) {
+    List<String> v1Parts = version1.split('.');
+    List<String> v2Parts = version2.split('.');
+    int len = v1Parts.length > v2Parts.length ? v1Parts.length : v2Parts.length;
+    for (int i = 0; i < len; i++) {
+      int v1 = i < v1Parts.length ? int.parse(v1Parts[i]) : 0;
+      int v2 = i < v2Parts.length ? int.parse(v2Parts[i]) : 0;
+      if (v1 < v2) return -1;
+      if (v1 > v2) return 1;
+    }
+    return 0;
+  }
+
   Future<void> checkForUpdate() async {
     try {
       final response = await http.get(Uri.parse(
@@ -327,9 +341,9 @@ class _HomePageState extends State<HomePage> {
         final data = json.decode(response.body);
         final latestVersion = data['version'];
         final updateUrl = data['update_url'];
-        const currentVersion = '1.0.0';
+        const currentVersion = '1.0.2'; //
 
-        if (currentVersion != latestVersion) {
+        if (compareVersions(currentVersion, latestVersion) < 0) {
           showUpdateDialog(updateUrl);
         }
       }
@@ -337,40 +351,67 @@ class _HomePageState extends State<HomePage> {
   }
 
   void showUpdateDialog(String updateUrl) {
-    showDialog(
+    showGeneralDialog(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          titleTextStyle: TextStyle(
-              color: Theme.of(context).textTheme.bodyLarge!.color,
-              fontWeight: FontWeight.bold,
-              fontSize: 20),
-          contentTextStyle:
-              TextStyle(color: Theme.of(context).textTheme.bodyLarge!.color),
-          title: const Text("تحديث متاح"),
-          content: const Text(
-              "هناك تحديث جديد متاح للتطبيق, الرجاء التحديث للاستمرار."),
-          backgroundColor: Theme.of(context).cardColor,
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text("لاحقاً",
-                  style: TextStyle(
-                      color: Theme.of(context).colorScheme.secondary,
-                      fontWeight: FontWeight.bold)),
+      barrierDismissible: false, // Prevent dismissing by tapping outside
+      barrierColor:
+          Colors.black.withOpacity(0.8), // Optional: Darken background
+      transitionDuration: const Duration(milliseconds: 200),
+      pageBuilder: (BuildContext buildContext, Animation animation,
+          Animation secondaryAnimation) {
+        return WillPopScope(
+          // To prevent back button dismissal on Android
+          onWillPop: () async => false,
+          child: Scaffold(
+            backgroundColor: Theme.of(context).cardColor,
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    Text(
+                      "⚠️ تحديث إجباري",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          color: Theme.of(context).textTheme.bodyLarge!.color,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 26),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      "هناك تحديث جديد إلزامي للتطبيق. الرجاء التحديث للاستمرار في استخدام التطبيق.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          color: Theme.of(context).textTheme.bodyLarge!.color),
+                    ),
+                    const SizedBox(height: 30),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor:
+                            Theme.of(context).colorScheme.secondary,
+                      ),
+                      onPressed: () async {
+                        if (await canLaunchUrl(Uri.parse(updateUrl))) {
+                          await launchUrl(Uri.parse(updateUrl));
+                        }
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 25, vertical: 12),
+                        child: Text("تحديث",
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            TextButton(
-              onPressed: () async {
-                if (await canLaunchUrl(Uri.parse(updateUrl))) {
-                  await launchUrl(Uri.parse(updateUrl));
-                }
-              },
-              child: Text("تحديث",
-                  style: TextStyle(
-                      color: Theme.of(context).colorScheme.secondary,
-                      fontWeight: FontWeight.bold)),
-            ),
-          ],
+          ),
         );
       },
     );

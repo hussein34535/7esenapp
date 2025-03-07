@@ -26,8 +26,8 @@ android {
         applicationId = "com.tv.hesen"
         minSdk = 21  //  <--  SET minSdkVersion EXPLICITLY!
         targetSdk = 34 //  <--  SET targetSdkVersion EXPLICITLY! (Match compileSdk)
-        versionCode = 1 //  <--  Use integers, not flutter.versionCode directly here
-        versionName = "1.0.0"  //  <-- Use a string.
+        versionCode = 2 //  <--  Use integers, not flutter.versionCode directly here
+        versionName = "1.0.2"  //  <-- Use a string.
     }
 
     buildTypes {

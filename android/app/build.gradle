@@ -1,16 +1,13 @@
 plugins {
     id "com.android.application"
-    // START: FlutterFire Configuration
-    id 'com.google.gms.google-services'
-    // END: FlutterFire Configuration
+    id "com.google.gms.google-services" // Firebase
     id "kotlin-android"
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id "dev.flutter.flutter-gradle-plugin"
 }
 
 android {
     namespace = "com.tv.hesen"
-    compileSdk = 34 // Use a specific, recent SDK version.  34 is a good choice as of late 2024.
+    compileSdk = 34
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -19,24 +16,29 @@ android {
     }
 
     kotlinOptions {
-        jvmTarget = '1.8' // Use a string for jvmTarget.
+        jvmTarget = '1.8'
     }
 
     defaultConfig {
         applicationId = "com.tv.hesen"
-        minSdk = 21  //  <--  SET minSdkVersion EXPLICITLY!
-        targetSdk = 34 //  <--  SET targetSdkVersion EXPLICITLY! (Match compileSdk)
-        versionCode = 2 //  <--  Use integers, not flutter.versionCode directly here
-        versionName = "1.0.2"  //  <-- Use a string.
+        minSdk = 21
+        targetSdk = 34
+        versionCode = 2
+        versionName = "1.0.2"
+    }
+
+    signingConfigs {
+        release {
+            storeFile file("upload-keystore.jks") // ملف التوقيع
+            storePassword "Hussein7#"
+            keyAlias "upload-key"
+            keyPassword "Hussein7#"
+        }
     }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.debug
-            
-            //  Enable Proguard/R8 for release builds (optional but highly recommended)
+            signingConfig signingConfigs.release
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
@@ -49,4 +51,5 @@ flutter {
 }
 
 dependencies {
+    implementation platform('com.google.firebase:firebase-bom:32.7.0') // Firebase dependencies
 }

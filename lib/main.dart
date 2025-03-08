@@ -14,7 +14,6 @@ import 'package:uuid/uuid.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:day_night_switch/day_night_switch.dart';
-import 'package:lottie/lottie.dart';
 import 'package:hesen/video_player_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:hesen/widgets.dart';

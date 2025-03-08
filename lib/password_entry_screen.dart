@@ -21,7 +21,6 @@ class _PasswordEntryScreenState extends State<PasswordEntryScreen> {
   final String correctInput = "0127";
   final _focusNode = FocusNode();
   bool _showError = false;
-  bool _obscureText = true;
 
   @override
   void initState() {
@@ -82,7 +81,6 @@ class _PasswordEntryScreenState extends State<PasswordEntryScreen> {
                       TextField(
                         controller: _inputController,
                         focusNode: _focusNode,
-                        obscureText: _obscureText,
                         decoration: InputDecoration(
                           labelText: _focusNode.hasFocus ? null : 'URL',
                           labelStyle: TextStyle(
@@ -91,21 +89,10 @@ class _PasswordEntryScreenState extends State<PasswordEntryScreen> {
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12.0),
                           ),
-                          prefixIcon: Icon(Icons.lock,
+                          prefixIcon: Icon(
+                              Icons
+                                  .link, // تم تغيير الأيقونة إلى Icons.key (مفتاح)
                               color: Theme.of(context).iconTheme.color),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscureText
-                                  ? Icons.visibility
-                                  : Icons.visibility_off,
-                              color: Theme.of(context).iconTheme.color,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _obscureText = !_obscureText;
-                              });
-                            },
-                          ),
                           filled: true,
                           fillColor:
                               Theme.of(context).brightness == Brightness.dark

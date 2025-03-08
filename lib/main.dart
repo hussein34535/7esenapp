@@ -24,6 +24,7 @@ import 'package:hesen/privacy_policy_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hesen/password_entry_screen.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:timezone/data/latest.dart' as tz;
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -34,6 +35,7 @@ Future<void> main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await FirebaseApi().initNotification();
   await MobileAds.instance.initialize();
+  tz.initializeTimeZones(); // Initialize timezone database
   prefs = await SharedPreferences.getInstance();
   runApp(MyApp());
 }

@@ -24,8 +24,32 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hesen/password_entry_screen.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:timezone/data/latest.dart' as tz;
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+    FlutterLocalNotificationsPlugin();
+
+Future<void> _createNotificationChannel() async {
+  var android =
+      AndroidInitializationSettings('@mipmap/ic_launcher'); // Or your app icon
+  var iOS = DarwinInitializationSettings();
+  var initSettings = InitializationSettings(android: android, iOS: iOS);
+  await flutterLocalNotificationsPlugin.initialize(initSettings);
+
+  var androidNotificationChannel = AndroidNotificationChannel(
+    'high_importance_channel', // Same as in AndroidManifest.xml
+    'High Importance Notifications',
+    description: 'This channel is used for important notifications.',
+    importance: Importance.max,
+  );
+
+  await flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>()
+      ?.createNotificationChannel(androidNotificationChannel);
+}
 
 SharedPreferences? prefs;
 
@@ -53,6 +77,7 @@ class _MyAppState extends State<MyApp> {
     super.initState();
     _loadThemeMode(); // Load theme mode from SharedPreferences
     _checkFirstTime();
+    _createNotificationChannel(); // Create the notification channel
   }
 
   Future<void> _loadThemeMode() async {

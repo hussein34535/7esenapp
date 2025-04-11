@@ -58,6 +58,7 @@ Future<void> main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await FirebaseApi().initNotification();
   await MobileAds.instance.initialize();
+  // Test device configuration removed for release build
   tz.initializeTimeZones(); // Initialize timezone database
   prefs = await SharedPreferences.getInstance();
   runApp(MyApp());
@@ -271,6 +272,11 @@ class _HomePageState extends State<HomePage> {
   List _filteredChannels = [];
   late bool _isDarkMode; // Initialize in initState based on themeMode
   bool _isSearchBarVisible = false;
+  InterstitialAd? _interstitialAd;
+  bool _isAdLoading = false;
+  // Use your real Ad Unit ID here in production
+  final String _adUnitId =
+      'ca-app-pub-2393153600924393/4147344165'; // Or use a test ID like InterstitialAd.testAdUnitId
   Completer<void>? _drawerCloseCompleter;
 
   @override
@@ -280,6 +286,7 @@ class _HomePageState extends State<HomePage> {
         widget.themeMode == ThemeMode.dark; // Initialize _isDarkMode here
     _dataFuture = _initData();
     requestNotificationPermission();
+    _loadAd(); // Load the first ad when HomePage initializes
   }
 
   @override
@@ -682,14 +689,47 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // Function to load Interstitial Ad
+  void _loadAd() {
+    if (_isAdLoading) {
+      return; // Don't load if already loading
+    }
+    _isAdLoading = true;
+    InterstitialAd.load(
+      adUnitId: _adUnitId,
+      request: const AdRequest(),
+      adLoadCallback: InterstitialAdLoadCallback(
+        onAdLoaded: (InterstitialAd ad) {
+          print('$ad loaded.');
+          _interstitialAd = ad;
+          _isAdLoading = false;
+        },
+        onAdFailedToLoad: (LoadAdError error) {
+          print('InterstitialAd failed to load: $error');
+          _isAdLoading = false;
+          _interstitialAd = null; // Ensure ad is null if loading failed
+        },
+      ),
+    );
+  }
+
   void openVideo(BuildContext context, String initialUrl,
       List<Map<String, dynamic>> streamLinks) {
+    // Prepare the ad to pass (it might be null if not loaded yet)
+    final adToShow = _interstitialAd;
+    _interstitialAd = null; // Clear the reference so it's used only once
+
+    // Start loading the next ad immediately
+    _loadAd();
+
+    // Navigate to the player screen, passing the ad
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => VideoPlayerScreen(
           initialUrl: initialUrl,
           streamLinks: streamLinks,
+          interstitialAd: adToShow, // Pass the loaded ad
         ),
       ),
     );

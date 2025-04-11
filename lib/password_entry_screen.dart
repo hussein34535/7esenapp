@@ -51,7 +51,16 @@ class _PasswordEntryScreenState extends State<PasswordEntryScreen> {
         automaticallyImplyLeading: false,
       ),
       body: Container(
-        color: Theme.of(context).scaffoldBackgroundColor,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Theme.of(context).colorScheme.primary.withOpacity(0.8),
+              Theme.of(context).scaffoldBackgroundColor
+            ],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
         child: Column(
           children: [
             Expanded(
@@ -64,10 +73,23 @@ class _PasswordEntryScreenState extends State<PasswordEntryScreen> {
                       Text(
                         '7eSen TV',
                         style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).textTheme.bodyLarge!.color,
-                        ),
+                            fontSize: 36, // Increased size
+                            fontWeight: FontWeight.w600, // Slightly less bold
+                            color: Theme.of(context)
+                                    .textTheme
+                                    .headlineLarge
+                                    ?.color ??
+                                Theme.of(context)
+                                    .colorScheme
+                                    .primary, // Use headline color or primary
+                            shadows: [
+                              // Add a subtle shadow
+                              Shadow(
+                                blurRadius: 4.0,
+                                color: Colors.black.withOpacity(0.3),
+                                offset: Offset(2.0, 2.0),
+                              ),
+                            ]),
                       ),
                       SizedBox(height: 30),
                       Text(
@@ -117,20 +139,26 @@ class _PasswordEntryScreenState extends State<PasswordEntryScreen> {
                         onPressed: _checkInput,
                         child: Text('Submit', style: TextStyle(fontSize: 16)),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              Theme.of(context).colorScheme.secondary,
-                          foregroundColor: Colors.white,
+                          backgroundColor: Theme.of(context)
+                              .colorScheme
+                              .primary, // Use primary color
+                          foregroundColor: Theme.of(context)
+                              .colorScheme
+                              .onPrimary, // Text color on primary
                           padding: EdgeInsets.symmetric(
-                              horizontal: 40, vertical: 15),
+                              horizontal: 50,
+                              vertical: 16), // Slightly larger padding
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10.0),
+                            borderRadius:
+                                BorderRadius.circular(30.0), // More rounded
                           ),
+                          elevation: 5, // Add elevation
                         ),
                       ),
                       SizedBox(height: 20),
                       ElevatedButton.icon(
                         icon: FaIcon(FontAwesomeIcons.telegram, size: 20),
-                        label: Text('Telegram للمساعدة',
+                        label: Text('Telegram لو مش عارف تشغله',
                             style: TextStyle(fontSize: 16)),
                         onPressed: () async {
                           final Uri telegramUri =
@@ -143,12 +171,15 @@ class _PasswordEntryScreenState extends State<PasswordEntryScreen> {
                           }
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
+                          backgroundColor:
+                              Color(0xFF0088cc), // Specific Telegram blue
                           foregroundColor: Colors.white,
                           padding: EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 12),
+                              horizontal: 25, vertical: 12), // Adjust padding
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10.0)),
+                              borderRadius: BorderRadius.circular(
+                                  8.0)), // Slightly less rounded
+                          elevation: 3,
                         ),
                       ),
                     ],

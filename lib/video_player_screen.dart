@@ -131,7 +131,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     _videoPlayerController?.removeListener(_videoPlayerListener);
     _videoPlayerController?.dispose();
     _chewieController?.dispose();
-    _disableFullscreenMode(); // Disable fullscreen and wakelock
+    // Disable fullscreen and wakelock directly in dispose
+    WakelockPlus.disable();
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
     super.dispose();
   }
 
@@ -1103,17 +1109,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     ]);
   }
 
-  void _disableFullscreenMode() {
-    WakelockPlus.disable();
-    // Ensure UI mode and orientation are reset *after* the frame renders
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        // Check if still mounted in callback
-        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-        SystemChrome.setPreferredOrientations([]);
-      }
-    });
-  }
+  // Removed _disableFullscreenMode method as logic moved directly into dispose
 
   @override
   Widget build(BuildContext context) {

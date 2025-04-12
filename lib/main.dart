@@ -374,7 +374,7 @@ class _HomePageState extends State<HomePage> {
         final data = json.decode(response.body);
         final latestVersion = data['version'];
         final updateUrl = data['update_url'];
-        const currentVersion = '1.0.2'; //
+        const currentVersion = '1.0.4'; //
 
         if (compareVersions(currentVersion, latestVersion) < 0) {
           showUpdateDialog(updateUrl);

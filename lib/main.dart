@@ -23,6 +23,7 @@ import 'package:hesen/privacy_policy_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hesen/password_entry_screen.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart'; // Import dotenv
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
@@ -54,7 +55,9 @@ Future<void> _createNotificationChannel() async {
 SharedPreferences? prefs;
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  // Ensure widgets are initialized first
+  // Load environment variables from .env file
+  await dotenv.load(fileName: ".env");
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await FirebaseApi().initNotification();
   await MobileAds.instance.initialize();

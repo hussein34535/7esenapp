@@ -3,6 +3,7 @@
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
+import 'package:flutter_dotenv/flutter_dotenv.dart'; // Import dotenv
 
 /// Default [FirebaseOptions] for use with your Firebase apps.
 ///
@@ -40,49 +41,54 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDwH7wGp-8_8vw_GlWcvCiJRbBWKWobqM4',
-    appId: '1:415589112214:web:9e46f64bc53ef4e4da65b7',
-    messagingSenderId: '415589112214',
-    projectId: 'hesen-notification',
-    authDomain: 'hesen-notification.firebaseapp.com',
-    storageBucket: 'hesen-notification.firebasestorage.app',
-    measurementId: 'G-K3M054KY45',
+  // Use dotenv.env to get values, remove 'const'
+  static FirebaseOptions web = FirebaseOptions(
+    apiKey: dotenv.env['FIREBASE_WEB_API_KEY']!,
+    appId: dotenv.env['FIREBASE_WEB_APP_ID']!,
+    messagingSenderId: dotenv.env['FIREBASE_WEB_MESSAGING_SENDER_ID']!,
+    projectId: dotenv.env['FIREBASE_WEB_PROJECT_ID']!,
+    authDomain: dotenv.env['FIREBASE_WEB_AUTH_DOMAIN']!,
+    storageBucket: dotenv.env['FIREBASE_WEB_STORAGE_BUCKET']!,
+    measurementId: dotenv.env['FIREBASE_WEB_MEASUREMENT_ID']!,
   );
 
-  static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBGl78gOw94X-vaFVL8uQgfDjW_DXBQNoM',
-    appId: '1:415589112214:android:864a57edd3972e98da65b7',
-    messagingSenderId: '415589112214',
-    projectId: 'hesen-notification',
-    storageBucket: 'hesen-notification.firebasestorage.app',
+  // Use dotenv.env to get values, remove 'const'
+  static FirebaseOptions android = FirebaseOptions(
+    apiKey: dotenv.env['FIREBASE_ANDROID_API_KEY']!,
+    appId: dotenv.env['FIREBASE_ANDROID_APP_ID']!,
+    messagingSenderId: dotenv.env['FIREBASE_ANDROID_MESSAGING_SENDER_ID']!,
+    projectId: dotenv.env['FIREBASE_ANDROID_PROJECT_ID']!,
+    storageBucket: dotenv.env['FIREBASE_ANDROID_STORAGE_BUCKET']!,
   );
 
-  static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyBJfL0OUox86_InB0W_KfaKAchsmChkn_Y',
-    appId: '1:415589112214:ios:75d990a4c8aa5021da65b7',
-    messagingSenderId: '415589112214',
-    projectId: 'hesen-notification',
-    storageBucket: 'hesen-notification.firebasestorage.app',
-    iosBundleId: 'com.tv.hesen',
+  // Use dotenv.env to get values, remove 'const'
+  static FirebaseOptions ios = FirebaseOptions(
+    apiKey: dotenv.env['FIREBASE_IOS_API_KEY']!,
+    appId: dotenv.env['FIREBASE_IOS_APP_ID']!,
+    messagingSenderId: dotenv.env['FIREBASE_IOS_MESSAGING_SENDER_ID']!,
+    projectId: dotenv.env['FIREBASE_IOS_PROJECT_ID']!,
+    storageBucket: dotenv.env['FIREBASE_IOS_STORAGE_BUCKET']!,
+    iosBundleId: dotenv.env['FIREBASE_IOS_BUNDLE_ID']!,
   );
 
-  static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyBJfL0OUox86_InB0W_KfaKAchsmChkn_Y',
-    appId: '1:415589112214:ios:75d990a4c8aa5021da65b7',
-    messagingSenderId: '415589112214',
-    projectId: 'hesen-notification',
-    storageBucket: 'hesen-notification.firebasestorage.app',
-    iosBundleId: 'com.tv.hesen',
+  // Use dotenv.env to get values, remove 'const'
+  static FirebaseOptions macos = FirebaseOptions(
+    apiKey: dotenv.env['FIREBASE_MACOS_API_KEY']!,
+    appId: dotenv.env['FIREBASE_MACOS_APP_ID']!,
+    messagingSenderId: dotenv.env['FIREBASE_MACOS_MESSAGING_SENDER_ID']!,
+    projectId: dotenv.env['FIREBASE_MACOS_PROJECT_ID']!,
+    storageBucket: dotenv.env['FIREBASE_MACOS_STORAGE_BUCKET']!,
+    iosBundleId: dotenv.env['FIREBASE_MACOS_IOS_BUNDLE_ID']!,
   );
 
-  static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyDwH7wGp-8_8vw_GlWcvCiJRbBWKWobqM4',
-    appId: '1:415589112214:web:74a477abaa98579cda65b7',
-    messagingSenderId: '415589112214',
-    projectId: 'hesen-notification',
-    authDomain: 'hesen-notification.firebaseapp.com',
-    storageBucket: 'hesen-notification.firebasestorage.app',
-    measurementId: 'G-RJFYTCC6R0',
+  // Use dotenv.env to get values, remove 'const'
+  static FirebaseOptions windows = FirebaseOptions(
+    apiKey: dotenv.env['FIREBASE_WINDOWS_API_KEY']!,
+    appId: dotenv.env['FIREBASE_WINDOWS_APP_ID']!,
+    messagingSenderId: dotenv.env['FIREBASE_WINDOWS_MESSAGING_SENDER_ID']!,
+    projectId: dotenv.env['FIREBASE_WINDOWS_PROJECT_ID']!,
+    authDomain: dotenv.env['FIREBASE_WINDOWS_AUTH_DOMAIN']!,
+    storageBucket: dotenv.env['FIREBASE_WINDOWS_STORAGE_BUCKET']!,
+    measurementId: dotenv.env['FIREBASE_WINDOWS_MEASUREMENT_ID']!,
   );
 }

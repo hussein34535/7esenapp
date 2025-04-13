@@ -1,278 +1,105 @@
-name: test
-
-on:
-  workflow_dispatch:
-  push:
-    branches:
-      - main
-      - dev
-  pull_request:
-    paths:
-      - setup.sh
-      - action.yaml
-      - .github/workflows/workflow.yaml
+name: Flutter Build and Upload iOS IPA
+on: workflow_dispatch
+    
 jobs:
-  lint_shellcheck:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Clone repository
-        uses: actions/checkout@v4
-      - name: Run shellcheck
-        uses: ludeeus/action-shellcheck@master
-
-  test_channel:
-    runs-on: ${{ matrix.operating-system }}
-
-    strategy:
-      matrix:
-        operating-system:
-          - ubuntu-latest
-          - windows-latest
-          - macos-latest
-          - macos-13
-        channel: [stable, beta, master]
-        dry-run: [true, false]
-        git-source:
-          - https://github.com/flutter/flutter.git
-          - https://github.com/Flutter-Foundation/flutter.git
-          - https://gitee.com/harmonycommando_flutter/flutter.git
-        include:
-          - operating-system: ubuntu-latest
-            channel: main
-
-    steps:
-      - name: Clone repository
-        uses: actions/checkout@v4
-      - id: flutter-action
-        uses: ./
-        with:
-          channel: ${{ matrix.channel }}
-          dry-run: ${{ matrix.dry-run }}
-          git-source: ${{ matrix.git-source }}
-      - name: Echo outputs
-        run: |
-          echo RUNNER-OS=${{ runner.os }}
-          echo RUNNER-ARCH=${{ runner.arch }}
-
-          echo CACHE-PATH=${{ steps.flutter-action.outputs.CACHE-PATH }}
-          echo CACHE-KEY=${{ steps.flutter-action.outputs.CACHE-KEY }}
-          echo CHANNEL=${{ steps.flutter-action.outputs.CHANNEL }}
-          echo VERSION=${{ steps.flutter-action.outputs.VERSION }}
-          echo ARCHITECTURE=${{ steps.flutter-action.outputs.ARCHITECTURE }}
-        shell: bash
-      - run: dart --version
-        if: ${{ matrix.dry-run != true }}
-        shell: bash
-      - run: flutter --version
-        if: ${{ matrix.dry-run != true }}
-        shell: bash
-      - run: "! dart --version"
-        if: ${{ matrix.dry-run == true }}
-        shell: bash
-      - run: "! flutter --version"
-        if: ${{ matrix.dry-run == true }}
-        shell: bash
-
-  test_cache:
-    runs-on: ${{ matrix.operating-system }}
-
-    strategy:
-      matrix:
-        operating-system:
-          [ubuntu-latest, windows-latest, macos-latest, macos-13]
-
-    steps:
-      - name: Clone repository
-        uses: actions/checkout@v4
-      - uses: ./
-        with:
-          channel: stable
-          flutter-version: 3.10.6
-          cache: true
-      - run: dart --version
-        shell: bash
-      - run: flutter --version
-        shell: bash
-
-  test_version_file:
-    runs-on: ${{ matrix.operating-system }}
-
-    strategy:
-      matrix:
-        operating-system: [ubuntu-latest]
-
-    steps:
-      - name: Clone repository
-        uses: actions/checkout@v4
-      - uses: ./
-        with:
-          channel: stable
-          flutter-version-file: test/pubspec.yaml
-      - name: Verify Dart version
-        run: dart --version | grep '2.18.6'
-        shell: bash
-      - name: Verify Flutter version
-        run: flutter --version | grep '3.3.10'
-        shell: bash
-
-  test_print_output_x64:
-    runs-on: ubuntu-latest
-
-    # These calls to setup.sh sepcify the -t flag, which enables test mode.
-    # Test mode uses hardcoded Flutter release manifests from test/ directory.
-
-    steps:
-      - name: Clone repository
-        uses: actions/checkout@v4
-      - run: ./setup.sh -t -p -f test/pubspec.yaml   | grep '3.3.10'
-        shell: bash
-      - run: ./setup.sh -t -p                        | grep 'stable'
-        shell: bash
-      - run: ./setup.sh -t -p                        | grep '3.7.7'
-        shell: bash
-      - run: ./setup.sh -t -p                        | grep 'x64'
-        shell: bash
-      - run: ./setup.sh -t -p stable                 | grep 'stable'
-        shell: bash
-      - run: ./setup.sh -t -p beta                   | grep 'beta'
-        shell: bash
-      - run: ./setup.sh -t -p beta                   | grep '3.9.0-0.1.pre'
-        shell: bash
-      - run: ./setup.sh -t -p -n 3.3.10 stable       | grep '3.3.10'
-        shell: bash
-      - run: ./setup.sh -t -p -n 3.3.1 stable        | grep '3.3.1'
-        shell: bash
-      - run: ./setup.sh -t -p -n 2 stable            | grep '2.10.5'
-        shell: bash
-      - run: ./setup.sh -t -p -n 2 beta              | grep '2.13.0-0.4.pre'
-        shell: bash
-      - run: ./setup.sh -t -p -n 2 any               | grep 'beta'
-        shell: bash
-      - run: ./setup.sh -t -p -n 2 any               | grep '2.13.0-0.4.pre'
-        shell: bash
-      - run: ./setup.sh -t -p -n 3 any               | grep 'beta'
-        shell: bash
-      - run: ./setup.sh -t -p -n 3 any               | grep '3.9.0-0.1.pre'
-        shell: bash
-      - run: ./setup.sh -t -p -n 3 any               | grep 'x64'
-        shell: bash
-      - run: ./setup.sh -t -p -n any stable          | grep 'stable'
-        shell: bash
-      - run: ./setup.sh -t -p -n any stable          | grep '3.7.7'
-        shell: bash
-      - run: ./setup.sh -t -p -n any stable          | grep 'x64'
-        shell: bash
-      - run: ./setup.sh -t -p -n 1 stable            | grep '1.22.6'
-        shell: bash
-      - run: ./setup.sh -t -p -n 0 any               | grep 'beta'
-        shell: bash
-      - run: ./setup.sh -t -p -n 0 any               | grep '0.11.13'
-        shell: bash
-      - run: ./setup.sh -t -p                        | grep 'flutter-linux-stable-3.7.7-x64-2ad6cd72c040113b47ee9055e722606a490ef0da'
-        shell: bash
-      - run: ./setup.sh -t -p stable                 | grep 'flutter-linux-stable-3.7.7-x64-2ad6cd72c040113b47ee9055e722606a490ef0da'
-        shell: bash
-      - run: ./setup.sh -t -p beta                   | grep 'flutter-linux-beta-3.9.0-0.1.pre-x64-f732038a8cf4562ce38a1d7debb30209ae3da896'
-        shell: bash
-      - run: ./setup.sh -t -p dev                    | grep 'flutter-linux-dev-2.13.0-0.1.pre-x64-13a2fb10b838971ce211230f8ffdd094c14af02c'
-        shell: bash
-      - run: ./setup.sh -t -p master                 | grep 'flutter-linux-master-any-x64-master'
-        shell: bash
-      - run: ./setup.sh -t -p -n 5b12b74 master      | grep 'flutter-linux-master-5b12b74-x64-master'
-        shell: bash
-      - run: ./setup.sh -t -p -n 3.12.0-12.0.pre master     | grep 'flutter-linux-master-3.12.0-12.0.pre-x64-master'
-        shell: bash
-      - run: ./setup.sh -t -p -n stable master       | grep 'flutter-linux-master-stable-x64-master'
-        shell: bash
-      - run: ./setup.sh -t -p -n 2 any               | grep 'flutter-linux-beta-2.13.0-0.4.pre-x64-25caf1461b8f643092a9f6f5b224453b5c057d10'
-        shell: bash
-      - run: ./setup.sh -t -p -n 1 any               | grep 'flutter-linux-beta-1.26.0-17.8.pre-x64-044f2cf5607a26f8818dab0f766400e85c52bdff'
-        shell: bash
-      - run: ./setup.sh -t -p -n 0 any               | grep 'flutter-linux-beta-0.11.13-x64-58c8489fcdb4e4ef6c010117584c9b23d15221aa'
-        shell: bash
-      - run: ./setup.sh -t -p                        | grep '/opt/hostedtoolcache/flutter/stable-3.7.7-x64'
-        shell: bash
-      - run: ./setup.sh -t -p stable                 | grep '/opt/hostedtoolcache/flutter/stable-3.7.7-x64'
-        shell: bash
-      - run: ./setup.sh -t -p beta                   | grep '/opt/hostedtoolcache/flutter/beta-3.9.0-0.1.pre-x64'
-        shell: bash
-      - run: ./setup.sh -t -p dev                    | grep '/opt/hostedtoolcache/flutter/dev-2.13.0-0.1.pre-x64'
-        shell: bash
-      - run: ./setup.sh -t -p master                 | grep '/opt/hostedtoolcache/flutter/master-any-x64'
-        shell: bash
-      - run: ./setup.sh -t -p -k 'custom-:channel:-:version:-:hash:'       | grep 'custom-stable-3.7.7-2ad6cd72c040113b47ee9055e722606a490ef0da'
-        shell: bash
-      - run: ./setup.sh -t -p -k 'custom-:channel:-:version:-:sha256:'     | grep 'custom-stable-3.7.7-cdd49597e88c35e5de5184e9acff433dfbb3c075b74ef7b27790af7f57ce2420'
-        shell: bash
-      - run: ./setup.sh -t -p -c '/tmp/flutter/:channel:-:version:-:hash:' | grep '/tmp/flutter/stable-3.7.7-2ad6cd72c040113b47ee9055e722606a490ef0da'
-        shell: bash
-
-
-  test_print_output_arm64:
+  build:
     runs-on: macos-latest
-
-    # These calls to setup.sh sepcify the -t flag, which enables test mode.
-    # Test mode uses hardcoded Flutter release manifests from test/ directory.
+    permissions:
+      contents: write
 
     steps:
-      - name: Clone repository
-        uses: actions/checkout@v4
-      - run: ./setup.sh -t -p -f test/pubspec.yaml   | grep '3.3.10'
-        shell: bash
-      - run: ./setup.sh -t -p                        | grep 'stable'
-        shell: bash
-      - run: ./setup.sh -t -p                        | grep '3.7.7'
-        shell: bash
-      - run: ./setup.sh -t -p                        | grep 'arm64'
-        shell: bash
-      - run: ./setup.sh -t -p stable                 | grep 'stable'
-        shell: bash
-      - run: ./setup.sh -t -p beta                   | grep 'beta'
-        shell: bash
-      - run: ./setup.sh -t -p beta                   | grep '3.9.0-0.1.pre'
-        shell: bash
-      - run: ./setup.sh -t -p -n 3.3.10 stable       | grep '3.3.10'
-        shell: bash
-      - run: ./setup.sh -t -p -n 3.3.1 stable        | grep '3.3.1'
-        shell: bash
-      - run: ./setup.sh -t -p -n 3 any               | grep 'beta'
-        shell: bash
-      - run: ./setup.sh -t -p -n 3 any               | grep '3.9.0-0.1.pre'
-        shell: bash
-      - run: ./setup.sh -t -p -n 3 -a arm64 any      | grep 'arm64'
-        shell: bash
-      - run: ./setup.sh -t -p -n any -a arm64 stable | grep 'stable'
-        shell: bash
-      - run: ./setup.sh -t -p -n any -a arm64 stable | grep '3.7.7'
-        shell: bash
-      - run: ./setup.sh -t -p -n any -a arm64 stable | grep 'arm64'
-        shell: bash
-      - run: ./setup.sh -t -p                        | grep 'flutter-macos-stable-3.7.7-arm64-2ad6cd72c040113b47ee9055e722606a490ef0da'
-        shell: bash
-      - run: ./setup.sh -t -p stable                 | grep 'flutter-macos-stable-3.7.7-arm64-2ad6cd72c040113b47ee9055e722606a490ef0da'
-        shell: bash
-      - run: ./setup.sh -t -p beta                   | grep 'flutter-macos-beta-3.9.0-0.1.pre-arm64-8b9b90e75107181aadc303d8d7422205863a35dd'
-        shell: bash
-      - run: ./setup.sh -t -p master                 | grep 'flutter-macos-master-any-arm64-master'
-        shell: bash
-      - run: ./setup.sh -t -p -n 5b12b74 master      | grep 'flutter-macos-master-5b12b74-arm64-master'
-        shell: bash
-      - run: ./setup.sh -t -p -n 3.12.0-12.0.pre master     | grep 'flutter-macos-master-3.12.0-12.0.pre-arm64-master'
-        shell: bash
-      - run: ./setup.sh -t -p -n stable master       | grep 'flutter-macos-master-stable-arm64-master'
-        shell: bash
-      - run: ./setup.sh -t -p                        | grep '/Users/runner/hostedtoolcache/flutter/stable-3.7.7-arm64'
-        shell: bash
-      - run: ./setup.sh -t -p stable                 | grep '/Users/runner/hostedtoolcache/flutter/stable-3.7.7-arm64'
-        shell: bash
-      - run: ./setup.sh -t -p beta                   | grep '/Users/runner/hostedtoolcache/flutter/beta-3.9.0-0.1.pre-arm64'
-        shell: bash
-      - run: ./setup.sh -t -p master                 | grep '/Users/runner/hostedtoolcache/flutter/master-any-arm64'
-        shell: bash
-      - run: ./setup.sh -t -p -k 'custom-:channel:-:version:-:hash:'       | grep 'custom-stable-3.7.7-2ad6cd72c040113b47ee9055e722606a490ef0da'
-        shell: bash
-      - run: ./setup.sh -t -p -k 'custom-:channel:-:version:-:sha256:'     | grep 'custom-stable-3.7.7-0511b9f164a62f467b063e6c83d9c683bb3fb056ee556b2f45e987a2c2f4a260'
-        shell: bash
-      - run: ./setup.sh -t -p -c '/tmp/flutter/:channel:-:version:-:hash:' | grep '/tmp/flutter/stable-3.7.7-2ad6cd72c040113b47ee9055e722606a490ef0da'
-        shell: bash
+      - name: Checkout repository
+        uses: actions/checkout@v3     # Checkout the Repository on the Virtual Machine
+
+      # Install the Apple certificate and provisioning profile 
+      - name: Install the Apple certificate and provisioning profile
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.APPSTORE_CERT_BASE64 }}
+          P12_PASSWORD: ${{ secrets.APPSTORE_CERT_PASSWORD }}
+          BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.MOBILEPROVISION_BASE64 }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          # Create Environmental variables
+          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+          PP_PATH=$RUNNER_TEMP/build_pp.mobileprovision
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          # Import Certificate and Provisioning Profile from secrets
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode --output $CERTIFICATE_PATH
+          echo -n "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode --output $PP_PATH
+          # Create Temporary Keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          # Import Certificate to Keychain
+          security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+          # Apply provisioning profile
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles  
+
+      - name: Install yq
+        uses: mikefarah/yq@v4.42.1
+
+      - name: Get pubspec version
+        id: get_flutter_app_version
+        run: |
+          VERSION=$(yq .version | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' pubspec.yaml | head -n 1)
+          echo "TAG_VERSION=$VERSION" >> $GITHUB_OUTPUT
+  
+      - name: Create git tag
+        run: |
+          git tag "v${{ steps.get_flutter_app_version.outputs.TAG_VERSION }}"
+
+      - name: Install Flutter               # Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'main'
+
+      - name: Get Flutter dependencies      # Get the Libraries and Dependencies
+        run: flutter pub get
+
+      - name: Building IPA                  # Build and sign the ipa using a single flutter command
+        run: flutter build ipa --release --export-options-plist=ios/Runner/ExportOptions.plist
+              
+      - name: Save IPA to Artifacts         # Collect the file and upload as artifact 
+        uses: actions/upload-artifact@v3
+        with:
+         name: release-ipa
+         path: build/ios/ipa/*.ipa
+
+      - name: Create Github Release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "build/ios/ipa/*.ipa"
+          tag: "v${{ steps.get_flutter_app_version.outputs.TAG_VERSION }}-ios"
+
+      # Important! Cleanup: remove the certificate and provisioning profile from the GitHub Machine [Runner]!
+      - name: Clean up keychain and provisioning profile
+        if: ${{ always() }}
+        run: |
+          security delete-keychain $RUNNER_TEMP/app-signing.keychain-db
+          rm ~/Library/MobileDevice/Provisioning\ Profiles/build_pp.mobileprovision
+
+  # TODO:  Upload to Firebase - for App Distribution
+  # Release job, upload the ipa to Firebase App Distribution
+  # release:
+  #   name: Release ipa to Firebase
+  #   needs: [ build ]
+  #   runs-on: ubuntu-latest
+  #   steps:
+    
+  #   # Retrieve ipa file from GitHub artifacts
+  #   - uses: actions/checkout@v3
+  #   - name: Get release-ipa from artifacts
+  #     uses: actions/download-artifact@v3
+  #     with:
+  #       name: release-ipa
+
+  #   # Upload ipa file to Firebase
+  #   - name: Upload artifact to Firebase App Distribution
+  #     uses: wzieba/Firebase-Distribution-Github-Action@v1
+  #     with:
+  #       appId: ${{secrets.FIREBASE_IOS_APP_ID}}
+  #       serviceCredentialsFileContent: ${{ secrets.CREDENTIAL_FILE_CONTENT }}
+  #       groups: ios-developers
+  #       file: ${{secrets.APP_NAME}}.ipa

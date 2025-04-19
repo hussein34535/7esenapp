@@ -22,10 +22,10 @@ import 'package:share_plus/share_plus.dart';
 import 'package:hesen/privacy_policy_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hesen/password_entry_screen.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart'; // Import dotenv
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:hesen/telegram_dialog.dart'; // Import the Telegram dialog
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -57,11 +57,9 @@ SharedPreferences? prefs;
 Future<void> main() async {
   // Ensure widgets are initialized first
   // Load environment variables from .env file
-  await dotenv.load(fileName: ".env");
+  await dotenv.load(fileName: './.env');
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await FirebaseApi().initNotification();
-  await MobileAds.instance.initialize();
-  // Test device configuration removed for release build
   tz.initializeTimeZones(); // Initialize timezone database
   prefs = await SharedPreferences.getInstance();
   runApp(MyApp());
@@ -179,9 +177,9 @@ class _MyAppState extends State<MyApp> {
         ),
       ),
       themeMode: _themeMode,
-      initialRoute: '/',
+      initialRoute: '/home', // Go directly to home/password check
       routes: {
-        '/': (context) => MySplashScreen(),
+        // '/': (context) => MySplashScreen(), // Removed custom splash route
         '/home': (context) => _isFirstTime
             ? PasswordEntryScreen(
                 key: ValueKey('password'),
@@ -212,43 +210,7 @@ class _MyAppState extends State<MyApp> {
   }
 }
 
-class MySplashScreen extends StatefulWidget {
-  const MySplashScreen({super.key});
-
-  @override
-  _MySplashScreenState createState() => _MySplashScreenState();
-}
-
-class _MySplashScreenState extends State<MySplashScreen> {
-  @override
-  void initState() {
-    super.initState();
-    Timer(Duration(seconds: 3), () {
-      Navigator.pushReplacementNamed(context, '/home');
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        children: [
-          Container(
-            color: Colors.black,
-            width: double.infinity,
-            height: double.infinity,
-          ),
-          Center(
-            child: SizedBox(
-              width: MediaQuery.of(context).size.width / 2,
-              child: Image.asset('assets/icon/icon.png'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+// Removed MySplashScreen widget
 
 class HomePage extends StatefulWidget {
   final Function(bool) onThemeChanged;
@@ -275,11 +237,15 @@ class _HomePageState extends State<HomePage> {
   List _filteredChannels = [];
   late bool _isDarkMode; // Initialize in initState based on themeMode
   bool _isSearchBarVisible = false;
-  InterstitialAd? _interstitialAd;
-  bool _isAdLoading = false;
-  // Use your real Ad Unit ID here in production
-  final String _adUnitId =
-      'ca-app-pub-2393153600924393/4147344165'; // Or use a test ID like InterstitialAd.testAdUnitId
+  // InterstitialAd? _interstitialAd;
+  // bool _isAdLoading = false;
+  // // Use your real Ad Unit ID here in production
+  // final String _interstitialAdUnitId =
+  //     'ca-app-pub-2393153600924393/2316622245'; // Production Interstitial Ad ID
+  // final String _rewardedAdUnitId =
+  //     'ca-app-pub-2393153600924393/1679399820'; // Production Rewarded Ad ID
+  // RewardedAd? _rewardedAd;
+  // bool _isRewardedAdLoading = false;
   Completer<void>? _drawerCloseCompleter;
 
   @override
@@ -289,7 +255,15 @@ class _HomePageState extends State<HomePage> {
         widget.themeMode == ThemeMode.dark; // Initialize _isDarkMode here
     _dataFuture = _initData();
     requestNotificationPermission();
-    _loadAd(); // Load the first ad when HomePage initializes
+    // _loadAd(); // Load the interstitial ad
+    // _loadRewardedAd(); // Load the rewarded ad
+
+    // Show Telegram dialog after the first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Check if the dialog should be shown (e.g., only once per session or based on SharedPreferences)
+      // For now, let's show it every time HomePage is initialized.
+      showTelegramDialog(context);
+    });
   }
 
   @override
@@ -372,7 +346,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> checkForUpdate() async {
     try {
       final response = await http.get(Uri.parse(
-          'https://raw.githubusercontent.com/7essen/forceupdate/main/latestversion.json'));
+          'https://raw.githubusercontent.com/hussein34535/forceupdate/refs/heads/main/update.json'));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final latestVersion = data['version'];
@@ -665,13 +639,11 @@ class _HomePageState extends State<HomePage> {
               },
             ),
       bottomNavigationBar: CurvedNavigationBar(
-        backgroundColor: Theme.of(context).brightness == Brightness.dark
-            ? Colors.black
-            : const Color(0xFF673AB7),
-        color: Theme.of(context).brightness == Brightness.dark
-            ? Theme.of(context).colorScheme.primary
-            : navBarBackgroundColor,
-        buttonBackgroundColor: Theme.of(context).cardColor,
+        // Background behind the bar matches the scaffold background
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        color: Colors.black, // Bar itself is always black
+        buttonBackgroundColor: Theme.of(context)
+            .cardColor, // Keep button background theme-aware for contrast
         animationDuration: const Duration(milliseconds: 300),
         items: [
           Image.asset('assets/tv.png',
@@ -692,47 +664,147 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // Function to load Rewarded Ad
+  // void _loadRewardedAd() {
+  //   if (_isRewardedAdLoading) {
+  //     return;
+  //   }
+  //   _isRewardedAdLoading = true;
+  //   RewardedAd.load(
+  //       adUnitId: _rewardedAdUnitId,
+  //       request: const AdRequest(),
+  //       rewardedAdLoadCallback: RewardedAdLoadCallback(
+  //         onAdLoaded: (RewardedAd ad) {
+  //           print('$ad loaded.');
+  //           _rewardedAd = ad;
+  //           _isRewardedAdLoading = false;
+  //         },
+  //         onAdFailedToLoad: (LoadAdError error) {
+  //           print('RewardedAd failed to load: $error');
+  //           _rewardedAd = null;
+  //           _isRewardedAdLoading = false;
+  //         },
+  //       ));
+  // }
+
   // Function to load Interstitial Ad
-  void _loadAd() {
-    if (_isAdLoading) {
-      return; // Don't load if already loading
-    }
-    _isAdLoading = true;
-    InterstitialAd.load(
-      adUnitId: _adUnitId,
-      request: const AdRequest(),
-      adLoadCallback: InterstitialAdLoadCallback(
-        onAdLoaded: (InterstitialAd ad) {
-          print('$ad loaded.');
-          _interstitialAd = ad;
-          _isAdLoading = false;
-        },
-        onAdFailedToLoad: (LoadAdError error) {
-          print('InterstitialAd failed to load: $error');
-          _isAdLoading = false;
-          _interstitialAd = null; // Ensure ad is null if loading failed
-        },
-      ),
-    );
+  // void _loadAd() {
+  //   if (_isAdLoading) {
+  //     return; // Don't load if already loading
+  //   }
+  //   _isAdLoading = true;
+  //   InterstitialAd.load(
+  //     adUnitId: _interstitialAdUnitId, // Corrected variable name
+  //     request: const AdRequest(),
+  //     adLoadCallback: InterstitialAdLoadCallback(
+  //       onAdLoaded: (InterstitialAd ad) {
+  //         print('$ad loaded.');
+  //         _interstitialAd = ad;
+  //         _isAdLoading = false;
+  //       },
+  //       onAdFailedToLoad: (LoadAdError error) {
+  //         print('InterstitialAd failed to load: $error');
+  //         _isAdLoading = false;
+  //         _interstitialAd = null; // Ensure ad is null if loading failed
+  //       },
+  //     ),
+  //   );
+  // }
+
+  // Updated openVideo to handle ads based on source
+  void openVideo(BuildContext context, String initialUrl,
+      List<Map<String, dynamic>> streamLinks, String sourceSection) {
+    print("openVideo called from: $sourceSection");
+
+    // if (sourceSection == 'news') {
+    //   // --- Show Rewarded Ad for News Section ---
+    //   if (_rewardedAd != null) {
+    //     print("Attempting to show Rewarded Ad for News.");
+    //     _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
+    //       onAdShowedFullScreenContent: (RewardedAd ad) =>
+    //           print('$ad onAdShowedFullScreenContent.'),
+    //       onAdDismissedFullScreenContent: (RewardedAd ad) {
+    //         print('$ad onAdDismissedFullScreenContent.');
+    //         ad.dispose();
+    //         _rewardedAd = null;
+    //         _loadRewardedAd(); // Load the next one
+    //         // Navigate AFTER ad dismissal
+    //         _navigateToVideoPlayer(context, initialUrl, streamLinks);
+    //       },
+    //       onAdFailedToShowFullScreenContent: (RewardedAd ad, AdError error) {
+    //         print('$ad onAdFailedToShowFullScreenContent: $error');
+    //         ad.dispose();
+    //         _rewardedAd = null;
+    //         _loadRewardedAd(); // Load the next one
+    //         // Navigate directly if ad fails to show
+    //         _navigateToVideoPlayer(context, initialUrl, streamLinks);
+    //       },
+    //     );
+
+    //     _rewardedAd!.show(
+    //         onUserEarnedReward: (AdWithoutView ad, RewardItem reward) {
+    //       print(
+    //           '$ad with reward $RewardItem(${reward.amount}, ${reward.type})');
+    //       // Handle reward if necessary
+    //     });
+    //   } else {
+    //     print("Rewarded Ad not ready for News, navigating directly.");
+    //     _loadRewardedAd(); // Try loading again
+    //     _navigateToVideoPlayer(context, initialUrl, streamLinks);
+    //   }
+    // } else {
+    //   // --- Show Interstitial Ad for Channels/Matches Sections ---
+    //   final interstitialAdToShow = _interstitialAd;
+    //   _interstitialAd = null; // Clear the reference
+
+    //   // Start loading the next interstitial ad immediately
+    //   _loadAd();
+
+    //   if (interstitialAdToShow != null) {
+    //     print("Attempting to show Interstitial Ad for $sourceSection.");
+    //     interstitialAdToShow.fullScreenContentCallback =
+    //         FullScreenContentCallback(
+    //       onAdShowedFullScreenContent: (InterstitialAd ad) =>
+    //           print('$ad onAdShowedFullScreenContent.'),
+    //       onAdDismissedFullScreenContent: (InterstitialAd ad) {
+    //         print('$ad onAdDismissedFullScreenContent.');
+    //         ad.dispose();
+    //         // Navigate AFTER ad dismissal using GlobalKey
+    //         _navigateToVideoPlayer(context, initialUrl, streamLinks);
+    //       },
+    //       onAdFailedToShowFullScreenContent:
+    //           (InterstitialAd ad, AdError error) {
+    //         print('$ad onAdFailedToShowFullScreenContent: $error');
+    //         ad.dispose();
+    //         // Navigate directly if ad fails to show using GlobalKey
+    //         _navigateToVideoPlayer(context, initialUrl, streamLinks);
+    //       },
+    //     );
+    //     interstitialAdToShow.show();
+    //   } else {
+    //     print(
+    //         "Interstitial Ad not ready for $sourceSection, navigating directly.");
+    //     // Navigate directly if no ad is loaded
+    //     _navigateToVideoPlayer(context, initialUrl, streamLinks);
+    //   }
+    // }
+
+    _navigateToVideoPlayer(context, initialUrl, streamLinks);
   }
 
-  void openVideo(BuildContext context, String initialUrl,
+  // Helper function for navigation using GlobalKey
+  void _navigateToVideoPlayer(
+      BuildContext context, // Context still passed but not used for navigation
+      String initialUrl,
       List<Map<String, dynamic>> streamLinks) {
-    // Prepare the ad to pass (it might be null if not loaded yet)
-    final adToShow = _interstitialAd;
-    _interstitialAd = null; // Clear the reference so it's used only once
-
-    // Start loading the next ad immediately
-    _loadAd();
-
-    // Navigate to the player screen, passing the ad
-    Navigator.push(
-      context,
+    // Use the GlobalKey to access the NavigatorState safely
+    navigatorKey.currentState?.push(
       MaterialPageRoute(
         builder: (context) => VideoPlayerScreen(
+          // BuildContext here is fine
           initialUrl: initialUrl,
           streamLinks: streamLinks,
-          interstitialAd: adToShow, // Pass the loaded ad
+          // interstitialAd: adToShow, // Removed parameter
         ),
       ),
     );

@@ -259,8 +259,12 @@ class ChannelTile extends StatelessWidget {
 
           if (streams.isNotEmpty) {
             if (streams[0]['url'] is String) {
-              openVideo(context, streams[0]['url']!,
-                  streams.map((e) => Map<String, dynamic>.from(e)).toList());
+              openVideo(
+                  context,
+                  streams[0]['url']!,
+                  streams.map((e) => Map<String, dynamic>.from(e)).toList(),
+                  'channels' // Added sourceSection
+                  );
             } else {
               scaffoldMessenger.showSnackBar(
                   SnackBar(content: Text('Invalid Stream Format')));
@@ -464,8 +468,12 @@ class MatchBox extends StatelessWidget {
       onTap: () {
         final scaffoldMessenger = ScaffoldMessenger.of(context);
         if (streams.isNotEmpty) {
-          openVideo(context, firstStreamUrl,
-              streams.map((e) => Map<String, dynamic>.from(e)).toList());
+          openVideo(
+              context,
+              firstStreamUrl,
+              streams.map((e) => Map<String, dynamic>.from(e)).toList(),
+              'matches' // Added sourceSection
+              );
         } else {
           scaffoldMessenger.showSnackBar(
               SnackBar(content: Text('لا يوجد رابط للبث المباشر')));
@@ -687,12 +695,13 @@ class NewsBox extends StatelessWidget {
           String firstStreamUrl =
               streams[0]['url'] ?? ''; // Access the first link
           openVideo(
-            context,
-            firstStreamUrl, // Pass the URL
-            streams
-                .map((e) => Map<String, dynamic>.from(e))
-                .toList(), // Pass all links (in the correct format)
-          );
+              context,
+              firstStreamUrl, // Pass the URL
+              streams
+                  .map((e) => Map<String, dynamic>.from(e))
+                  .toList(), // Pass all links (in the correct format)
+              'news' // Added sourceSection
+              );
         } else {
           scaffoldMessenger.showSnackBar(
             SnackBar(

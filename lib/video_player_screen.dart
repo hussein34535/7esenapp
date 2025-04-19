@@ -5,7 +5,6 @@ import 'package:chewie/chewie.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 enum VideoSize {
   fullScreen, // Use device's full screen size
@@ -23,7 +22,7 @@ class VideoPlayerScreen extends StatefulWidget {
   final Duration playbackTimeoutDuration;
   final int maxRetries;
   final Duration streamSwitchDelay;
-  final InterstitialAd? interstitialAd; // Accept the passed ad
+  // final InterstitialAd? interstitialAd; // Removed - Ad shown before navigation
 
   const VideoPlayerScreen({
     super.key,
@@ -35,7 +34,7 @@ class VideoPlayerScreen extends StatefulWidget {
     this.playbackTimeoutDuration = const Duration(seconds: 10),
     this.maxRetries = 5,
     this.streamSwitchDelay = const Duration(seconds: 3),
-    this.interstitialAd, // Accept the passed ad
+    // this.interstitialAd, // Removed
   });
 
   @override
@@ -89,11 +88,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     _connectivitySubscription =
         Connectivity().onConnectivityChanged.listen(_handleConnectivityChange);
 
-    // Show ad first, then initialize player in the callback
-    _showAd(onAdDismissed: () {
-      if (!mounted) return; // Check if still mounted after ad
-      _initializePlayerInternal(_currentUrl!); // Initialize player after ad
-    });
+    // Initialize player directly now
+    _initializePlayerInternal(_currentUrl!);
 
     _checkIfLive(); // Check live status after setting currentUrl
   }
@@ -131,53 +127,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     _videoPlayerController?.removeListener(_videoPlayerListener);
     _videoPlayerController?.dispose();
     _chewieController?.dispose();
-    // Disable fullscreen and wakelock directly in dispose
+    // Disable fullscreen and wakelock, allow all orientations
     WakelockPlus.disable();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
+    SystemChrome.setPreferredOrientations(
+        DeviceOrientation.values); // Allow all
     super.dispose();
   }
 
-  // --- Ad Handling ---
-
-  void _showAd({required VoidCallback onAdDismissed}) {
-    if (widget.interstitialAd != null) {
-      widget.interstitialAd!.fullScreenContentCallback =
-          FullScreenContentCallback(
-        onAdShowedFullScreenContent: (InterstitialAd ad) =>
-            print('%ad onAdShowedFullScreenContent.'),
-        onAdDismissedFullScreenContent: (InterstitialAd ad) {
-          print('$ad onAdDismissedFullScreenContent.');
-          ad.dispose(); // Dispose the ad after it's dismissed
-          if (mounted) {
-            // Ensure widget is still mounted before calling back
-            onAdDismissed();
-          }
-        },
-        onAdFailedToShowFullScreenContent: (InterstitialAd ad, AdError error) {
-          print('$ad onAdFailedToShowFullScreenContent: $error');
-          ad.dispose(); // Dispose the ad if it failed to show
-          if (mounted) {
-            // Ensure widget is still mounted before calling back
-            onAdDismissed(); // Proceed even if ad failed
-          }
-        },
-        onAdImpression: (InterstitialAd ad) =>
-            print('$ad impression occurred.'),
-      );
-      widget.interstitialAd!.show();
-    } else {
-      // If no ad was passed (e.g., failed to load in HomePage), proceed directly
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          onAdDismissed();
-        }
-      });
-    }
-  }
+  // --- Ad Handling Removed ---
 
   // --- Player Initialization and Control ---
 
@@ -1103,6 +1061,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   void _enableFullscreenMode() {
     WakelockPlus.enable();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    // Force landscape only when entering the player
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,

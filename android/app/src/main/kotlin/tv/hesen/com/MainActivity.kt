@@ -1,4 +1,4 @@
-package com.tv.hesen
+package tv.hesen.com
 
 import io.flutter.embedding.android.FlutterActivity
 

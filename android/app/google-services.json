@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:415589112214:android:864a57edd3972e98da65b7",
+        "mobilesdk_app_id": "1:415589112214:android:a0f1ba51f5e2ba82da65b7",
         "android_client_info": {
-          "package_name": "com.tv.hesen"
+          "package_name": "tv.hesen.com"
         }
       },
       "oauth_client": [],

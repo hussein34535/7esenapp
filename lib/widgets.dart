@@ -37,6 +37,7 @@ class _ChannelsSectionState extends State<ChannelsSection> {
 
                   return GridView.builder(
                     key: _gridKey,
+                    physics: const AlwaysScrollableScrollPhysics(),
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount:
                           orientation == Orientation.portrait ? 1 : 2,
@@ -79,19 +80,25 @@ class ChannelBox extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25.0)),
       child: InkWell(
+        borderRadius: BorderRadius.circular(25.0),
         onTap: () {
+          // Print the channels list just before navigation
+          List channelsToPass = category['channels'] ?? [];
+          // print("--- ChannelBox onTap - Channels being passed: ---");
+          // print(channelsToPass);
+          // print("--------------------------------------------------");
+
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (context) => CategoryChannelsScreen(
-                channels: category['channels'] ?? [],
+                channels: channelsToPass, // Pass the list
                 openVideo: openVideo,
               ),
             ),
           );
         },
-        borderRadius: BorderRadius.circular(10),
         child: Center(
           child: Padding(
             padding: const EdgeInsets.all(8.0),
@@ -128,6 +135,10 @@ class _CategoryChannelsScreenState extends State<CategoryChannelsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Add print statement here
+    // print("--- CategoryChannelsScreen RECEIVED CHANNELS ---");
+    // print(widget.channels);
+    // print("---------------------------------------------");
     return Scaffold(
       appBar: AppBar(
         title: Text('القنوات'),
@@ -143,6 +154,7 @@ class _CategoryChannelsScreenState extends State<CategoryChannelsScreen> {
 
             return GridView.builder(
               key: _gridKey,
+              physics: const AlwaysScrollableScrollPhysics(),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: orientation == Orientation.portrait ? 1 : 2,
                 childAspectRatio: _calculateAspectRatio(
@@ -249,8 +261,10 @@ class ChannelTile extends StatelessWidget {
     List<dynamic> streamLinks = channel['StreamLink'] ?? [];
 
     return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25.0)),
       margin: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: InkWell(
+        borderRadius: BorderRadius.circular(25.0),
         onTap: () {
           final scaffoldMessenger = ScaffoldMessenger.of(context);
           onChannelTap(channelId);
@@ -352,50 +366,20 @@ class MatchesSection extends StatelessWidget {
           return ListView(
             children: [
               if (liveMatches.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(10.0),
-                  child: Text(
-                    'مباريات مباشرة',
-                    style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).textTheme.bodyLarge!.color),
-                    textAlign: TextAlign.right,
-                  ),
-                ),
-              ...liveMatches
-                  .map((match) => MatchBox(match: match, openVideo: openVideo))
-                  .toList(),
+                ...liveMatches
+                    .map(
+                        (match) => MatchBox(match: match, openVideo: openVideo))
+                    .toList(),
               if (upcomingMatches.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(10.0),
-                  child: Text(
-                    'مباريات قادمة',
-                    style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).textTheme.bodyLarge!.color),
-                    textAlign: TextAlign.right,
-                  ),
-                ),
-              ...upcomingMatches
-                  .map((match) => MatchBox(match: match, openVideo: openVideo))
-                  .toList(),
+                ...upcomingMatches
+                    .map(
+                        (match) => MatchBox(match: match, openVideo: openVideo))
+                    .toList(),
               if (finishedMatches.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(10.0),
-                  child: Text(
-                    'مباريات انتهت',
-                    style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).textTheme.bodyLarge!.color),
-                    textAlign: TextAlign.right,
-                  ),
-                ),
-              ...finishedMatches
-                  .map((match) => MatchBox(match: match, openVideo: openVideo))
-                  .toList(),
+                ...finishedMatches
+                    .map(
+                        (match) => MatchBox(match: match, openVideo: openVideo))
+                    .toList(),
             ],
           );
         }
@@ -434,7 +418,8 @@ class MatchBox extends StatelessWidget {
       logoB = 'https://st9.onrender.com' + logoB;
     }
 
-    DateTime now = DateTime.now().toUtc().add(Duration(hours: 0));
+    // Use local time for comparison
+    DateTime now = DateTime.now();
     final matchDateTime = DateFormat('HH:mm').parse(matchTime);
     final matchDateTimeWithToday = DateTime(
         now.year, now.month, now.day, matchDateTime.hour, matchDateTime.minute);
@@ -480,9 +465,12 @@ class MatchBox extends StatelessWidget {
         }
       },
       child: Card(
-        margin: EdgeInsets.all(10),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(25.0),
+        ),
+        margin: EdgeInsets.all(9), // Medium margin
         child: Padding(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.all(9.0), // Medium padding
           child: Column(
             children: [
               Row(
@@ -491,39 +479,48 @@ class MatchBox extends StatelessWidget {
                   Expanded(
                     child: Column(
                       children: [
-                        _buildTeamLogo(logoA),
-                        SizedBox(height: 5),
+                        _buildTeamLogo(logoA, size: 52), // Medium logo size
+                        SizedBox(height: 4), // Kept smaller space
                         Text(teamA,
-                            style: TextStyle(fontWeight: FontWeight.bold)),
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15) // Medium font size
+                            ),
                       ],
                     ),
                   ),
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 7), // Medium padding
                     decoration: BoxDecoration(
                       color: borderColor,
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(9), // Medium radius
                     ),
                     child: Text(
                       timeStatus,
                       style: TextStyle(
-                          fontWeight: FontWeight.bold, color: Colors.white),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13, // Medium font size
+                          color: Colors.white),
                       textAlign: TextAlign.center,
                     ),
                   ),
                   Expanded(
                     child: Column(
                       children: [
-                        _buildTeamLogo(logoB),
-                        SizedBox(height: 5),
+                        _buildTeamLogo(logoB, size: 52), // Medium logo size
+                        SizedBox(height: 4), // Kept smaller space
                         Text(teamB,
-                            style: TextStyle(fontWeight: FontWeight.bold)),
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15) // Medium font size
+                            ),
                       ],
                     ),
                   ),
                 ],
               ),
-              SizedBox(height: 10),
+              SizedBox(height: 9), // Medium space
               // Details Row (Commentator, Channel)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -531,32 +528,44 @@ class MatchBox extends StatelessWidget {
                   // Commentator
                   Row(
                     children: [
-                      Icon(Icons.mic, size: 20, color: Colors.grey),
-                      SizedBox(width: 5),
-                      Text(commentator, style: TextStyle(color: Colors.grey)),
+                      Icon(Icons.mic,
+                          size: 18, color: Colors.grey), // Medium icon size
+                      SizedBox(width: 4), // Kept smaller space
+                      Text(commentator,
+                          style: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 12)), // Medium font size
                     ],
                   ),
                   // Channel
                   Row(
                     children: [
-                      Icon(Icons.tv, size: 20, color: Colors.grey),
-                      SizedBox(width: 5),
-                      Text(channel, style: TextStyle(color: Colors.grey)),
+                      Icon(Icons.tv,
+                          size: 18, color: Colors.grey), // Medium icon size
+                      SizedBox(width: 4), // Kept smaller space
+                      Text(channel,
+                          style: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 12)), // Medium font size
                     ],
                   ),
                 ],
               ),
               // Champion (moved below)
               Padding(
-                padding: const EdgeInsets.only(top: 8.0),
+                padding: const EdgeInsets.only(top: 7.0), // Medium padding
                 child: Row(
                   mainAxisAlignment:
                       MainAxisAlignment.center, // Center the champion
                   children: [
-                    Icon(Icons.stars, size: 20, color: Colors.grey),
-                    SizedBox(width: 5),
+                    Icon(Icons.emoji_events,
+                        size: 18,
+                        color: Colors.grey), // Changed from Icons.stars
+                    SizedBox(width: 4), // Kept smaller space
                     Text(champion,
-                        style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey)), // Medium font size
                   ],
                 ),
               ),
@@ -567,28 +576,28 @@ class MatchBox extends StatelessWidget {
     );
   }
 
-  Widget _buildTeamLogo(String logoUrl) {
+  Widget _buildTeamLogo(String logoUrl, {double size = 60}) {
     return Container(
-      width: 60,
-      height: 60,
-      child: logoUrl.isNotEmpty // تأكد من أن الرابط ليس فارغًا
+      width: size,
+      height: size,
+      child: logoUrl.isNotEmpty
           ? CachedNetworkImage(
-              imageUrl: logoUrl, // استخدم الرابط المعدل هنا
+              imageUrl: logoUrl,
               fit: BoxFit.contain,
               errorWidget: (context, url, error) => Image.asset(
-                'assets/ball.png', // Use the correct path
-                width: 40,
-                height: 40,
-                color: Colors.grey, // Optional: if you want to tint the image
+                'assets/no-image.png',
+                width: size * 0.8,
+                height: size * 0.8,
+                color: Colors.grey,
               ),
               placeholder: (context, url) =>
                   Center(child: CircularProgressIndicator()),
             )
           : Image.asset(
-              'assets/ball.png', // Use the correct path
-              width: 40,
-              height: 40,
-              color: Colors.grey, // Optional: if you want to tint the image
+              'assets/no-image.png',
+              width: size * 0.8,
+              height: size * 0.8,
+              color: Colors.grey,
             ),
     );
   }
@@ -602,30 +611,72 @@ class NewsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width; // Get screen width
+    final titleFontSize =
+        (screenWidth * 0.05).clamp(16.0, 24.0); // Calculate dynamic size
+
     return FutureBuilder<List<dynamic>>(
       future: newsArticles,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(child: CircularProgressIndicator());
         } else if (snapshot.hasError) {
-          return Center(
-              child: Text('خطأ في استرجاع الأخبار',
-                  style: TextStyle(
-                      color: Theme.of(context).textTheme.bodyLarge!.color)));
+          // Use CustomScrollView + SliverFillRemaining for centering + scrollability
+          return CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                      child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Text('خطأ في استرجاع الأخبار',
+                              textAlign: TextAlign.center, // Center text
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .textTheme
+                                      .bodyLarge!
+                                      .color))))),
+            ],
+          );
         } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return Center(
-              child: Text('لا توجد أخبار لعرضها',
-                  style: TextStyle(
-                      color: Theme.of(context).textTheme.bodyLarge!.color)));
+          // Use CustomScrollView + SliverFillRemaining for centering + scrollability
+          return CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                      child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Text('لا توجد أخبار لعرضها',
+                              textAlign: TextAlign.center, // Center text
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .textTheme
+                                      .bodyLarge!
+                                      .color))))),
+            ],
+          );
         } else {
           final articles =
               snapshot.data!.reversed.toList(); // Reverse the list here
-          return ListView.builder(
-            itemCount: articles.length,
-            itemBuilder: (context, index) {
-              final article = articles[index];
-              return NewsBox(article: article, openVideo: openVideo);
-            },
+          return Column(
+            // Wrap ListView in a Column
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                // Make ListView take remaining space
+                child: ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  itemCount: articles.length,
+                  itemBuilder: (context, index) {
+                    final article = articles[index];
+                    return NewsBox(article: article, openVideo: openVideo);
+                  },
+                ),
+              ),
+            ],
           );
         }
       },
@@ -710,24 +761,25 @@ class NewsBox extends StatelessWidget {
         }
       },
       child: Card(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(25.0)),
         clipBehavior: Clip.antiAlias,
         margin: EdgeInsets.all(10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Conditional rendering for image or icon container
-            imageUrl != null
-                ? CachedNetworkImage(
-                    imageUrl: imageUrl,
-                    placeholder: (context, url) =>
-                        Center(child: CircularProgressIndicator()),
-                    errorWidget: (context, url, error) =>
-                        _buildPlaceholder(), // Use the placeholder widget
-                    height: 200,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                  )
-                : _buildPlaceholder(), // Use the placeholder widget
+            // Always attempt CachedNetworkImage, rely on errorWidget for null/bad URLs
+            CachedNetworkImage(
+              imageUrl: imageUrl ?? '', // Pass url or empty string
+              placeholder: (context, url) => Center(
+                  child:
+                      CircularProgressIndicator()), // Keep placeholder for loading
+              errorWidget: (context, url, error) =>
+                  _buildPlaceholder(), // Use placeholder on error/null url
+              height: 200,
+              width: double.infinity,
+              fit: BoxFit.cover,
+            ),
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -764,16 +816,285 @@ class NewsBox extends StatelessWidget {
     );
   }
 
-//  إنشاء عنصر نائب للصورة
   Widget _buildPlaceholder() {
     return Container(
-      height: 200, // Same height as CachedNetworkImage
+      height: 200,
       width: double.infinity,
-      color: Colors.grey[300], // Light grey color
+      color: Colors.grey[300],
       child: Center(
-        child: Icon(Icons.image,
-            size: 50, color: Colors.grey[600]), // Darker grey icon
+        child: Icon(Icons.image, size: 50, color: Colors.grey[600]),
       ),
     );
+  }
+}
+
+class GoalsSection extends StatelessWidget {
+  final Future<List<dynamic>> goalsArticles;
+  final Function(BuildContext, String, List<Map<String, dynamic>>, String)
+      openVideo;
+
+  const GoalsSection({
+    super.key,
+    required this.goalsArticles,
+    required this.openVideo,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width; // Get screen width
+    final titleFontSize =
+        (screenWidth * 0.05).clamp(16.0, 24.0); // Calculate dynamic size
+
+    return FutureBuilder<List<dynamic>>(
+      future: goalsArticles,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (snapshot.hasError) {
+          // Use CustomScrollView + SliverFillRemaining for centering + scrollability
+          return CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                    child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    'Error loading goals',
+                    textAlign: TextAlign.center, // Center text
+                    style: TextStyle(
+                        color: Theme.of(context).textTheme.bodyLarge!.color),
+                  ),
+                )),
+              ),
+            ],
+          );
+        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          // Use CustomScrollView + SliverFillRemaining for centering + scrollability
+          return CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                    child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    'No goals available',
+                    textAlign: TextAlign.center, // Center text
+                    style: TextStyle(
+                        color: Theme.of(context).textTheme.bodyLarge!.color),
+                  ),
+                )),
+              ),
+            ],
+          );
+        }
+
+        final goals = snapshot.data!;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(
+                    top: 16.0, left: 16.0, right: 16.0, bottom: 8.0),
+                itemCount: goals.length,
+                itemBuilder: (context, index) {
+                  final goal = goals[index];
+                  final title = goal['title'] ?? '';
+                  final time = goal['time'] ?? '';
+                  final url = goal['url'] ?? [];
+                  final image = goal['image']?[0] ?? {};
+
+                  // Simplified image URL extraction: Use direct URL first
+                  String? imageUrl = image['url'];
+
+                  // Add base URL if the image URL is relative
+                  if (imageUrl != null && !imageUrl.startsWith('http')) {
+                    imageUrl = 'https://st9.onrender.com' + imageUrl;
+                  }
+
+                  List<Map<String, dynamic>> streamLinks = [];
+                  if (url is List) {
+                    for (var item in url) {
+                      if (item['type'] == 'paragraph' &&
+                          item['children'] is List) {
+                        for (var child in item['children']) {
+                          if (child['type'] == 'link' && child['url'] != null) {
+                            streamLinks.add({
+                              'name': child['children']?[0]['text'] ?? 'Link',
+                              'url': child['url'],
+                            });
+                          }
+                        }
+                      }
+                    }
+                  }
+
+                  return GestureDetector(
+                    onTap: () {
+                      if (streamLinks.isNotEmpty) {
+                        openVideo(context, streamLinks[0]['url'], streamLinks,
+                            'goals');
+                      }
+                    },
+                    child: Card(
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(25.0)),
+                      clipBehavior: Clip.antiAlias,
+                      margin: const EdgeInsets.only(bottom: 16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (imageUrl != null)
+                            CachedNetworkImage(
+                              imageUrl:
+                                  imageUrl ?? '', // Pass url or empty string
+                              height: 200,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => Container(
+                                height: 200,
+                                color: Colors.grey[300],
+                                child: const Center(
+                                    child: CircularProgressIndicator()),
+                              ),
+                              errorWidget: (context, url, error) => Container(
+                                height: 200,
+                                color: Colors.grey[300],
+                                child: const Icon(Icons.error),
+                              ),
+                            ),
+                          Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  title,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                    color: Theme.of(context)
+                                        .textTheme
+                                        .bodyLarge!
+                                        .color,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  time,
+                                  style: TextStyle(
+                                    color: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium!
+                                        .color,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+Widget _buildScoreOrTime(
+    BuildContext context, String? score, String? time, String status,
+    {double iconSize = 16.0}) {
+  if (status == 'FT' ||
+      status == 'HT' ||
+      score != null && score.contains('-')) {
+    // Final Score - Use larger font, different color if needed
+    return Text(
+      score ?? '-', // Show score if available, else fallback
+      style: TextStyle(
+        fontSize: 18.0, // Larger font for final score
+        fontWeight: FontWeight.bold,
+        color:
+            Theme.of(context).colorScheme.secondary, // Distinct color for score
+      ),
+    );
+  } else if (status == 'NS' || time == null || time.isEmpty) {
+    // Not Started or No Time - Use a placeholder icon
+    // Replace Image.asset with Icon
+    return Icon(
+      Icons.sports_soccer, // Placeholder icon
+      size: iconSize + 4, // Slightly larger icon
+      color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
+    );
+    /* Original Image.asset
+    return Image.asset(
+      'assets/ball.png', // Use the correct path
+      width: iconSize + 4, // Slightly larger icon
+      height: iconSize + 4,
+      color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
+    );
+    */
+  } else {
+    // In-progress or Scheduled Time - Regular time display
+    return Text(
+      time,
+      style: TextStyle(
+        fontSize: 14.0,
+        color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.9),
+      ),
+    );
+  }
+}
+
+Widget _buildLiveIndicator(BuildContext context, String status) {
+  if (status == 'LIVE' ||
+      status == 'HT' ||
+      (status.contains('') && status != 'FT' && status != 'NS')) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.redAccent,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: const Text(
+        'LIVE',
+        style: TextStyle(
+            color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+      ),
+    );
+  } else if (status == 'NS') {
+    // Replace Image.asset with Icon for Not Started status
+    return Image.asset(
+      'assets/no-image.png', // Use the specified asset
+      width: 16, // Consistent size
+      height: 16,
+      color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
+    );
+    /* Original Icon
+    return Icon(
+      Icons.sports_soccer, // Placeholder icon
+      size: 16, // Consistent size
+      color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
+    );
+    */
+    /* Original Image.asset
+    return Image.asset(
+      'assets/ball.png', // Use the correct path
+      width: 16,
+      height: 16,
+      color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
+    );
+    */
+  } else {
+    return const SizedBox.shrink(); // Return empty space if not LIVE or NS
   }
 }

@@ -4,11 +4,14 @@ import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:android_pip/android_pip.dart';
 
 enum VideoSize {
   fullScreen, // Use device's full screen size
   ratio16_9, // 16:9 aspect ratio
+  ratio18_9, // 18:9 aspect ratio (Wider)
   ratio4_3, // 4:3 aspect ratio
   ratio1_1, // 1:1 aspect ratio
 }
@@ -52,7 +55,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   bool _hasError = false;
   bool _isControlsVisible = true;
   String? _currentUrl = "";
-  bool _isLive = false;
   int _selectedQualityIndex = 0;
   bool _isTryingNextStream = false;
   VideoSize _currentVideoSize = VideoSize.ratio16_9; // Start with 16:9
@@ -62,6 +64,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   Timer? _playbackTimeoutTimer;
   Timer? _bufferingTimer;
   StreamSubscription<ConnectivityResult>? _connectivitySubscription;
+
+  // Add instance for android_pip
+  final AndroidPIP _androidPIP = AndroidPIP();
 
   @override
   void initState() {
@@ -90,8 +95,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
     // Initialize player directly now
     _initializePlayerInternal(_currentUrl!);
-
-    _checkIfLive(); // Check live status after setting currentUrl
   }
 
   @override
@@ -99,7 +102,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     super.didUpdateWidget(oldWidget);
     if (widget.initialUrl != oldWidget.initialUrl ||
         widget.streamLinks != oldWidget.streamLinks) {
-      print("didUpdateWidget: URLs or stream links changed, re-initializing.");
+      // print("didUpdateWidget: URLs or stream links changed, re-initializing.");
       _cancelAllTimers();
       if (widget.streamLinks.isNotEmpty) {
         _currentUrl = widget.streamLinks[0]['url'];
@@ -113,13 +116,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
           _initializePlayerInternal(_currentUrl!);
         }
       });
-      _checkIfLive();
     }
   }
 
   @override
   dispose() {
-    print("dispose: Disposing VideoPlayerScreenState");
+    // print("dispose: Disposing VideoPlayerScreenState");
     _cancelAllTimers();
     _connectivitySubscription?.cancel();
     _animationController.dispose();
@@ -141,7 +143,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
   Future<void> _initializePlayerInternal(String url) async {
     if (!mounted) return; // Add mounted check at the start
-    print("_initializePlayerInternal: START for url: $url");
+    // print("_initializePlayerInternal: START for url: $url");
 
     // Ensure loading state is set
     if (!_isLoading) {
@@ -216,14 +218,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
           _hasError = false; // Reset error state on successful init
         });
       }
-      print("_initializePlayerInternal: SUCCESS for url: $url");
+      // print("_initializePlayerInternal: SUCCESS for url: $url");
     } catch (e) {
-      print("Error initializing player internal: $e for url: $url");
+      // print("Error initializing player internal: $e for url: $url");
       if (mounted) {
         setState(() {
-          _isLoading = false;
           _hasError = true;
-        }); // Stop loading, set error
+          _isLoading = false;
+        });
         _tryNextStream(); // Attempt next stream if init fails
       } else {
         // If not mounted, ensure the controller is disposed
@@ -233,7 +235,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   }
 
   Future<void> _releaseControllers() async {
-    print("_releaseControllers: Releasing controllers");
+    // print("_releaseControllers: Releasing controllers");
     final vpController = _videoPlayerController;
     final chController = _chewieController;
 
@@ -246,8 +248,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     try {
       chController?.dispose();
     } catch (e) {
-      print(
-          "Error disposing ChewieController (might be expected if already disposed): $e");
+      // print(
+      //     "Error disposing ChewieController (might be expected if already disposed): $e");
     }
   }
 
@@ -269,7 +271,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         !_videoPlayerController!.value.isInitialized) return;
     if (_videoPlayerController!.value.hasError) {
       if (mounted && !_isTryingNextStream) {
-        print("VideoPlayerListener: Error detected, trying next stream.");
+        // print("VideoPlayerListener: Error detected, trying next stream.");
         setState(() {
           _isLoading = false;
         }); // Ensure loading indicator is off
@@ -297,40 +299,59 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   // --- Stream Handling ---
 
   Future<void> _changeStream(String url, int index) async {
-    if (!mounted) return; // Add mounted check at the start
-    if (url == _currentUrl || url.isEmpty) return;
-    print("_changeStream: START to URL: $url, index: $index");
+    // print("--- _changeStream START ---");
+    // print("Attempting to change to: URL: $url, Index: $index");
+    if (!mounted) {
+      // print("_changeStream: Aborting - not mounted.");
+      // print("--- _changeStream END (Aborted - Not Mounted) ---");
+      return;
+    }
 
-    // Update state first
+    // Cancel timers and stop automatic retries immediately
+    _playbackTimeoutTimer?.cancel();
+    _bufferingTimer?.cancel();
+    _isTryingNextStream = false;
+
     setState(() {
-      _hasError = false;
-      _isLoading = true; // Set loading true while changing stream
+      _isLoading = true;
+      _hasError = false; // Reset error state on user-initiated change
+      _currentUrl = url; // Update current URL immediately
       _selectedQualityIndex = index;
-      _currentUrl = url;
+      // print(
+      //     "_changeStream: State updated - isLoading=true, index=$index, url=$url");
     });
 
-    // Initialize the player with the new URL (this now handles disposal internally)
+    // Add a small delay before initialization
+    await Future.delayed(const Duration(milliseconds: 100));
+
+    if (!mounted) {
+      // print("_changeStream: Aborting - not mounted after delay.");
+      // print("--- _changeStream END (Aborted Post-Delay) ---");
+      return; // Check again if mounted after delay
+    }
+
     await _initializePlayerInternal(url);
+    // print("--- _changeStream END (Finished Initialization Attempt) ---");
   }
 
   Future<void> _tryNextStream() async {
     if (!mounted || _isTryingNextStream) {
       if (_isTryingNextStream)
-        print("_tryNextStream: Already trying next stream, exiting");
-      return;
+        // print("_tryNextStream: Already trying next stream, exiting");
+        return;
     }
     _isTryingNextStream = true; // Set flag immediately
 
-    print(
-        "_tryNextStream: Attempting to find next stream. Current index: $_selectedQualityIndex");
+    // print(
+    //     "_tryNextStream: Attempting to find next stream. Current index: $_selectedQualityIndex");
     final nextIndex = _findNextViableStreamIndex();
 
     if (nextIndex != -1) {
       // Found a different stream to try
       final nextUrl = widget.streamLinks[nextIndex]['url'];
       if (nextUrl != null && nextUrl.isNotEmpty) {
-        print(
-            "_tryNextStream: Changing stream to index: $nextIndex, URL: $nextUrl after delay");
+        // print(
+        //     "_tryNextStream: Changing stream to index: $nextIndex, URL: $nextUrl after delay");
         await Future.delayed(widget.streamSwitchDelay);
         if (!mounted) {
           _isTryingNextStream = false; // Reset flag if unmounted during delay
@@ -340,21 +361,21 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         // Reset flag *after* attempting the change, regardless of success/failure handled within _changeStream
         _isTryingNextStream = false;
       } else {
-        print(
-            "_tryNextStream: Next stream URL is empty or null at index: $nextIndex");
+        // print(
+        //     "_tryNextStream: Next stream URL is empty or null at index: $nextIndex");
         _handleNoMoreStreams(); // This sets error state
-        _isTryingNextStream = false; // Reset flag
+        _isTryingNextStream = false; // Corrected variable name
       }
     } else {
-      print("_tryNextStream: No other viable stream found after full loop.");
+      // print("_tryNextStream: No other viable stream found after full loop.");
       _handleNoMoreStreams(); // This sets error state
-      _isTryingNextStream = false; // Reset flag
+      _isTryingNextStream = false; // Corrected variable name
     }
   }
 
   int _findNextViableStreamIndex() {
-    print(
-        "_findNextViableStreamIndex: Searching from index: $_selectedQualityIndex");
+    // print(
+    //     "_findNextViableStreamIndex: Searching from index: $_selectedQualityIndex");
     final int totalStreams = widget.streamLinks.length;
     if (totalStreams <= 1) return -1; // No other streams to try
 
@@ -362,8 +383,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     for (int i = _selectedQualityIndex + 1; i < totalStreams; i++) {
       if (widget.streamLinks[i]['url'] != null &&
           widget.streamLinks[i]['url'].isNotEmpty) {
-        print(
-            "_findNextViableStreamIndex: Found forward, index: $i, URL: ${widget.streamLinks[i]['url']}");
+        // print(
+        //     "_findNextViableStreamIndex: Found forward, index: $i, URL: ${widget.streamLinks[i]['url']}");
         return i;
       }
     }
@@ -372,14 +393,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     for (int i = 0; i < _selectedQualityIndex; i++) {
       if (widget.streamLinks[i]['url'] != null &&
           widget.streamLinks[i]['url'].isNotEmpty) {
-        print(
-            "_findNextViableStreamIndex: Found looping back, index: $i, URL: ${widget.streamLinks[i]['url']}");
+        // print(
+        //     "_findNextViableStreamIndex: Found looping back, index: $i, URL: ${widget.streamLinks[i]['url']}");
         return i;
       }
     }
 
-    print(
-        "_findNextViableStreamIndex: No other viable stream found after full loop.");
+    // print(
+    //     "_findNextViableStreamIndex: No other viable stream found after full loop.");
     return -1; // No other viable stream found
   }
 
@@ -563,6 +584,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
               _currentVideoSize = VideoSize.ratio16_9;
               break;
             case VideoSize.ratio16_9:
+              _currentVideoSize = VideoSize.ratio18_9; // Next is 18:9
+              break;
+            case VideoSize.ratio18_9: // Added case for 18:9
               _currentVideoSize = VideoSize.ratio4_3;
               break;
             case VideoSize.ratio4_3:
@@ -623,7 +647,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     try {
       oldChewieController?.dispose();
     } catch (e) {
-      print("Error disposing old ChewieController (might be expected): $e");
+      // print("Error disposing old ChewieController (might be expected): $e");
     }
 
     // Check if still mounted before creating the new one
@@ -678,6 +702,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         return mediaQuerySize.width / mediaQuerySize.height;
       case VideoSize.ratio16_9:
         return 16 / 9;
+      case VideoSize.ratio18_9: // Added case for 18:9
+        return 18 / 9;
       case VideoSize.ratio4_3:
         return 4 / 3;
       case VideoSize.ratio1_1:
@@ -693,6 +719,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         return "Full";
       case VideoSize.ratio16_9:
         return "16:9";
+      case VideoSize.ratio18_9: // Added case for 18:9
+        return "18:9";
       case VideoSize.ratio4_3:
         return "4:3";
       case VideoSize.ratio1_1:
@@ -711,6 +739,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
             ignoring: !_isControlsVisible,
             child: Stack(
               children: [
+                // RESTORED: Top positioned stream selector
                 Positioned(
                   top: MediaQuery.of(context).padding.top + 10,
                   left: 0,
@@ -746,9 +775,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                         ),
                 ),
                 Positioned(
-                  bottom: 0,
+                  bottom: -10, // Trying -10 for a slight offset below the edge
                   left: 0,
                   right: 0,
+                  // Removed Column, only bottom controls here
                   child: _buildBottomControls(context),
                 ),
               ],
@@ -765,165 +795,277 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   }
 
   Widget _buildBottomControls(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.bottomCenter,
-          end: Alignment.topCenter,
-          colors: [Colors.black.withOpacity(0.7), Colors.transparent],
-          stops: const [0.0, 1.0],
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              IconButton(
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                icon: const Icon(Icons.replay_10, color: Colors.white),
-                onPressed: () {
-                  if (!mounted) return;
-                  if (_videoPlayerController != null &&
-                      !_isLive &&
-                      _videoPlayerController!.value.isInitialized) {
-                    final currentPosition =
-                        _videoPlayerController!.value.position;
-                    _videoPlayerController!
-                        .seekTo(currentPosition - const Duration(seconds: 10));
-                  }
-                  _startHideControlsTimer();
-                },
-              ),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () {
+    // Use AnimatedBuilder to get the latest player values
+    return AnimatedBuilder(
+      animation: _videoPlayerController ??
+          Listenable.merge([]), // Use dummy if controller is null
+      builder: (context, child) {
+        // Log the value of _isLive when building controls
+        // print("_buildBottomControls: Building controls, _isLive = $_isLive"); // REMOVE print statement
+
+        // Check controller validity inside builder
+        final videoValue = _videoPlayerController?.value;
+        final bool isInitialized = videoValue?.isInitialized ?? false;
+        final Duration position = videoValue?.position ?? Duration.zero;
+        final Duration duration = videoValue?.duration ?? Duration.zero;
+        final double aspectRatio = videoValue?.aspectRatio ?? 16 / 9;
+
+        // --- PiP Button (Android Only) ---
+        Widget pipButton = const SizedBox.shrink();
+        if (defaultTargetPlatform == TargetPlatform.android) {
+          pipButton = IconButton(
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            icon: const Icon(Icons.picture_in_picture_alt, color: Colors.white),
+            tooltip: 'Picture-in-Picture',
+            onPressed: !isInitialized
+                ? null
+                : () async {
+                    // Disable if not initialized
                     if (!mounted) return;
-                    if (_videoPlayerController != null &&
-                        _videoPlayerController!.value.isInitialized) {
-                      if (_videoPlayerController!.value.isPlaying) {
-                        _videoPlayerController!.pause();
-                      } else {
-                        _videoPlayerController!.play();
-                      }
-                    }
-                    _startHideControlsTimer();
-                  },
-                  onHorizontalDragUpdate: !_isLive &&
-                          _videoPlayerController != null &&
-                          _videoPlayerController!.value.isInitialized
-                      ? (details) {
-                          if (!mounted) return;
-                          final duration =
-                              _videoPlayerController!.value.duration;
-                          final position =
-                              _videoPlayerController!.value.position;
-
-                          // Avoid dragging if duration is unknown (live streams sometimes report 0)
-                          if (duration <= Duration.zero) return;
-
-                          final dragDistance = details.primaryDelta ?? 0;
-                          final screenWidth = MediaQuery.of(context).size.width;
-                          // Avoid division by zero if screen width is somehow zero
-                          if (screenWidth == 0) return;
-
-                          final dragPercentage = dragDistance / screenWidth;
-
-                          final durationOffset =
-                              duration.inMilliseconds * dragPercentage;
-
-                          final newPosition = position +
-                              Duration(milliseconds: durationOffset.toInt());
-
-                          // Clamp new position between 0 and duration
-                          final clampedPosition = newPosition.clamp(
-                              Duration.zero, duration); // Use Duration.clamp
-
-                          _videoPlayerController!.seekTo(clampedPosition);
-
-                          _startHideControlsTimer();
+                    try {
+                      // print("Entering PiP mode (android_pip)...");
+                      // Calculate aspect ratio for PiP
+                      int num = 16; // Default
+                      int den = 9; // Default
+                      if (aspectRatio > 0 &&
+                          !aspectRatio.isNaN &&
+                          aspectRatio.isFinite) {
+                        num = (aspectRatio * 100).round();
+                        den = 100;
+                        int gcd(int a, int b) => b == 0 ? a : gcd(b, a % b);
+                        int divisor = gcd(num, den);
+                        num ~/= divisor;
+                        den ~/= divisor;
+                        // Clamp aspect ratio within Android limits (approx 1/2.39 to 2.39)
+                        double decimalRatio = num / den;
+                        if (decimalRatio > 2.39) {
+                          num = 239;
+                          den = 100;
+                        } else if (decimalRatio < (1 / 2.39)) {
+                          num = 100;
+                          den = 239;
                         }
-                      : null,
-                  child: _isLive
-                      ? Center(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.red,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text(
-                              "LIVE",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
+                      }
+
+                      // print("PiP Aspect Ratio: $num/$den");
+                      final success = await _androidPIP
+                          .enterPipMode(aspectRatio: [num, den]);
+
+                      if (success == true && mounted) {
+                        // print("PiP mode entered successfully.");
+                        // Optionally hide controls, though they might hide automatically
+                        // _hideControls(animate: false);
+                        // _hideControlsTimer?.cancel();
+                      } else {
+                        // print("Failed to enter PiP mode (returned $success).");
+                        if (mounted)
+                          _showError(
+                              "Failed to enter Picture-in-Picture mode.");
+                      }
+                    } catch (e) {
+                      // print("Error entering PiP mode: $e");
+                      if (mounted) _showError("Error entering PiP mode: $e");
+                    }
+                  },
+          );
+        }
+
+        // --- Logic to Determine Controls based on Duration ---
+        // Check if duration indicates a live stream (duration is very small)
+        final bool isEffectivelyLive = isInitialized &&
+            duration.inMilliseconds <
+                100; // Check if duration is less than 100ms
+        // print(
+        //     "_buildBottomControls: isInitialized = $isInitialized, duration = $duration (ms: ${duration.inMilliseconds}), isEffectivelyLive = $isEffectivelyLive");
+
+        if (isEffectivelyLive) {
+          // --- Live Controls Layout (with progress bar) ---
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10.0), // Keep bottom padding
+            child: Container(
+              // Changed Padding back to Container
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                // Re-added decoration
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.4),
+                    Colors.transparent
+                  ], // Lighter opacity
+                  stops: const [0.0, 1.0],
+                ),
+              ),
+              child: Row(
+                children: [
+                  // Live Indicator: Icon + Text in an oval transparent white container
+                  Container(
+                    // Re-introduce Container
+                    margin: const EdgeInsets.only(right: 8.0), // Keep margin
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10.0, vertical: 4.0), // Adjust padding
+                    decoration: BoxDecoration(
+                      color: Colors.white
+                          .withOpacity(0.25), // Transparent white background
+                      borderRadius: BorderRadius.circular(
+                          20.0), // High radius for oval/pill shape
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.sensors,
+                          color: const Color(0xFFE50914), // Keep icon red
+                          size: 15.0,
+                        ),
+                        const SizedBox(width: 5),
+                        const Text(
+                          'LIVE',
+                          style: TextStyle(
+                            color: Colors.white, // Keep text white
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    // Progress Bar (Will likely show nothing or be full, but keep it)
+                    child: GestureDetector(
+                      onTap: () {
+                        // Keep play/pause tap
+                        if (!mounted ||
+                            !isInitialized ||
+                            _videoPlayerController == null) return;
+                        if (_videoPlayerController!.value.isPlaying) {
+                          _videoPlayerController!.pause();
+                        } else {
+                          _videoPlayerController!.play();
+                        }
+                        _startHideControlsTimer();
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 5.0),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(4.0),
+                          child: VideoProgressIndicator(
+                            _videoPlayerController!, // Still needed
+                            allowScrubbing:
+                                false, // Disable scrubbing for live?
+                            padding:
+                                const EdgeInsets.only(top: 5.0, bottom: 5.0),
+                            colors: VideoProgressColors(
+                              playedColor: widget.progressBarColor,
+                              bufferedColor: widget.progressBarBufferedColor,
+                              backgroundColor: Colors.white30,
                             ),
                           ),
-                        )
-                      : _videoPlayerController != null &&
-                              _videoPlayerController!.value.isInitialized
-                          ? VideoProgressIndicator(
-                              _videoPlayerController!,
-                              allowScrubbing: true,
-                              colors: VideoProgressColors(
-                                playedColor: widget.progressBarColor,
-                                // handleColor: widget.progressBarColor, // Removed invalid parameter
-                                bufferedColor: widget.progressBarBufferedColor,
-                                backgroundColor: Colors.white30,
-                              ),
-                            )
-                          : const SizedBox
-                              .shrink(), // Show nothing if controller not ready
-                ),
+                        ),
+                      ),
+                    ),
+                  ), // REMOVE Total Duration Text Padding
+                  // Keep PiP Button
+                  pipButton,
+                  const SizedBox(width: 4), // Spacer
+                  // Keep Aspect Ratio Button
+                  _buildAspectRatioButton(),
+                ],
               ),
-              IconButton(
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                icon: const Icon(Icons.forward_10, color: Colors.white),
-                onPressed: () {
-                  if (!mounted) return;
-                  if (_videoPlayerController != null &&
-                      !_isLive &&
-                      _videoPlayerController!.value.isInitialized) {
-                    final currentPosition =
-                        _videoPlayerController!.value.position;
-                    _videoPlayerController!
-                        .seekTo(currentPosition + const Duration(seconds: 10));
-                  }
-                  _startHideControlsTimer();
-                },
-              ),
-              _buildAspectRatioButton(),
-            ],
-          ),
-          if (!_isLive &&
-              _videoPlayerController != null &&
-              _videoPlayerController!.value.isInitialized)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(left: 46),
-                  child: Text(
-                    _formatDuration(_videoPlayerController!.value.position),
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(right: 46),
-                  child: Text(
-                    _formatDuration(_videoPlayerController!.value.duration),
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                ),
-              ],
             ),
-        ],
-      ),
+          );
+        } else {
+          // --- Non-Live Controls Layout ---
+          return Padding(
+            padding: const EdgeInsets.only(
+                bottom: 10.0), // Add bottom padding to raise controls
+            child: Container(
+              // Changed Padding back to Container
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                // Re-added decoration
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.4),
+                    Colors.transparent
+                  ], // Lighter opacity
+                  stops: const [0.0, 1.0],
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min, // Important for Column height
+                children: [
+                  Row(
+                    children: [
+                      // Current Position Text
+                      Padding(
+                        padding: const EdgeInsets.only(
+                            left: 10.0, right: 8.0), // Adjust padding as needed
+                        child: Text(
+                          _formatDuration(position),
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 14),
+                        ),
+                      ),
+                      Expanded(
+                        // Progress Bar
+                        child: GestureDetector(
+                          onTap: () {
+                            // Keep play/pause tap
+                            if (!mounted ||
+                                !isInitialized || // Added check
+                                _videoPlayerController == null) return;
+                            if (_videoPlayerController!.value.isPlaying) {
+                              _videoPlayerController!.pause();
+                            } else {
+                              _videoPlayerController!.play();
+                            }
+                            _startHideControlsTimer();
+                          },
+                          child: isInitialized &&
+                                  duration >
+                                      Duration.zero // Condition already here
+                              ? Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 5.0),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(4.0),
+                                    child: VideoProgressIndicator(
+                                      _videoPlayerController!,
+                                      allowScrubbing: true,
+                                      padding: const EdgeInsets.only(
+                                          top: 5.0, bottom: 5.0),
+                                      colors: VideoProgressColors(
+                                        playedColor: widget.progressBarColor,
+                                        bufferedColor:
+                                            widget.progressBarBufferedColor,
+                                        backgroundColor: Colors.white30,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : const SizedBox.shrink(),
+                        ),
+                      ),
+                      // PiP Button
+                      pipButton,
+                      const SizedBox(width: 4), // Spacer
+                      // Aspect Ratio Button
+                      _buildAspectRatioButton(),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+      },
     );
   }
 
@@ -932,8 +1074,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     if (_chewieController == null ||
         _videoPlayerController == null ||
         !_videoPlayerController!.value.isInitialized) {
-      print(
-          "_buildVideoPlayer: Controller is null or not initialized, returning SizedBox");
+      // print(
+      //     "_buildVideoPlayer: Controller is null or not initialized, returning SizedBox");
       // Show loading indicator while Chewie is being rebuilt or initially loading
       return Center(
         child: CircularProgressIndicator(
@@ -943,7 +1085,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     }
 
     if (_hasError) {
-      print("_buildVideoPlayer: Error state, returning error widget");
+      // print("_buildVideoPlayer: Error state, returning error widget");
       // Show error widget directly here if there's an error
       return _buildErrorWidget("Failed to load video");
     }
@@ -958,8 +1100,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     //   );
     // }
 
-    print(
-        "_buildVideoPlayer: Building Chewie with controller: $_chewieController");
+    // print(
+    //     "_buildVideoPlayer: Building Chewie with controller: $_chewieController");
     // Use a unique key to force rebuild when controller instance changes
     return Chewie(
       key: ValueKey(
@@ -985,6 +1127,42 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
   // --- Helper Methods --- (Moved from previous location)
 
+  void _handleDoubleTap(TapDownDetails details) {
+    if (!mounted ||
+        _videoPlayerController == null ||
+        !_videoPlayerController!.value.isInitialized ||
+        (_videoPlayerController!.value.duration <= Duration.zero))
+      return; // Don't seek if duration unknown
+
+    final screenWidth = MediaQuery.of(context).size.width;
+    final tapPosition = details.localPosition.dx;
+    final Duration currentPosition = _videoPlayerController!.value.position;
+    final Duration totalDuration = _videoPlayerController!.value.duration;
+    const seekDuration = Duration(seconds: 10);
+
+    Duration newPosition;
+    if (tapPosition < screenWidth / 3) {
+      // Seek backward (left third)
+      newPosition =
+          (currentPosition - seekDuration).clamp(Duration.zero, totalDuration);
+      // print("Double tap left: Seeking back to $newPosition");
+    } else if (tapPosition > screenWidth * 2 / 3) {
+      // Seek forward (right third)
+      newPosition =
+          (currentPosition + seekDuration).clamp(Duration.zero, totalDuration);
+      // print("Double tap right: Seeking forward to $newPosition");
+    } else {
+      // Middle third tapped, do nothing or maybe toggle play/pause?
+      // For now, do nothing related to seeking.
+      _onTap(); // Treat middle double tap as single tap (show/hide controls)
+      return;
+    }
+
+    _videoPlayerController!.seekTo(newPosition);
+    // Optionally add visual feedback here (e.g., show a quick icon)
+    _startHideControlsTimer(); // Reset hide timer on seek
+  }
+
   void _handleConnectivityChange(ConnectivityResult result) {
     if (!mounted) return;
 
@@ -996,7 +1174,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       if (_videoPlayerController == null ||
           !_videoPlayerController!.value.isInitialized) {
         if (mounted && _currentUrl != null) {
-          print("Connectivity restored, re-initializing player.");
+          // print("Connectivity restored, re-initializing player.");
           _initializePlayerInternal(_currentUrl!);
         }
       } else if (!(_videoPlayerController!.value.isPlaying ||
@@ -1019,7 +1197,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
           !_videoPlayerController!.value.isBuffering &&
           _videoPlayerController!.value.position <= Duration.zero) {
         // Use <= zero
-        print("Playback timeout timer triggered retry");
+        // print("Playback timeout timer triggered retry");
         _tryNextStream();
       }
     });
@@ -1030,7 +1208,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     _bufferingTimer = Timer.periodic(const Duration(seconds: 7), (timer) {
       if (!mounted) return;
       if (_videoPlayerController?.value.isBuffering ?? false) {
-        print("Buffering timer triggered retry");
+        // print("Buffering timer triggered retry");
         _tryNextStream();
       }
     });
@@ -1046,16 +1224,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     final index = widget.streamLinks
         .indexWhere((link) => link['url'] == widget.initialUrl);
     return index != -1 ? index : 0;
-  }
-
-  void _checkIfLive() {
-    if (!mounted) return;
-    _isLive = widget.streamLinks.any((link) =>
-        link['url'] == _currentUrl &&
-        link.containsKey('isLive') &&
-        link['isLive'] == true);
-    // Update state if needed, e.g., to show/hide progress bar
-    setState(() {});
   }
 
   void _enableFullscreenMode() {
@@ -1076,6 +1244,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       backgroundColor: Colors.black,
       body: GestureDetector(
         onTap: _onTap,
+        onDoubleTapDown: _handleDoubleTap,
         behavior: HitTestBehavior.opaque,
         child: Stack(
           fit: StackFit.expand,
@@ -1096,5 +1265,68 @@ extension DurationClamp on Duration {
     if (this < lowerLimit) return lowerLimit;
     if (this > upperLimit) return upperLimit;
     return this;
+  }
+}
+
+// --- AdaptiveVideoPlayer Widget ---
+
+class AdaptiveVideoPlayer extends StatelessWidget {
+  final VideoPlayerController videoController;
+  final VideoSize size;
+  final ChewieController? chewieController;
+
+  const AdaptiveVideoPlayer({
+    Key? key,
+    required this.videoController,
+    this.chewieController,
+    this.size = VideoSize.ratio16_9,
+  }) : super(key: key);
+
+  double _getAspectRatio() {
+    switch (size) {
+      case VideoSize.fullScreen:
+        // Handle this case manually in build
+        return 0;
+      case VideoSize.ratio16_9:
+        return 16 / 9;
+      case VideoSize.ratio18_9: // Added missing case
+        return 18 / 9;
+      case VideoSize.ratio4_3:
+        return 4 / 3;
+      case VideoSize.ratio1_1:
+        return 1 / 1;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    final width = mq.size.width;
+
+    if (size == VideoSize.fullScreen) {
+      return SizedBox(
+        width: mq.size.width,
+        height: mq.size.height,
+        child: _buildPlayer(),
+      );
+    }
+
+    final aspect = _getAspectRatio();
+    // Avoid division by zero if aspect ratio is somehow 0
+    final height = aspect > 0 ? width / aspect : mq.size.height;
+
+    return SizedBox(
+      width: width,
+      height: height,
+      child: _buildPlayer(),
+    );
+  }
+
+  Widget _buildPlayer() {
+    if (chewieController != null) {
+      return Chewie(controller: chewieController!);
+    } else {
+      return VideoPlayer(videoController);
+    }
   }
 }

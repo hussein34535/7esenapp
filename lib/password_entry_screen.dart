@@ -4,6 +4,7 @@ import 'package:hesen/privacy_policy_page.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:hesen/main.dart';
+import 'package:pinput/pinput.dart';
 
 class PasswordEntryScreen extends StatefulWidget {
   final SharedPreferences prefs;
@@ -34,8 +35,7 @@ class _PasswordEntryScreenState extends State<PasswordEntryScreen> {
       await widget.prefs.setBool('isFirstTime', false);
       widget.onCorrectInput?.call();
       if (mounted) {
-        Navigator.pushReplacementNamed(
-            context, '/home'); // Navigate using named route
+        Navigator.pushReplacementNamed(context, '/home');
       }
     } else {
       setState(() => _showError = input.isNotEmpty);
@@ -45,22 +45,16 @@ class _PasswordEntryScreenState extends State<PasswordEntryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('7eSen TV'),
-        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
-        automaticallyImplyLeading: false,
-      ),
+      // REMOVED AppBar
+      // appBar: AppBar(
+      //   title: Text('7eSen TV'),
+      //   backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+      //   automaticallyImplyLeading: false,
+      // ),
+      backgroundColor: Colors.black, // Set background to black
       body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              Theme.of(context).colorScheme.primary.withOpacity(0.8),
-              Theme.of(context).scaffoldBackgroundColor
-            ],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-        ),
+        // REMOVED BoxDecoration with gradient
+        // decoration: BoxDecoration(...),
         child: Column(
           children: [
             Expanded(
@@ -93,48 +87,58 @@ class _PasswordEntryScreenState extends State<PasswordEntryScreen> {
                       ),
                       SizedBox(height: 30),
                       Text(
-                        'Enter URL Code',
-                        style: TextStyle(
-                            fontSize: 18,
-                            color:
-                                Theme.of(context).textTheme.bodyLarge!.color),
+                        'Enter The Code',
+                        style: TextStyle(fontSize: 18, color: Colors.white),
                       ),
-                      SizedBox(height: 20),
-                      TextField(
+                      SizedBox(height: 30),
+                      Pinput(
                         controller: _inputController,
-                        focusNode: _focusNode,
-                        decoration: InputDecoration(
-                          labelText: _focusNode.hasFocus ? null : 'URL',
-                          labelStyle: TextStyle(
-                              color:
-                                  Theme.of(context).textTheme.bodyLarge!.color),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12.0),
+                        length: 4,
+                        obscureText: false,
+                        defaultPinTheme: PinTheme(
+                          width: 56,
+                          height: 60,
+                          textStyle:
+                              TextStyle(fontSize: 22, color: Colors.white),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade800.withOpacity(0.5),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey.shade700),
                           ),
-                          prefixIcon: Icon(
-                              Icons
-                                  .link, // تم تغيير الأيقونة إلى Icons.key (مفتاح)
-                              color: Theme.of(context).iconTheme.color),
-                          filled: true,
-                          fillColor:
-                              Theme.of(context).brightness == Brightness.dark
-                                  ? Colors.grey.shade800
-                                  : Colors.grey.shade200,
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12.0),
-                            borderSide: BorderSide(
-                                color: Theme.of(context).colorScheme.secondary,
-                                width: 2.0),
-                          ),
-                          errorText: _showError ? 'Invalid input' : null,
-                          errorStyle: TextStyle(color: Colors.red),
                         ),
-                        style: TextStyle(
-                            color:
-                                Theme.of(context).textTheme.bodyLarge!.color),
-                        keyboardType: TextInputType.text,
+                        focusedPinTheme: PinTheme(
+                          width: 56,
+                          height: 60,
+                          textStyle:
+                              TextStyle(fontSize: 22, color: Colors.white),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade800.withOpacity(0.5),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: Theme.of(context).colorScheme.secondary),
+                          ),
+                        ),
+                        submittedPinTheme: PinTheme(
+                          width: 56,
+                          height: 60,
+                          textStyle:
+                              TextStyle(fontSize: 22, color: Colors.white),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade800.withOpacity(0.7),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: Theme.of(context).colorScheme.primary),
+                          ),
+                        ),
+                        validator: (s) {
+                          if (s == null || s.length != 4) {
+                            return 'Code must be 4 digits';
+                          }
+                          return null;
+                        },
+                        onCompleted: (pin) => _checkInput(),
                       ),
-                      SizedBox(height: 20),
+                      SizedBox(height: 20), // Space below Pinput
                       ElevatedButton(
                         onPressed: _checkInput,
                         child: Text('Submit', style: TextStyle(fontSize: 16)),
@@ -149,37 +153,10 @@ class _PasswordEntryScreenState extends State<PasswordEntryScreen> {
                               horizontal: 50,
                               vertical: 16), // Slightly larger padding
                           shape: RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.circular(30.0), // More rounded
+                            borderRadius: BorderRadius.circular(
+                                25.0), // Set radius to 25.0
                           ),
                           elevation: 5, // Add elevation
-                        ),
-                      ),
-                      SizedBox(height: 20),
-                      ElevatedButton.icon(
-                        icon: FaIcon(FontAwesomeIcons.telegram, size: 20),
-                        label: Text('Telegram لو مش عارف تشغله',
-                            style: TextStyle(fontSize: 16)),
-                        onPressed: () async {
-                          final Uri telegramUri =
-                              Uri.parse('https://t.me/tv_7esen');
-                          if (await canLaunchUrl(telegramUri)) {
-                            await launchUrl(telegramUri,
-                                mode: LaunchMode.externalApplication);
-                          } else {
-                            print('Could not launch $telegramUri');
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              Color(0xFF0088cc), // Specific Telegram blue
-                          foregroundColor: Colors.white,
-                          padding: EdgeInsets.symmetric(
-                              horizontal: 25, vertical: 12), // Adjust padding
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(
-                                  8.0)), // Slightly less rounded
-                          elevation: 3,
                         ),
                       ),
                     ],
@@ -187,20 +164,32 @@ class _PasswordEntryScreenState extends State<PasswordEntryScreen> {
                 ),
               ),
             ),
+            // Position Telegram button below Expanded content with specific padding
             Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: TextButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => PrivacyPolicyPage()),
-                  );
+              padding: const EdgeInsets.only(
+                  left: 20.0, right: 20.0, top: 10.0, bottom: 30.0),
+              child: ElevatedButton.icon(
+                icon: FaIcon(FontAwesomeIcons.telegram, size: 20),
+                label: Text('Telegram الكود من هنا',
+                    style: TextStyle(fontSize: 16)),
+                onPressed: () async {
+                  final Uri telegramUri = Uri.parse('https://t.me/tv_7esen');
+                  if (await canLaunchUrl(telegramUri)) {
+                    await launchUrl(telegramUri,
+                        mode: LaunchMode.externalApplication);
+                  } else {
+                    // print('Could not launch $telegramUri');
+                  }
                 },
-                child: Text(
-                  'View Privacy Policy',
-                  style:
-                      TextStyle(color: Theme.of(context).colorScheme.secondary),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFF0088cc), // Specific Telegram blue
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(
+                      horizontal: 25, vertical: 12), // Adjust padding
+                  shape: RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(25.0)), // Set radius to 25.0
+                  elevation: 3,
                 ),
               ),
             ),

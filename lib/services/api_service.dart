@@ -7,8 +7,8 @@ class ApiService {
 
   static Future<List> fetchChannelCategories() async {
     try {
-      final response = await http
-          .get(Uri.parse('$baseUrl/channel-categories?populate=channels'));
+      final response = await http.get(Uri.parse(
+          '$baseUrl/channel-categories?populate[channels][sort][0]=createdAt:asc&sort=createdAt:asc'));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         return List.from(data['data'] ?? []);
@@ -43,5 +43,21 @@ class ApiService {
       }
     } catch (e, stackTrace) {}
     return [];
+  }
+
+  static Future<List<dynamic>> fetchGoals() async {
+    try {
+      final response = await http
+          .get(Uri.parse('https://st9.onrender.com/api/goals?populate=*'));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['data'] ?? [];
+      }
+      throw Exception('Failed to load goals');
+    } catch (e) {
+      // Handle potential network or parsing errors
+      // print('Error fetching goals: $e');
+      return []; // Return empty list on error
+    }
   }
 }

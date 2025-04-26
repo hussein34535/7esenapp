@@ -22,10 +22,17 @@ import 'package:share_plus/share_plus.dart';
 import 'package:hesen/privacy_policy_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hesen/password_entry_screen.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart'; // Import dotenv
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:hesen/telegram_dialog.dart'; // Import the Telegram dialog
+import 'package:hesen/telegram_dialog.dart';
+import 'package:unity_ads_plugin/unity_ads_plugin.dart';
+import 'dart:math' as math;
+import 'dart:math';
+import 'package:flutter/foundation.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:provider/provider.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -33,14 +40,13 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
 Future<void> _createNotificationChannel() async {
-  var android =
-      AndroidInitializationSettings('@mipmap/ic_launcher'); // Or your app icon
-  var iOS = DarwinInitializationSettings();
+  var android = const AndroidInitializationSettings('@mipmap/ic_launcher');
+  var iOS = const DarwinInitializationSettings();
   var initSettings = InitializationSettings(android: android, iOS: iOS);
   await flutterLocalNotificationsPlugin.initialize(initSettings);
 
-  var androidNotificationChannel = AndroidNotificationChannel(
-    'high_importance_channel', // Same as in AndroidManifest.xml
+  var androidNotificationChannel = const AndroidNotificationChannel(
+    'high_importance_channel',
     'High Importance Notifications',
     description: 'This channel is used for important notifications.',
     importance: Importance.max,
@@ -55,19 +61,28 @@ Future<void> _createNotificationChannel() async {
 SharedPreferences? prefs;
 
 Future<void> main() async {
-  // Ensure widgets are initialized first
-  // Load environment variables from .env file
+  WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: './.env');
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await FirebaseApi().initNotification();
-  tz.initializeTimeZones(); // Initialize timezone database
+  tz.initializeTimeZones();
   prefs = await SharedPreferences.getInstance();
-  runApp(MyApp());
+
+  await UnityAds.init(
+    gameId: '5840220',
+    testMode: false,
+    onComplete: () {},
+    onFailed: (error, message) {},
+  );
+
+  runApp(const MyApp());
 }
 
 class MyApp extends StatefulWidget {
+  const MyApp({super.key});
+
   @override
-  _MyAppState createState() => _MyAppState();
+  State<MyApp> createState() => _MyAppState();
 }
 
 class _MyAppState extends State<MyApp> {
@@ -77,9 +92,9 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    _loadThemeMode(); // Load theme mode from SharedPreferences
+    _loadThemeMode();
     _checkFirstTime();
-    _createNotificationChannel(); // Create the notification channel
+    _createNotificationChannel();
   }
 
   Future<void> _loadThemeMode() async {
@@ -145,13 +160,13 @@ class _MyAppState extends State<MyApp> {
       darkTheme: ThemeData(
         brightness: Brightness.dark,
         primaryColor: const Color(0xFF673AB7),
-        scaffoldBackgroundColor: const Color(0xFF0A0A0A),
-        cardColor: const Color(0xFF0A0A0A),
+        scaffoldBackgroundColor: Colors.black,
+        cardColor: const Color(0xFF1C1C1C),
         colorScheme: const ColorScheme.dark(
           primary: Color(0xFF1C1C1C),
           secondary: Color.fromARGB(255, 184, 28, 176),
           surface: Color(0xFF1C1C1C),
-          background: Color(0xFF0A0A0A),
+          background: Colors.black,
           error: Colors.red,
           onPrimary: Colors.white,
           onSecondary: Colors.white,
@@ -177,28 +192,25 @@ class _MyAppState extends State<MyApp> {
         ),
       ),
       themeMode: _themeMode,
-      initialRoute: '/home', // Go directly to home/password check
+      initialRoute: '/home',
       routes: {
-        // '/': (context) => MySplashScreen(), // Removed custom splash route
         '/home': (context) => _isFirstTime
             ? PasswordEntryScreen(
-                key: ValueKey('password'),
+                key: const ValueKey('password'),
                 onCorrectInput: () {
                   setState(() {
                     _isFirstTime = false;
                   });
-                  Navigator.pushReplacementNamed(
-                      context, '/home'); // Re-navigate to home after password
+                  Navigator.pushReplacementNamed(context, '/home');
                 },
                 prefs: prefs!,
               )
             : HomePage(
-                key: ValueKey('home'),
+                key: const ValueKey('home'),
                 onThemeChanged: (isDarkMode) {
                   setState(() {
                     _themeMode = isDarkMode ? ThemeMode.dark : ThemeMode.light;
-                    _saveThemeMode(
-                        _themeMode); // Save theme mode to SharedPreferences
+                    _saveThemeMode(_themeMode);
                   });
                 },
                 themeMode: _themeMode,
@@ -210,133 +222,220 @@ class _MyAppState extends State<MyApp> {
   }
 }
 
-// Removed MySplashScreen widget
+// --- Top-level function for background processing ---
+Future<Map<String, dynamic>> _processFetchedData(List<dynamic> results) async {
+  final fetchedChannels = results[0] as List<dynamic>;
+  final fetchedNews = results[1] as List<dynamic>;
+  final fetchedMatches = results[2] as List<Match>;
+  final fetchedGoals = results[3] as List<dynamic>;
+
+  final uuid = Uuid();
+  // print("--- BACKGROUND: Processing Channels --- ");
+
+  // Sort categories by createdAt
+  // Use try-catch for robust parsing
+  List<Map<String, dynamic>> sortedCategories = [];
+  for (var categoryData in fetchedChannels) {
+    if (categoryData is Map) {
+      sortedCategories.add(Map<String, dynamic>.from(categoryData));
+    }
+  }
+  sortedCategories.sort((a, b) {
+    if (a['createdAt'] == null || b['createdAt'] == null) return 0;
+    try {
+      final dateA = DateTime.parse(a['createdAt'].toString());
+      final dateB = DateTime.parse(b['createdAt'].toString());
+      return dateA.compareTo(dateB);
+    } catch (e) {
+      return a['createdAt'].toString().compareTo(b['createdAt'].toString());
+    }
+  });
+
+  // Process categories: assign IDs and sort channels
+  List<Map<String, dynamic>> processedChannels = [];
+  for (var categoryData in sortedCategories) {
+    // Iterate sorted categories
+    Map<String, dynamic> newCategory =
+        categoryData; // Already a new map if needed
+
+    // Assign UUID if category id is null
+    if (newCategory['id'] == null) {
+      newCategory['id'] = uuid.v4();
+    }
+
+    // Sort channels within the category by creation date
+    if (newCategory['channels'] is List) {
+      List originalChannels = newCategory['channels'];
+      List<Map<String, dynamic>> sortedChannelsList = [];
+
+      for (var channelData in originalChannels) {
+        if (channelData is Map) {
+          Map<String, dynamic> newChannel =
+              Map<String, dynamic>.from(channelData);
+          if (newChannel['id'] == null) {
+            newChannel['id'] = uuid.v4();
+          }
+          sortedChannelsList.add(newChannel);
+        }
+      }
+
+      // Sort the new list of channel maps by createdAt
+      sortedChannelsList.sort((a, b) {
+        if (a['createdAt'] == null || b['createdAt'] == null) return 0;
+        try {
+          final dateA = DateTime.parse(a['createdAt'].toString());
+          final dateB = DateTime.parse(b['createdAt'].toString());
+          return dateA.compareTo(dateB);
+        } catch (e) {
+          return a['createdAt'].toString().compareTo(b['createdAt'].toString());
+        }
+      });
+      newCategory['channels'] = sortedChannelsList;
+    } else {
+      newCategory['channels'] = [];
+    }
+    processedChannels.add(newCategory);
+  }
+  // print("--- BACKGROUND: Processing Complete --- ");
+
+  return {
+    'channels': processedChannels,
+    'news': fetchedNews,
+    'matches': fetchedMatches,
+    'goals': fetchedGoals,
+  };
+}
 
 class HomePage extends StatefulWidget {
   final Function(bool) onThemeChanged;
   final ThemeMode themeMode;
 
-  HomePage({Key? key, required this.onThemeChanged, required this.themeMode})
-      : super(key: key);
+  const HomePage(
+      {super.key, required this.onThemeChanged, required this.themeMode});
 
   @override
-  _HomePageState createState() => _HomePageState();
+  State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
   List<Match> matches = [];
-  List channels = [];
-  List news = [];
+  List<dynamic> channels = [];
+  List<dynamic> news = [];
+  List<dynamic> goals = [];
   int _selectedIndex = 0;
-  late Future<List> channelCategories;
-  late Future<List> newsArticles;
-  late Future<List<Match>> matchesFuture;
-  late Future<void> _dataFuture;
+  Future<void>? _dataFuture;
   final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
-  List _filteredChannels = [];
-  late bool _isDarkMode; // Initialize in initState based on themeMode
+  List<dynamic> _filteredChannels = [];
+  late bool _isDarkMode;
   bool _isSearchBarVisible = false;
-  // InterstitialAd? _interstitialAd;
-  // bool _isAdLoading = false;
-  // // Use your real Ad Unit ID here in production
-  // final String _interstitialAdUnitId =
-  //     'ca-app-pub-2393153600924393/2316622245'; // Production Interstitial Ad ID
-  // final String _rewardedAdUnitId =
-  //     'ca-app-pub-2393153600924393/1679399820'; // Production Rewarded Ad ID
-  // RewardedAd? _rewardedAd;
-  // bool _isRewardedAdLoading = false;
-  Completer<void>? _drawerCloseCompleter;
+
+  // Unity Ad Placement IDs
+  final String _interstitialPlacementId = 'Interstitial_Android';
+  final String _rewardedPlacementId = 'Rewarded_Android';
+  Map<String, bool> _adPlacements = {
+    'Interstitial_Android': false,
+    'Rewarded_Android': false,
+  };
 
   @override
   void initState() {
     super.initState();
-    _isDarkMode =
-        widget.themeMode == ThemeMode.dark; // Initialize _isDarkMode here
+    _isDarkMode = widget.themeMode == ThemeMode.dark;
     _dataFuture = _initData();
     requestNotificationPermission();
-    // _loadAd(); // Load the interstitial ad
-    // _loadRewardedAd(); // Load the rewarded ad
+    _loadAds();
 
-    // Show Telegram dialog after the first frame
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Check if the dialog should be shown (e.g., only once per session or based on SharedPreferences)
-      // For now, let's show it every time HomePage is initialized.
-      showTelegramDialog(context);
-    });
+    // Load the flag and schedule the dialog if needed
+    _checkAndShowTelegramDialog();
   }
 
   @override
   void dispose() {
-    _drawerCloseCompleter?.complete();
     _searchController.dispose();
     super.dispose();
   }
 
   Future<void> _initData() async {
-    channelCategories = fetchChannelCategories();
-    newsArticles = fetchNews();
-    matchesFuture = fetchMatches();
-    checkForUpdate();
-    await Future.wait([channelCategories, newsArticles, matchesFuture]);
-  }
-
-  Future<List<Match>> fetchMatches() async {
     try {
-      final fetchedMatches = await ApiService.fetchMatches();
-      matches = fetchedMatches;
-      return fetchedMatches;
-    } catch (e) {
-      return [];
-    }
-  }
+      // Step 1: Fetch data concurrently (remains the same)
+      final results = await Future.wait([
+        ApiService.fetchChannelCategories(),
+        ApiService.fetchNews(),
+        ApiService.fetchMatches(),
+        ApiService.fetchGoals(),
+      ]);
 
-  Future<List> fetchChannelCategories() async {
-    final fetchedChannels = await ApiService.fetchChannelCategories();
-    final uuid = Uuid();
-    for (var channel in fetchedChannels) {
-      if (channel['id'] == null) {
-        channel['id'] = uuid.v4();
+      // Step 2: Process data in the background using compute
+      // print("--- Starting background data processing ---");
+      final processedData = await compute(_processFetchedData, results);
+      // print("--- Finished background data processing ---");
+
+      // Step 3: Update state with processed data (only if mounted)
+      if (mounted) {
+        setState(() {
+          channels = processedData['channels'] as List<dynamic>;
+          _filteredChannels = channels; // Initialize filter with processed data
+          news = processedData['news'] as List<dynamic>;
+          matches = processedData['matches'] as List<Match>;
+          goals = processedData['goals'] as List<dynamic>;
+        });
       }
-      for (var streamLink in channel['channels']) {
-        if (streamLink['id'] == null) {
-          streamLink['id'] = uuid.v4();
-        }
+
+      // Step 4: Check for updates (can likely stay here)
+      checkForUpdate();
+    } catch (e) {
+      // print('Error initializing data: $e');
+      if (mounted) {
+        setState(() {
+          // Handle error state if necessary, maybe set lists to empty
+          channels = [];
+          _filteredChannels = [];
+          news = [];
+          matches = [];
+          goals = [];
+        });
       }
     }
-    channels = fetchedChannels;
-    _filteredChannels = channels;
-    return fetchedChannels;
   }
 
   void _filterChannels(String query) {
+    if (!mounted) return;
     setState(() {
-      _searchQuery = query;
       if (query.isEmpty) {
         _filteredChannels = channels;
       } else {
-        _filteredChannels = channels.where((channel) {
-          String channelName = channel['name']?.toLowerCase() ?? '';
-          return channelName.contains(query.toLowerCase());
+        _filteredChannels = channels.where((channelCategory) {
+          if (channelCategory is Map) {
+            String categoryName = channelCategory['name']?.toLowerCase() ?? '';
+
+            if (categoryName.contains(query.toLowerCase())) {
+              return true;
+            }
+
+            if (channelCategory['channels'] is List) {
+              return channelCategory['channels'].any((channel) {
+                if (channel is Map) {
+                  String channelName = channel['name']?.toLowerCase() ?? '';
+                  return channelName.contains(query.toLowerCase());
+                }
+                return false;
+              });
+            }
+            return false;
+          }
+          return false;
         }).toList();
       }
     });
   }
 
-  Future<List> fetchNews() async {
-    final fetchedNews = await ApiService.fetchNews();
-    news = fetchedNews;
-    return fetchedNews;
-  }
-
-  // Helper function to compare version strings
   int compareVersions(String version1, String version2) {
     List<String> v1Parts = version1.split('.');
     List<String> v2Parts = version2.split('.');
     int len = v1Parts.length > v2Parts.length ? v1Parts.length : v2Parts.length;
     for (int i = 0; i < len; i++) {
-      int v1 = i < v1Parts.length ? int.parse(v1Parts[i]) : 0;
-      int v2 = i < v2Parts.length ? int.parse(v2Parts[i]) : 0;
+      int v1 = i < v1Parts.length ? int.tryParse(v1Parts[i]) ?? 0 : 0;
+      int v2 = i < v2Parts.length ? int.tryParse(v2Parts[i]) ?? 0 : 0;
       if (v1 < v2) return -1;
       if (v1 > v2) return 1;
     }
@@ -351,73 +450,104 @@ class _HomePageState extends State<HomePage> {
         final data = json.decode(response.body);
         final latestVersion = data['version'];
         final updateUrl = data['update_url'];
-        const currentVersion = '1.0.4'; //
+        const currentVersion = '1.0.5';
 
-        if (compareVersions(currentVersion, latestVersion) < 0) {
-          showUpdateDialog(updateUrl);
+        if (latestVersion != null &&
+            updateUrl != null &&
+            compareVersions(currentVersion, latestVersion) < 0) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              showUpdateDialog(updateUrl);
+            }
+          });
+        } else {
+          // print('No update required or update data incomplete.');
         }
+      } else {
+        // print(
+        //     'Failed to fetch update check. Status code: ${response.statusCode}');
       }
-    } catch (e) {}
+    } catch (e) {
+      // print('Error during update check: $e');
+    }
   }
 
   void showUpdateDialog(String updateUrl) {
+    if (!mounted) return;
+
     showGeneralDialog(
       context: context,
-      barrierDismissible: false, // Prevent dismissing by tapping outside
-      barrierColor:
-          Colors.black.withOpacity(0.8), // Optional: Darken background
+      barrierDismissible: false,
+      barrierColor: Colors.black.withAlpha((0.8 * 255).round()),
       transitionDuration: const Duration(milliseconds: 200),
-      pageBuilder: (BuildContext buildContext, Animation animation,
-          Animation secondaryAnimation) {
-        return WillPopScope(
-          // To prevent back button dismissal on Android
-          onWillPop: () async => false,
+      pageBuilder: (BuildContext buildContext, Animation<double> animation,
+          Animation<double> secondaryAnimation) {
+        return PopScope(
+          canPop: false,
           child: Scaffold(
-            backgroundColor: Theme.of(context).cardColor,
+            backgroundColor: Theme.of(context)
+                .scaffoldBackgroundColor
+                .withAlpha((255 * 0.9).round()),
             body: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: <Widget>[
-                    Text(
-                      "⚠️ تحديث إجباري",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                          color: Theme.of(context).textTheme.bodyLarge!.color,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 26),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24.0),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: <Widget>[
+                        Text(
+                          "⚠️ تحديث إجباري",
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineSmall
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 20),
+                        Text(
+                          "هناك تحديث جديد إلزامي للتطبيق. الرجاء التحديث للاستمرار في استخدام التطبيق.",
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 30),
+                        ElevatedButton(
+                          onPressed: () async {
+                            final Uri uri = Uri.parse(updateUrl);
+                            try {
+                              if (await canLaunchUrl(uri)) {
+                                await launchUrl(uri,
+                                    mode: LaunchMode.externalApplication);
+                              } else {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                          content: Text(
+                                              'لا يمكن فتح رابط التحديث.')));
+                                }
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content:
+                                            Text('حدث خطأ عند فتح الرابط.')));
+                              }
+                            }
+                          },
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 25, vertical: 12),
+                            child: Text("تحديث الآن",
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 18)),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 20),
-                    Text(
-                      "هناك تحديث جديد إلزامي للتطبيق. الرجاء التحديث للاستمرار في استخدام التطبيق.",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                          color: Theme.of(context).textTheme.bodyLarge!.color),
-                    ),
-                    const SizedBox(height: 30),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            Theme.of(context).colorScheme.secondary,
-                      ),
-                      onPressed: () async {
-                        if (await canLaunchUrl(Uri.parse(updateUrl))) {
-                          await launchUrl(Uri.parse(updateUrl));
-                        }
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 25, vertical: 12),
-                        child: Text("تحديث",
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18)),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -432,6 +562,112 @@ class _HomePageState extends State<HomePage> {
     if (!status.isGranted) {
       await Permission.notification.request();
     }
+  }
+
+  void _loadAds() {
+    for (var placementId in _adPlacements.keys) {
+      _loadAd(placementId);
+    }
+  }
+
+  void _loadAd(String placementId) {
+    UnityAds.load(
+        placementId: placementId,
+        onComplete: (placementId) {
+          // print('Load Complete $placementId');
+          if (mounted) {
+            setState(() {
+              _adPlacements[placementId] = true;
+            });
+          }
+        },
+        onFailed: (placementId, error, message) =>
+            {} // print('Load Failed $placementId: $error $message'),
+        );
+  }
+
+  void openVideo(BuildContext context, String initialUrl,
+      List<Map<String, dynamic>> streamLinks, String sourceSection) async {
+    // print("openVideo called from: $sourceSection");
+
+    // Determine placement ID and if it's a rewarded ad
+    final bool isRewardedSection =
+        sourceSection == 'news' || sourceSection == 'goals';
+    final String placementId =
+        isRewardedSection ? _rewardedPlacementId : _interstitialPlacementId;
+    final bool adReady = _adPlacements[placementId] ?? false;
+
+    // print(
+    //     "Attempting to show ${isRewardedSection ? 'Rewarded' : 'Interstitial'} Ad ($placementId) for $sourceSection. Ad Ready: $adReady");
+
+    try {
+      if (adReady) {
+        // Mark ad as used immediately
+        if (mounted) {
+          setState(() {
+            _adPlacements[placementId] = false;
+          });
+        }
+
+        await UnityAds.showVideoAd(
+          placementId: placementId,
+          onComplete: (placementId) {
+            // print('Video Ad $placementId completed.');
+            _navigateToVideoPlayer(context, initialUrl, streamLinks);
+            _loadAd(placementId); // Reload the ad
+            if (isRewardedSection) {
+              // print("Reward earned for watching ad: $placementId");
+              // Optional: Show a confirmation message to the user about the reward
+            }
+          },
+          onFailed: (placementId, error, message) {
+            // print('Video Ad $placementId failed: $error $message');
+            _navigateToVideoPlayer(context, initialUrl, streamLinks);
+            _loadAd(placementId); // Attempt to reload the ad anyway
+          },
+          onStart: (placementId) =>
+              {}, // print('Video Ad $placementId started.'),
+          onClick: (placementId) =>
+              {}, // print('Video Ad $placementId clicked.'),
+          onSkipped: (placementId) {
+            // print('Video Ad $placementId skipped.');
+            _loadAd(placementId); // Reload the ad
+            // Only navigate if it wasn't a rewarded ad that requires completion
+            if (!isRewardedSection) {
+              _navigateToVideoPlayer(context, initialUrl, streamLinks);
+            } else {
+              // Show message that reward requires full watch
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text(
+                        'يجب مشاهدة الإعلان كاملاً للوصول للمحتوى.'))); // Updated message
+              }
+            }
+          },
+        );
+      } else {
+        // print("Unity Ad $placementId not ready, navigating directly.");
+        _navigateToVideoPlayer(context, initialUrl, streamLinks);
+        // Still try to load the ad for next time
+        _loadAd(placementId);
+      }
+    } catch (e) {
+      // print("Error showing Unity Ad ($placementId): $e");
+      _navigateToVideoPlayer(context, initialUrl, streamLinks);
+      _loadAd(placementId); // Attempt to reload on error
+    }
+  }
+
+  void _navigateToVideoPlayer(BuildContext context, String initialUrl,
+      List<Map<String, dynamic>> streamLinks) {
+    navigatorKey.currentState?.push(
+      MaterialPageRoute(
+        builder: (context) => VideoPlayerScreen(
+          initialUrl: initialUrl,
+          streamLinks: streamLinks,
+        ),
+      ),
+    );
   }
 
   List<Widget> _buildAppBarActions() {
@@ -451,7 +687,7 @@ class _HomePageState extends State<HomePage> {
             widget.onThemeChanged(value);
           },
           dayColor: Color(0xFFF8F8F8),
-          nightColor: Color(0xFF0A0A0A),
+          nightColor: Color.fromARGB(255, 27, 27, 27),
           sunColor: Color(0xFFF8F8F8),
           moonColor: Color(0xFF0A0A0A),
         ),
@@ -461,13 +697,185 @@ class _HomePageState extends State<HomePage> {
     return actions;
   }
 
+  Widget _buildSearchBar() {
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+        child: Container(
+          height: 48,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+                color: Theme.of(context)
+                    .colorScheme
+                    .secondary
+                    .withAlpha((0.5 * 255).round())),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'بحث عن قناة...',
+                    hintStyle: TextStyle(
+                        color: Theme.of(context).textTheme.bodySmall?.color),
+                    prefixIcon: Icon(Icons.search,
+                        color: Theme.of(context).colorScheme.secondary),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14),
+                    isDense: true,
+                  ),
+                  onChanged: _filterChannels,
+                  style: TextStyle(
+                      color: Theme.of(context).textTheme.bodyLarge!.color),
+                ),
+              ),
+              IconButton(
+                icon: Icon(Icons.close,
+                    color: Theme.of(context).textTheme.bodyLarge!.color),
+                onPressed: () {
+                  if (!mounted) return;
+                  setState(() {
+                    _isSearchBarVisible = false;
+                    _searchController.clear();
+                    _filterChannels('');
+                  });
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Add this function to handle refresh
+  Future<void> _refreshSection(int index) async {
+    try {
+      switch (index) {
+        case 0: // Channels
+          final fetchedChannels = await ApiService.fetchChannelCategories();
+          // print("--- REFRESHED CHANNELS DATA ---");
+
+          // Sort the fetched categories first by their creation date
+          fetchedChannels.sort((a, b) {
+            if (a is! Map ||
+                b is! Map ||
+                a['createdAt'] == null ||
+                b['createdAt'] == null) return 0;
+            try {
+              final dateA = DateTime.parse(a['createdAt'].toString());
+              final dateB = DateTime.parse(b['createdAt'].toString());
+              return dateA.compareTo(dateB);
+            } catch (e) {
+              // Handle potential parsing errors, fallback to string compare
+              return a['createdAt']
+                  .toString()
+                  .compareTo(b['createdAt'].toString());
+            }
+          });
+
+          // Process categories: assign IDs and create new maps with channels sorted by createdAt
+          final uuid = Uuid();
+          List<Map<String, dynamic>> processedChannels = [];
+          for (var categoryData in fetchedChannels) {
+            if (categoryData is Map) {
+              Map<String, dynamic> newCategory =
+                  Map<String, dynamic>.from(categoryData);
+
+              // Assign UUID if category id is null
+              if (newCategory['id'] == null) {
+                newCategory['id'] = uuid.v4();
+              }
+
+              // Sort channels within the category by creation date, creating a new list
+              if (newCategory['channels'] is List) {
+                List originalChannels = newCategory['channels'];
+                List<Map<String, dynamic>> sortedChannelsList = [];
+
+                // Assign UUIDs to channels if needed and create new maps
+                for (var channelData in originalChannels) {
+                  if (channelData is Map) {
+                    Map<String, dynamic> newChannel =
+                        Map<String, dynamic>.from(channelData);
+                    if (newChannel['id'] == null) {
+                      newChannel['id'] = uuid.v4();
+                    }
+                    sortedChannelsList.add(newChannel);
+                  }
+                }
+
+                // Sort the new list of channel maps by createdAt
+                sortedChannelsList.sort((a, b) {
+                  if (a['createdAt'] == null || b['createdAt'] == null)
+                    return 0;
+                  try {
+                    final dateA = DateTime.parse(a['createdAt'].toString());
+                    final dateB = DateTime.parse(b['createdAt'].toString());
+                    return dateA.compareTo(dateB);
+                  } catch (e) {
+                    return a['createdAt']
+                        .toString()
+                        .compareTo(b['createdAt'].toString());
+                  }
+                });
+                newCategory['channels'] = sortedChannelsList;
+              } else {
+                newCategory['channels'] = [];
+              }
+              processedChannels.add(newCategory);
+            }
+          }
+          // print("--- SORTED REFRESHED CHANNELS DATA ---");
+          // print(processedChannels);
+          // print("-------------------------------------");
+
+          if (mounted) {
+            setState(() {
+              channels = processedChannels; // Use the processed list
+              _filterChannels(_searchController.text);
+            });
+          }
+          break;
+        case 1: // News
+          final fetchedNews = await ApiService.fetchNews();
+          if (mounted) setState(() => news = fetchedNews);
+          break;
+        case 2: // Goals
+          final fetchedGoals = await ApiService.fetchGoals();
+          if (mounted) setState(() => goals = fetchedGoals);
+          break;
+        case 3: // Matches
+          final fetchedMatches = await ApiService.fetchMatches();
+          if (mounted) setState(() => matches = fetchedMatches);
+          break;
+      }
+    } catch (e) {
+      // Handle or log error if needed
+      // print("Error refreshing section $index: $e");
+    }
+  }
+
+  // --- Show Telegram Dialog Logic ---
+  Future<void> _checkAndShowTelegramDialog() async {
+    // Always schedule the dialog to show after the first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        // Check if the widget is still mounted
+        showTelegramDialog(context);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final appBarHeight = AppBar().preferredSize.height;
     final additionalOffset = MediaQuery.of(context).padding.top + 2.0;
     final totalOffset = appBarHeight + additionalOffset;
-
-    final navBarBackgroundColor = Color(0xFF7C52D8);
 
     return Scaffold(
       appBar: PreferredSize(
@@ -488,7 +896,11 @@ class _HomePageState extends State<HomePage> {
           child: AppBar(
             elevation: 0,
             leading: IconButton(
-              icon: Icon(Icons.menu_rounded, color: Colors.white),
+              icon: Icon(
+                Icons.menu_rounded,
+                color: Colors.white,
+                size: 28,
+              ),
               onPressed: () {
                 showModalBottomSheet(
                   context: context,
@@ -521,13 +933,13 @@ class _HomePageState extends State<HomePage> {
                                 await launchUrl(telegramUri,
                                     mode: LaunchMode.externalApplication);
                               } catch (e) {
-                                print(
-                                    'Error launching URL in external app: $e');
+                                // print(
+                                //     'Error launching URL in external app: $e');
                                 try {
                                   await launchUrl(telegramUri,
                                       mode: LaunchMode.inAppWebView);
                                 } catch (e) {
-                                  print('Error launching URL in browser: $e');
+                                  // print('Error launching URL in browser: $e');
                                 }
                               }
                             },
@@ -593,7 +1005,11 @@ class _HomePageState extends State<HomePage> {
             ),
             title: Text(
               '7eSen TV',
-              style: TextStyle(fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 22,
+                color: Colors.white,
+              ),
             ),
             actions: _buildAppBarActions(),
           ),
@@ -615,42 +1031,57 @@ class _HomePageState extends State<HomePage> {
                                   .bodyLarge!
                                   .color)));
                 } else {
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 10.0),
-                    child: IndexedStack(
-                      index: _selectedIndex,
-                      children: [
-                        ChannelsSection(
-                          channelCategories: _filteredChannels,
-                          openVideo: openVideo,
-                        ),
-                        NewsSection(
-                          newsArticles: newsArticles,
-                          openVideo: openVideo,
-                        ),
-                        MatchesSection(
-                          matches: matchesFuture,
-                          openVideo: openVideo,
-                        ),
-                      ],
+                  return RefreshIndicator(
+                    color: Theme.of(context).colorScheme.secondary,
+                    backgroundColor: Theme.of(context).cardColor,
+                    onRefresh: () => _refreshSection(_selectedIndex),
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 10.0),
+                      child: IndexedStack(
+                        index: _selectedIndex,
+                        children: [
+                          Builder(builder: (context) {
+                            // print(
+                            //     "--- HomePage build - Passing to ChannelsSection: ---");
+                            // print(_filteredChannels);
+                            // print(
+                            //     "-----------------------------------------------------");
+                            return ChannelsSection(
+                              channelCategories: _filteredChannels,
+                              openVideo: openVideo,
+                            );
+                          }),
+                          NewsSection(
+                            newsArticles: Future.value(news),
+                            openVideo: openVideo,
+                          ),
+                          GoalsSection(
+                            goalsArticles: Future.value(goals),
+                            openVideo: openVideo,
+                          ),
+                          MatchesSection(
+                            matches: Future.value(matches),
+                            openVideo: openVideo,
+                          ),
+                        ],
+                      ),
                     ),
                   );
                 }
               },
             ),
       bottomNavigationBar: CurvedNavigationBar(
-        // Background behind the bar matches the scaffold background
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        color: Colors.black, // Bar itself is always black
-        buttonBackgroundColor: Theme.of(context)
-            .cardColor, // Keep button background theme-aware for contrast
+        color: _isDarkMode ? Colors.black : Color(0xFF7C52D8),
+        buttonBackgroundColor: Theme.of(context).cardColor,
         animationDuration: const Duration(milliseconds: 300),
         items: [
-          Image.asset('assets/tv.png',
-              width: 30, height: 30, color: Colors.white),
+          Icon(Icons.tv, size: 30, color: Colors.white),
           Image.asset('assets/replay.png',
               width: 30, height: 30, color: Colors.white),
-          Image.asset('assets/ball.png',
+          Image.asset('assets/goal.png',
+              width: 30, height: 30, color: Colors.white),
+          Image.asset('assets/table.png',
               width: 30, height: 30, color: Colors.white),
         ],
         index: _selectedIndex,
@@ -660,180 +1091,6 @@ class _HomePageState extends State<HomePage> {
           });
         },
         height: 60,
-      ),
-    );
-  }
-
-  // Function to load Rewarded Ad
-  // void _loadRewardedAd() {
-  //   if (_isRewardedAdLoading) {
-  //     return;
-  //   }
-  //   _isRewardedAdLoading = true;
-  //   RewardedAd.load(
-  //       adUnitId: _rewardedAdUnitId,
-  //       request: const AdRequest(),
-  //       rewardedAdLoadCallback: RewardedAdLoadCallback(
-  //         onAdLoaded: (RewardedAd ad) {
-  //           print('$ad loaded.');
-  //           _rewardedAd = ad;
-  //           _isRewardedAdLoading = false;
-  //         },
-  //         onAdFailedToLoad: (LoadAdError error) {
-  //           print('RewardedAd failed to load: $error');
-  //           _rewardedAd = null;
-  //           _isRewardedAdLoading = false;
-  //         },
-  //       ));
-  // }
-
-  // Function to load Interstitial Ad
-  // void _loadAd() {
-  //   if (_isAdLoading) {
-  //     return; // Don't load if already loading
-  //   }
-  //   _isAdLoading = true;
-  //   InterstitialAd.load(
-  //     adUnitId: _interstitialAdUnitId, // Corrected variable name
-  //     request: const AdRequest(),
-  //     adLoadCallback: InterstitialAdLoadCallback(
-  //       onAdLoaded: (InterstitialAd ad) {
-  //         print('$ad loaded.');
-  //         _interstitialAd = ad;
-  //         _isAdLoading = false;
-  //       },
-  //       onAdFailedToLoad: (LoadAdError error) {
-  //         print('InterstitialAd failed to load: $error');
-  //         _isAdLoading = false;
-  //         _interstitialAd = null; // Ensure ad is null if loading failed
-  //       },
-  //     ),
-  //   );
-  // }
-
-  // Updated openVideo to handle ads based on source
-  void openVideo(BuildContext context, String initialUrl,
-      List<Map<String, dynamic>> streamLinks, String sourceSection) {
-    print("openVideo called from: $sourceSection");
-
-    // if (sourceSection == 'news') {
-    //   // --- Show Rewarded Ad for News Section ---
-    //   if (_rewardedAd != null) {
-    //     print("Attempting to show Rewarded Ad for News.");
-    //     _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
-    //       onAdShowedFullScreenContent: (RewardedAd ad) =>
-    //           print('$ad onAdShowedFullScreenContent.'),
-    //       onAdDismissedFullScreenContent: (RewardedAd ad) {
-    //         print('$ad onAdDismissedFullScreenContent.');
-    //         ad.dispose();
-    //         _rewardedAd = null;
-    //         _loadRewardedAd(); // Load the next one
-    //         // Navigate AFTER ad dismissal
-    //         _navigateToVideoPlayer(context, initialUrl, streamLinks);
-    //       },
-    //       onAdFailedToShowFullScreenContent: (RewardedAd ad, AdError error) {
-    //         print('$ad onAdFailedToShowFullScreenContent: $error');
-    //         ad.dispose();
-    //         _rewardedAd = null;
-    //         _loadRewardedAd(); // Load the next one
-    //         // Navigate directly if ad fails to show
-    //         _navigateToVideoPlayer(context, initialUrl, streamLinks);
-    //       },
-    //     );
-
-    //     _rewardedAd!.show(
-    //         onUserEarnedReward: (AdWithoutView ad, RewardItem reward) {
-    //       print(
-    //           '$ad with reward $RewardItem(${reward.amount}, ${reward.type})');
-    //       // Handle reward if necessary
-    //     });
-    //   } else {
-    //     print("Rewarded Ad not ready for News, navigating directly.");
-    //     _loadRewardedAd(); // Try loading again
-    //     _navigateToVideoPlayer(context, initialUrl, streamLinks);
-    //   }
-    // } else {
-    //   // --- Show Interstitial Ad for Channels/Matches Sections ---
-    //   final interstitialAdToShow = _interstitialAd;
-    //   _interstitialAd = null; // Clear the reference
-
-    //   // Start loading the next interstitial ad immediately
-    //   _loadAd();
-
-    //   if (interstitialAdToShow != null) {
-    //     print("Attempting to show Interstitial Ad for $sourceSection.");
-    //     interstitialAdToShow.fullScreenContentCallback =
-    //         FullScreenContentCallback(
-    //       onAdShowedFullScreenContent: (InterstitialAd ad) =>
-    //           print('$ad onAdShowedFullScreenContent.'),
-    //       onAdDismissedFullScreenContent: (InterstitialAd ad) {
-    //         print('$ad onAdDismissedFullScreenContent.');
-    //         ad.dispose();
-    //         // Navigate AFTER ad dismissal using GlobalKey
-    //         _navigateToVideoPlayer(context, initialUrl, streamLinks);
-    //       },
-    //       onAdFailedToShowFullScreenContent:
-    //           (InterstitialAd ad, AdError error) {
-    //         print('$ad onAdFailedToShowFullScreenContent: $error');
-    //         ad.dispose();
-    //         // Navigate directly if ad fails to show using GlobalKey
-    //         _navigateToVideoPlayer(context, initialUrl, streamLinks);
-    //       },
-    //     );
-    //     interstitialAdToShow.show();
-    //   } else {
-    //     print(
-    //         "Interstitial Ad not ready for $sourceSection, navigating directly.");
-    //     // Navigate directly if no ad is loaded
-    //     _navigateToVideoPlayer(context, initialUrl, streamLinks);
-    //   }
-    // }
-
-    _navigateToVideoPlayer(context, initialUrl, streamLinks);
-  }
-
-  // Helper function for navigation using GlobalKey
-  void _navigateToVideoPlayer(
-      BuildContext context, // Context still passed but not used for navigation
-      String initialUrl,
-      List<Map<String, dynamic>> streamLinks) {
-    // Use the GlobalKey to access the NavigatorState safely
-    navigatorKey.currentState?.push(
-      MaterialPageRoute(
-        builder: (context) => VideoPlayerScreen(
-          // BuildContext here is fine
-          initialUrl: initialUrl,
-          streamLinks: streamLinks,
-          // interstitialAd: adToShow, // Removed parameter
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSearchBar() {
-    return Container(
-      width: double.infinity,
-      height: 40,
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-            color: Theme.of(context).colorScheme.secondary.withOpacity(0.6)),
-      ),
-      child: TextField(
-        controller: _searchController,
-        decoration: InputDecoration(
-          hintText: 'بحث عن قناة',
-          hintStyle: TextStyle(color: Colors.grey.shade500),
-          prefixIcon: Icon(Icons.search,
-              color: Theme.of(context).colorScheme.secondary),
-          border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(horizontal: 16),
-        ),
-        onChanged: (query) {
-          _filterChannels(query);
-        },
-        style: TextStyle(color: Theme.of(context).textTheme.bodyLarge!.color),
       ),
     );
   }

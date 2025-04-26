@@ -12,12 +12,12 @@ class FirebaseApi {
           vapidKey: 'YOUR_VAPID_KEY', // Get this from Firebase Console
         );
       } catch (e) {
-        print('Web notification error: $e');
+        // print('Web notification error: $e');
       }
     } else {
       await _firebseMessaging.requestPermission();
       String? token = await _firebseMessaging.getToken();
-      print("token: $token");
+      // print("token: $token");
     }
   }
 

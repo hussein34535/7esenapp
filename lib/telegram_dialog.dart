@@ -28,22 +28,52 @@ void showTelegramDialog(BuildContext context) {
                   color: Colors.blue, // Set icon color to blue
                   size: 24),
               SizedBox(width: 10),
-              Text(
-                'انضم لقناتنا على التيليجرام',
-                style: TextStyle(
-                  color:
-                      theme.textTheme.bodyLarge!.color, // Use theme text color
-                  fontWeight: FontWeight.bold,
+              // Re-add Expanded to prevent overflow
+              Expanded(
+                child: Text(
+                  'انضم لقناتنا على التيليجرام',
+                  style: TextStyle(
+                    color: theme
+                        .textTheme.bodyLarge!.color, // Use theme text color
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center, // Keep text centered
                 ),
               ),
             ],
           ),
         ), // End Center
-        content: Text(
-          'تابع آخر الأخبار والتحديثات من خلال الانضمام لقناتنا على التيليجرام!',
-          textAlign: TextAlign.center, // Center align content
-          style: TextStyle(
-              color: theme.textTheme.bodyMedium!.color), // Use theme text color
+        content: Column(
+          // Use Column to display text on separate lines
+          mainAxisSize: MainAxisSize.min, // Ensure Column takes minimum space
+          children: [
+            Text(
+              'تابع آخر الأخبار والتحديثات!',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: theme.textTheme.bodyMedium!.color),
+            ),
+            SizedBox(height: 8), // Add some space between the texts
+            // Wrap the second Text in a Container for styling
+            Container(
+              padding: EdgeInsets.symmetric(
+                  horizontal: 16.0, vertical: 8.0), // Add padding
+              decoration: BoxDecoration(
+                color: theme.colorScheme.secondaryContainer
+                    .withOpacity(0.3), // Transparent background
+                borderRadius: BorderRadius.circular(20.0), // Oval shape
+              ),
+              child: Text(
+                'اللهم صل وسلم وبارك على سيدنا محمد',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  // Use a color that contrasts with the new background
+                  color: theme.colorScheme.onSecondaryContainer,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
         ),
         actionsAlignment: MainAxisAlignment.center, // Center align buttons
         actions: <Widget>[
@@ -73,11 +103,16 @@ void showTelegramDialog(BuildContext context) {
             ),
             onPressed: () async {
               final telegramUrl = Uri.parse('https://t.me/tv_7esen');
-              if (await canLaunchUrl(telegramUrl)) {
-                await launchUrl(telegramUrl);
-              } else {
+              try {
+                if (await canLaunchUrl(telegramUrl)) {
+                  await launchUrl(telegramUrl,
+                      mode: LaunchMode.externalApplication);
+                } else {
+                  // print('Could not launch Telegram URL');
+                }
+              } catch (e) {
                 // Handle error if Telegram URL can't be launched
-                print('Could not launch Telegram URL');
+                // print('Could not launch Telegram URL');
               }
               Navigator.of(context).pop();
             },

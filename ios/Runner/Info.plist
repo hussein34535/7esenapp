@@ -45,8 +45,9 @@
 		<true/>
 		<key>UIApplicationSupportsIndirectInputEvents</key>
 		<true/>
-		<key>GADApplicationIdentifier</key>
-		<string>ca-app-pub-2393153600924393~8385972075</string>
+		<!-- Replace AdMob App ID with Unity Ads Game ID -->
+		<key>UnityAdsAppId</key>
+		<string>5840221</string>
 		<key>UIStatusBarHidden</key>
 		<false/>
 	</dict>

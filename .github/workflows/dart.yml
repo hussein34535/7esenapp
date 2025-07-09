@@ -5,11 +5,10 @@ on:
 
 jobs:
   build-ios:
-    name: 🎉 iOS Build
     runs-on: macos-latest
 
     steps:
-      - name: 🔄 Checkout source
+      - name: 🔄 Checkout code
         uses: actions/checkout@v3
 
       - name: 🧰 Install Flutter
@@ -18,17 +17,17 @@ jobs:
           channel: stable
           architecture: x64
 
-      - name: 📦 Get dependencies
+      - name: 📦 Install dependencies
         run: flutter pub get
 
-      - name: ⚙️ Generate iOS Flutter files
-        run: flutter build ios --no-codesign --release
+      - name: 🛠️ Generate iOS config (podhelper.rb)
+        run: flutter create .
 
       - name: 📦 Install CocoaPods
         run: pod install
         working-directory: ios
 
-      - name: 🛠 Build IPA
+      - name: 🚀 Build release IPA
         run: flutter build ios --release --no-codesign
 
       - name: 📁 Prepare IPA

@@ -1,7 +1,7 @@
 platform :ios, '13.0'
 
-# أضف السطر ده لتحميل podhelper وتعريف الدالة
-require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), __dir__)
+flutter_application_path = File.expand_path(File.join('..', '..'))
+load File.join(flutter_application_path, '.ios', 'Flutter', 'podhelper.rb')
 
 target 'Runner' do
   use_frameworks!

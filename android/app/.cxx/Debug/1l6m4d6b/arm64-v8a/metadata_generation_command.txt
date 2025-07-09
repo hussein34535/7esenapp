@@ -5,10 +5,10 @@
 -DANDROID_PLATFORM=android-21
 -DANDROID_ABI=arm64-v8a
 -DCMAKE_ANDROID_ARCH_ABI=arm64-v8a
--DANDROID_NDK=E:\andrid studio\Sdk\ndk\29.0.13113456
--DCMAKE_ANDROID_NDK=E:\andrid studio\Sdk\ndk\29.0.13113456
--DCMAKE_TOOLCHAIN_FILE=E:\andrid studio\Sdk\ndk\29.0.13113456\build\cmake\android.toolchain.cmake
--DCMAKE_MAKE_PROGRAM=E:\andrid studio\Sdk\cmake\3.22.1\bin\ninja.exe
+-DANDROID_NDK=E:\andridstudio\Sdk\ndk\29.0.13113456
+-DCMAKE_ANDROID_NDK=E:\andridstudio\Sdk\ndk\29.0.13113456
+-DCMAKE_TOOLCHAIN_FILE=E:\andridstudio\Sdk\ndk\29.0.13113456\build\cmake\android.toolchain.cmake
+-DCMAKE_MAKE_PROGRAM=E:\andridstudio\Sdk\cmake\3.22.1\bin\ninja.exe
 -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=E:\flutterhere\flutterproject\hesen\build\app\intermediates\cxx\Debug\1l6m4d6b\obj\arm64-v8a
 -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=E:\flutterhere\flutterproject\hesen\build\app\intermediates\cxx\Debug\1l6m4d6b\obj\arm64-v8a
 -DCMAKE_BUILD_TYPE=Debug

@@ -15,10 +15,10 @@ android {
         applicationId "tv.hesen.com"
         // You can update the following values to match your application needs.
         // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-gradle-build-configuration.
-        minSdk = 21
+        minSdk = 26
         targetSdk = 34
-        versionCode = 4
-        versionName = "4"
+        versionCode = 7
+        versionName = "7"
     }
 
     compileOptions {
@@ -58,4 +58,5 @@ dependencies {
     implementation platform('com.google.firebase:firebase-bom:33.1.0') // Use the Firebase BOM
     // Add the specific Firebase dependencies you need here, without versions
     // e.g., implementation 'com.google.firebase:firebase-analytics'
+    implementation 'com.unity3d.ads:unity-ads:4.9.3' // Added Unity Ads SDK
 }

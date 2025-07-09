@@ -18,10 +18,8 @@ import 'package:hesen/video_player_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:hesen/widgets.dart';
 import 'dart:async';
-import 'package:share_plus/share_plus.dart';
 import 'package:hesen/privacy_policy_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:hesen/password_entry_screen.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -30,9 +28,9 @@ import 'package:unity_ads_plugin/unity_ads_plugin.dart';
 import 'dart:math' as math;
 import 'dart:math';
 import 'package:flutter/foundation.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:hesen/theme_customization_screen.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -75,7 +73,12 @@ Future<void> main() async {
     onFailed: (error, message) {},
   );
 
-  runApp(const MyApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => ThemeProvider(),
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatefulWidget {
@@ -86,53 +89,31 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  ThemeMode _themeMode = ThemeMode.dark;
-  bool _isFirstTime = true;
-
   @override
   void initState() {
     super.initState();
-    _loadThemeMode();
-    _checkFirstTime();
     _createNotificationChannel();
-  }
-
-  Future<void> _loadThemeMode() async {
-    final savedThemeMode = prefs?.getString('themeMode');
-    if (savedThemeMode != null) {
-      setState(() {
-        _themeMode =
-            savedThemeMode == 'dark' ? ThemeMode.dark : ThemeMode.light;
-      });
-    }
-  }
-
-  Future<void> _saveThemeMode(ThemeMode themeMode) async {
-    await prefs?.setString(
-        'themeMode', themeMode == ThemeMode.dark ? 'dark' : 'light');
-  }
-
-  Future<void> _checkFirstTime() async {
-    bool? isFirstTime = prefs?.getBool('isFirstTime');
-    setState(() {
-      _isFirstTime = isFirstTime == null || isFirstTime;
-    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
     return MaterialApp(
       title: '7eSen TV',
+      debugShowCheckedModeBanner: false,
+      themeMode: themeProvider.themeMode,
       theme: ThemeData(
         brightness: Brightness.light,
-        primaryColor: const Color(0xFF673AB7),
-        scaffoldBackgroundColor: const Color(0xFF673AB7),
-        cardColor: const Color(0xFF673AB7),
-        colorScheme: const ColorScheme.light(
-          primary: Color(0xFF673AB7),
-          secondary: Color(0xFF00BCD4),
+        primaryColor: themeProvider.getPrimaryColor(false),
+        scaffoldBackgroundColor:
+            themeProvider.getScaffoldBackgroundColor(false),
+        cardColor: themeProvider.getCardColor(false),
+        colorScheme: ColorScheme.light(
+          primary: themeProvider.getPrimaryColor(false),
+          secondary: themeProvider.getSecondaryColor(false),
           surface: Colors.white,
-          background: Color(0xFF673AB7),
+          background: themeProvider.getScaffoldBackgroundColor(false),
           error: Colors.red,
           onPrimary: Colors.white,
           onSecondary: Colors.white,
@@ -141,11 +122,11 @@ class _MyAppState extends State<MyApp> {
           onError: Colors.white,
           brightness: Brightness.light,
         ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF673AB7),
+        appBarTheme: AppBarTheme(
+          backgroundColor: themeProvider.getAppBarBackgroundColor(false),
           foregroundColor: Colors.white,
-          iconTheme: IconThemeData(color: Colors.white),
-          titleTextStyle: TextStyle(
+          iconTheme: const IconThemeData(color: Colors.white),
+          titleTextStyle: const TextStyle(
             color: Colors.white,
             fontSize: 20,
             fontWeight: FontWeight.bold,
@@ -159,14 +140,14 @@ class _MyAppState extends State<MyApp> {
       ),
       darkTheme: ThemeData(
         brightness: Brightness.dark,
-        primaryColor: const Color(0xFF673AB7),
-        scaffoldBackgroundColor: Colors.black,
-        cardColor: const Color(0xFF1C1C1C),
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF1C1C1C),
-          secondary: Color.fromARGB(255, 184, 28, 176),
-          surface: Color(0xFF1C1C1C),
-          background: Colors.black,
+        primaryColor: themeProvider.getPrimaryColor(true),
+        scaffoldBackgroundColor: themeProvider.getScaffoldBackgroundColor(true),
+        cardColor: themeProvider.getCardColor(true),
+        colorScheme: ColorScheme.dark(
+          primary: themeProvider.getPrimaryColor(true),
+          secondary: themeProvider.getSecondaryColor(true),
+          surface: const Color(0xFF1C1C1C),
+          background: themeProvider.getScaffoldBackgroundColor(true),
           error: Colors.red,
           onPrimary: Colors.white,
           onSecondary: Colors.white,
@@ -175,11 +156,11 @@ class _MyAppState extends State<MyApp> {
           onError: Colors.white,
           brightness: Brightness.dark,
         ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color.fromARGB(255, 0, 0, 0),
+        appBarTheme: AppBarTheme(
+          backgroundColor: themeProvider.getAppBarBackgroundColor(true),
           foregroundColor: Colors.white,
-          iconTheme: IconThemeData(color: Colors.white),
-          titleTextStyle: TextStyle(
+          iconTheme: const IconThemeData(color: Colors.white),
+          titleTextStyle: const TextStyle(
             color: Colors.white,
             fontSize: 20,
             fontWeight: FontWeight.bold,
@@ -191,30 +172,15 @@ class _MyAppState extends State<MyApp> {
           bodySmall: TextStyle(color: Colors.white),
         ),
       ),
-      themeMode: _themeMode,
       initialRoute: '/home',
       routes: {
-        '/home': (context) => _isFirstTime
-            ? PasswordEntryScreen(
-                key: const ValueKey('password'),
-                onCorrectInput: () {
-                  setState(() {
-                    _isFirstTime = false;
-                  });
-                  Navigator.pushReplacementNamed(context, '/home');
-                },
-                prefs: prefs!,
-              )
-            : HomePage(
-                key: const ValueKey('home'),
-                onThemeChanged: (isDarkMode) {
-                  setState(() {
-                    _themeMode = isDarkMode ? ThemeMode.dark : ThemeMode.light;
-                    _saveThemeMode(_themeMode);
-                  });
-                },
-                themeMode: _themeMode,
-              ),
+        '/home': (context) => HomePage(
+              key: const ValueKey('home'),
+              onThemeChanged: (isDarkMode) {
+                themeProvider.setThemeMode(
+                    isDarkMode ? ThemeMode.dark : ThemeMode.light);
+              },
+            ),
         '/Notification_screen': (context) => const NotificationPage(),
       },
       navigatorKey: navigatorKey,
@@ -308,16 +274,15 @@ Future<Map<String, dynamic>> _processFetchedData(List<dynamic> results) async {
 
 class HomePage extends StatefulWidget {
   final Function(bool) onThemeChanged;
-  final ThemeMode themeMode;
 
-  const HomePage(
-      {super.key, required this.onThemeChanged, required this.themeMode});
+  const HomePage({super.key, required this.onThemeChanged});
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   List<Match> matches = [];
   List<dynamic> channels = [];
   List<dynamic> news = [];
@@ -328,22 +293,19 @@ class _HomePageState extends State<HomePage> {
   List<dynamic> _filteredChannels = [];
   late bool _isDarkMode;
   bool _isSearchBarVisible = false;
+  late TabController _tabController;
 
   // Unity Ad Placement IDs
   final String _interstitialPlacementId = 'Interstitial_Android';
   final String _rewardedPlacementId = 'Rewarded_Android';
-  Map<String, bool> _adPlacements = {
-    'Interstitial_Android': false,
-    'Rewarded_Android': false,
-  };
 
   @override
   void initState() {
     super.initState();
-    _isDarkMode = widget.themeMode == ThemeMode.dark;
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    _isDarkMode = themeProvider.themeMode == ThemeMode.dark;
     _dataFuture = _initData();
     requestNotificationPermission();
-    _loadAds();
 
     // Load the flag and schedule the dialog if needed
     _checkAndShowTelegramDialog();
@@ -352,6 +314,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     _searchController.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
@@ -373,28 +336,18 @@ class _HomePageState extends State<HomePage> {
       // Step 3: Update state with processed data (only if mounted)
       if (mounted) {
         setState(() {
-          channels = processedData['channels'] as List<dynamic>;
-          _filteredChannels = channels; // Initialize filter with processed data
-          news = processedData['news'] as List<dynamic>;
-          matches = processedData['matches'] as List<Match>;
-          goals = processedData['goals'] as List<dynamic>;
+          channels = processedData['channels'];
+          news = processedData['news'];
+          matches = processedData['matches'];
+          goals = processedData['goals'];
+          _filteredChannels = channels; // Initialize filtered channels
+          _tabController = TabController(length: channels.length, vsync: this);
+          _tabController.addListener(_handleTabSelection);
         });
       }
-
-      // Step 4: Check for updates (can likely stay here)
-      checkForUpdate();
     } catch (e) {
-      // print('Error initializing data: $e');
-      if (mounted) {
-        setState(() {
-          // Handle error state if necessary, maybe set lists to empty
-          channels = [];
-          _filteredChannels = [];
-          news = [];
-          matches = [];
-          goals = [];
-        });
-      }
+      // Handle errors
+      debugPrint('Error initializing data: $e');
     }
   }
 
@@ -450,7 +403,7 @@ class _HomePageState extends State<HomePage> {
         final data = json.decode(response.body);
         final latestVersion = data['version'];
         final updateUrl = data['update_url'];
-        const currentVersion = '1.0.5';
+        const currentVersion = '2.0.0';
 
         if (latestVersion != null &&
             updateUrl != null &&
@@ -564,102 +517,168 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _loadAds() {
-    for (var placementId in _adPlacements.keys) {
-      _loadAd(placementId);
-    }
-  }
-
-  void _loadAd(String placementId) {
-    UnityAds.load(
-        placementId: placementId,
-        onComplete: (placementId) {
-          // print('Load Complete $placementId');
-          if (mounted) {
-            setState(() {
-              _adPlacements[placementId] = true;
-            });
-          }
-        },
-        onFailed: (placementId, error, message) =>
-            {} // print('Load Failed $placementId: $error $message'),
-        );
-  }
-
   void openVideo(BuildContext context, String initialUrl,
       List<Map<String, dynamic>> streamLinks, String sourceSection) async {
-    // print("openVideo called from: $sourceSection");
-
-    // Determine placement ID and if it's a rewarded ad
     final bool isRewardedSection =
         sourceSection == 'news' || sourceSection == 'goals';
     final String placementId =
         isRewardedSection ? _rewardedPlacementId : _interstitialPlacementId;
-    final bool adReady = _adPlacements[placementId] ?? false;
 
-    // print(
-    //     "Attempting to show ${isRewardedSection ? 'Rewarded' : 'Interstitial'} Ad ($placementId) for $sourceSection. Ad Ready: $adReady");
+    // --- State variables for this specific call ---
+    bool adLoadFinished = false; // True if load completes or fails
+    bool navigationDone = false; // True if navigation to player screen happened
+    String? loadedPlacementIdIfReady; // Stores placementId if load completes
+    Timer? loadTimer; // Timer for the 4-second timeout
+    // ----
 
-    try {
-      if (adReady) {
-        // Mark ad as used immediately
-        if (mounted) {
-          setState(() {
-            _adPlacements[placementId] = false;
-          });
-        }
-
-        await UnityAds.showVideoAd(
-          placementId: placementId,
-          onComplete: (placementId) {
-            // print('Video Ad $placementId completed.');
-            _navigateToVideoPlayer(context, initialUrl, streamLinks);
-            _loadAd(placementId); // Reload the ad
-            if (isRewardedSection) {
-              // print("Reward earned for watching ad: $placementId");
-              // Optional: Show a confirmation message to the user about the reward
-            }
-          },
-          onFailed: (placementId, error, message) {
-            // print('Video Ad $placementId failed: $error $message');
-            _navigateToVideoPlayer(context, initialUrl, streamLinks);
-            _loadAd(placementId); // Attempt to reload the ad anyway
-          },
-          onStart: (placementId) =>
-              {}, // print('Video Ad $placementId started.'),
-          onClick: (placementId) =>
-              {}, // print('Video Ad $placementId clicked.'),
-          onSkipped: (placementId) {
-            // print('Video Ad $placementId skipped.');
-            _loadAd(placementId); // Reload the ad
-            // Only navigate if it wasn't a rewarded ad that requires completion
-            if (!isRewardedSection) {
-              _navigateToVideoPlayer(context, initialUrl, streamLinks);
-            } else {
-              // Show message that reward requires full watch
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text(
-                        'يجب مشاهدة الإعلان كاملاً للوصول للمحتوى.'))); // Updated message
-              }
-            }
-          },
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return const AlertDialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          content: Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
+          ),
         );
-      } else {
-        // print("Unity Ad $placementId not ready, navigating directly.");
-        _navigateToVideoPlayer(context, initialUrl, streamLinks);
-        // Still try to load the ad for next time
-        _loadAd(placementId);
+      },
+    );
+
+    final BuildContext? capturedNavigatorContext = navigatorKey.currentContext;
+
+    // --- Helper function to safely dismiss dialog and navigate ---
+    void dismissAndNavigate() {
+      if (navigationDone) return; // Prevent multiple navigations
+      navigationDone = true;
+      BuildContext effectiveContext = capturedNavigatorContext ?? context;
+      if (Navigator.canPop(effectiveContext)) {
+        Navigator.pop(effectiveContext);
       }
+      _navigateToVideoPlayer(effectiveContext, initialUrl, streamLinks);
+    }
+    // ----
+
+    // --- Helper function to show ad AFTER navigation ---
+    void showAdOverlay(String adPlacementId) {
+      // print("showAdOverlay: Showing ad $adPlacementId over video player.");
+      UnityAds.showVideoAd(
+        placementId: adPlacementId,
+        // These callbacks DON'T navigate
+        onComplete: (pid) {}, // print("Overlay Ad $pid Complete"),
+        onFailed:
+            (pid, err, msg) {}, // print("Overlay Ad $pid Failed: $err $msg"),
+        onStart: (pid) {}, // print("Overlay Ad $pid Start"),
+        onClick: (pid) {}, // print("Overlay Ad $pid Click"),
+        onSkipped: (pid) {
+          // print("Overlay Ad $pid Skipped");
+          if (isRewardedSection) {
+            // Still show message even if it's an overlay
+            BuildContext effectiveContext = capturedNavigatorContext ?? context;
+            ScaffoldMessenger.of(effectiveContext).showSnackBar(const SnackBar(
+                content: Text('يجب مشاهدة الإعلان كاملاً للوصول للمحتوى.')));
+          }
+        },
+      );
+    }
+    // ----
+
+    // Start the 4-second timer
+    loadTimer = Timer(const Duration(seconds: 4), () {
+      // print("Ad load timer expired.");
+      if (!adLoadFinished) {
+        // print("Timeout occurred before ad load finished. Navigating early.");
+        dismissAndNavigate(); // Navigate early, ad load continues
+      }
+    });
+
+    // Attempt to load the ad
+    try {
+      UnityAds.load(
+        placementId: placementId,
+        onComplete: (loadedPlacementId) async {
+          // print("UnityAds.load complete: $loadedPlacementId");
+          if (adLoadFinished)
+            return; // Already handled (e.g., by failure or previous complete)
+          adLoadFinished = true;
+          loadTimer?.cancel();
+          loadedPlacementIdIfReady = loadedPlacementId;
+
+          if (navigationDone) {
+            // Navigation already happened due to timeout
+            // print("Ad loaded AFTER timeout/navigation. Showing as overlay.");
+            showAdOverlay(loadedPlacementId);
+          } else {
+            // Ad loaded within the 4-second timeout
+            // print("Ad loaded WITHIN timeout. Dismissing dialog and showing ad now.");
+            BuildContext effectiveContext = capturedNavigatorContext ?? context;
+            if (Navigator.canPop(effectiveContext)) {
+              Navigator.pop(effectiveContext); // Dismiss dialog FIRST
+            }
+
+            // Show the ad, and navigate AFTER it finishes/fails/skips
+            await UnityAds.showVideoAd(
+              placementId: loadedPlacementId,
+              onComplete: (completedPlacementId) {
+                // print("Pre-Nav Ad $completedPlacementId Complete. Navigating.");
+                dismissAndNavigate(); // Navigate after completion
+              },
+              onFailed: (failedPlacementId, error, message) {
+                // print("Pre-Nav Ad $failedPlacementId Failed: $error $message. Navigating.");
+                dismissAndNavigate(); // Navigate even on failure to show
+              },
+              onStart: (startPlacementId) => {},
+              onClick: (clickPlacementId) => {},
+              onSkipped: (skippedPlacementId) {
+                // print("Pre-Nav Ad $skippedPlacementId Skipped.");
+                if (isRewardedSection) {
+                  // Don't navigate for skipped rewarded ad, just show message
+                  BuildContext effectiveContext =
+                      capturedNavigatorContext ?? context;
+                  ScaffoldMessenger.of(effectiveContext).showSnackBar(
+                      const SnackBar(
+                          content: Text(
+                              'يجب مشاهدة الإعلان كاملاً للوصول للمحتوى.')));
+                  // Ensure navigationDone is set so subsequent checks work correctly
+                  navigationDone = true;
+                } else {
+                  // Navigate for skipped non-rewarded ad
+                  dismissAndNavigate();
+                }
+              },
+            );
+          }
+        },
+        onFailed: (failedPlacementId, error, message) {
+          // print("UnityAds.load failed: $failedPlacementId, $error, $message");
+          if (adLoadFinished) return;
+          adLoadFinished = true;
+          loadTimer?.cancel();
+
+          if (!navigationDone) {
+            // print("Ad load failed WITHIN timeout. Navigating.");
+            dismissAndNavigate(); // Navigate if load failed before timeout
+          }
+          // If navigationDone is true, do nothing (timeout already handled navigation)
+        },
+      );
     } catch (e) {
-      // print("Error showing Unity Ad ($placementId): $e");
-      _navigateToVideoPlayer(context, initialUrl, streamLinks);
-      _loadAd(placementId); // Attempt to reload on error
+      // print("Error during UnityAds.load call: $e");
+      loadTimer?.cancel();
+      if (!navigationDone) {
+        // print("Error occurred WITHIN timeout. Navigating.");
+        dismissAndNavigate(); // Navigate on error before timeout
+      }
+      // If navigationDone is true, do nothing (timeout already handled navigation)
     }
   }
 
   void _navigateToVideoPlayer(BuildContext context, String initialUrl,
       List<Map<String, dynamic>> streamLinks) {
+    // Use the root navigator key to push the route
     navigatorKey.currentState?.push(
       MaterialPageRoute(
         builder: (context) => VideoPlayerScreen(
@@ -871,6 +890,13 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  void _handleTabSelection() {
+    if (!mounted) return;
+    setState(() {
+      _selectedIndex = _tabController.index;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final appBarHeight = AppBar().preferredSize.height;
@@ -915,6 +941,27 @@ class _HomePageState extends State<HomePage> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
+                          ListTile(
+                            leading: Icon(Icons.color_lens,
+                                color: Theme.of(context).colorScheme.secondary),
+                            title: Text('تخصيص الألوان',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(context)
+                                        .textTheme
+                                        .bodyLarge!
+                                        .color)),
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const ThemeCustomizationScreen(),
+                                ),
+                              );
+                            },
+                          ),
                           ListTile(
                             leading: Icon(FontAwesomeIcons.telegram,
                                 color: Theme.of(context).colorScheme.secondary),
@@ -979,21 +1026,6 @@ class _HomePageState extends State<HomePage> {
                                   builder: (context) => PrivacyPolicyPage(),
                                 ),
                               );
-                            },
-                          ),
-                          ListTile(
-                            leading: Icon(Icons.share_rounded,
-                                color: Theme.of(context).colorScheme.secondary),
-                            title: Text('مشاركه التطبيق',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Theme.of(context)
-                                        .textTheme
-                                        .bodyLarge!
-                                        .color)),
-                            onTap: () async {
-                              Navigator.pop(context);
-                              Share.share('https://t.me/tv_7esen');
                             },
                           ),
                         ],

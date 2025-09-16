@@ -9,7 +9,7 @@
             }
         }
     ],
-    "installCommand": "flutter config --enable-web && flutter pub get",
+    "installCommand": "wget https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.22.2-stable.tar.xz && tar -xf flutter_linux_3.22.2-stable.tar.xz && export PATH=\"$PATH:`pwd`/flutter/bin\" && flutter config --enable-web && flutter pub get",
     "buildCommand": "flutter build web --release",
     "outputDirectory": "build/web",
     "routes": [

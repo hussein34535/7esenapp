@@ -9,7 +9,7 @@
             }
         }
     ],
-    "installCommand": "bash ./install_flutter.sh",
+    "installCommand": "chmod +x ./install_flutter.sh && /bin/bash ./install_flutter.sh",
     "buildCommand": "flutter build web --release",
     "outputDirectory": "build/web",
     "routes": [

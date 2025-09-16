@@ -1,5 +1,17 @@
 {
     "version": 2,
+    "builds": [
+        {
+            "src": "index.html",
+            "use": "@vercel/static-build",
+            "config": {
+                "outputDirectory": "build/web"
+            }
+        }
+    ],
+    "installCommand": "flutter config --enable-web && flutter pub get",
+    "buildCommand": "flutter build web --release",
+    "outputDirectory": "build/web",
     "routes": [
         {
             "handle": "filesystem"
@@ -8,5 +20,8 @@
             "src": "/(.*)",
             "dest": "/index.html"
         }
-    ]
+    ],
+    "github": {
+        "silent": true
+    }
 } 

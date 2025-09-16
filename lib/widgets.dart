@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:hesen/models/match_model.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class ChannelsSection extends StatefulWidget {
   final List channelCategories;
   final Function openVideo;
+  final bool isAdLoading; // -->> استقبل الحالة هنا
 
-  ChannelsSection({required this.channelCategories, required this.openVideo});
+  ChannelsSection(
+      {required this.channelCategories,
+      required this.openVideo,
+      required this.isAdLoading});
 
   @override
   _ChannelsSectionState createState() => _ChannelsSectionState();
@@ -51,7 +54,8 @@ class _ChannelsSectionState extends State<ChannelsSection> {
                     itemBuilder: (context, index) {
                       return ChannelBox(
                           category: widget.channelCategories[index],
-                          openVideo: widget.openVideo);
+                          openVideo: widget.openVideo,
+                          isAdLoading: widget.isAdLoading);
                     },
                   );
                 },
@@ -73,8 +77,12 @@ class _ChannelsSectionState extends State<ChannelsSection> {
 class ChannelBox extends StatelessWidget {
   final dynamic category;
   final Function openVideo;
+  final bool isAdLoading; // -->> استقبل الحالة هنا
 
-  ChannelBox({required this.category, required this.openVideo});
+  ChannelBox(
+      {required this.category,
+      required this.openVideo,
+      required this.isAdLoading});
 
   @override
   Widget build(BuildContext context) {
@@ -83,33 +91,41 @@ class ChannelBox extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25.0)),
       child: InkWell(
         borderRadius: BorderRadius.circular(25.0),
-        onTap: () {
-          // Print the channels list just before navigation
-          List channelsToPass = category['channels'] ?? [];
-          // print("--- ChannelBox onTap - Channels being passed: ---");
-          // print(channelsToPass);
-          // print("--------------------------------------------------");
+        onTap: isAdLoading
+            ? null
+            : () {
+                // -->> استخدم الحالة هنا لتعطيل الضغط
+                // Print the channels list just before navigation
+                List channelsToPass = category['channels'] ?? [];
+                // print("--- ChannelBox onTap - Channels being passed: ---");
+                // print(channelsToPass);
+                // print("--------------------------------------------------");
 
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => CategoryChannelsScreen(
-                channels: channelsToPass, // Pass the list
-                openVideo: openVideo,
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => CategoryChannelsScreen(
+                      channels: channelsToPass, // Pass the list
+                      openVideo: openVideo,
+                      isAdLoading: isAdLoading, // -->> مرر الحالة
+                    ),
+                  ),
+                );
+              },
+        child: Opacity(
+          // -->> قم بتخفيف لون العنصر بصرياً
+          opacity: isAdLoading ? 0.5 : 1.0,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text(
+                category['name'] ?? 'Unknown Category',
+                style: TextStyle(
+                  color: Color(0xFF673ab7),
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
               ),
-            ),
-          );
-        },
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Text(
-              category['name'] ?? 'Unknown Category',
-              style: TextStyle(
-                color: Color(0xFF673ab7),
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
             ),
           ),
         ),
@@ -121,8 +137,12 @@ class ChannelBox extends StatelessWidget {
 class CategoryChannelsScreen extends StatefulWidget {
   final List channels;
   final Function openVideo;
+  final bool isAdLoading; // -->> استقبل الحالة هنا
 
-  CategoryChannelsScreen({required this.channels, required this.openVideo});
+  CategoryChannelsScreen(
+      {required this.channels,
+      required this.openVideo,
+      required this.isAdLoading});
 
   @override
   State<CategoryChannelsScreen> createState() => _CategoryChannelsScreenState();
@@ -180,6 +200,7 @@ class _CategoryChannelsScreenState extends State<CategoryChannelsScreen> {
                             (_selectedChannel == channelId) ? null : channelId;
                       });
                     },
+                    isAdLoading: widget.isAdLoading, // -->> مرر الحالة
                   ),
                 );
               },
@@ -208,6 +229,7 @@ class ChannelTile extends StatelessWidget {
   final Function openVideo;
   final bool isSelected;
   final Function(String) onChannelTap;
+  final bool isAdLoading; // -->> استقبل الحالة هنا
 
   ChannelTile({
     required Key key,
@@ -215,6 +237,7 @@ class ChannelTile extends StatelessWidget {
     required this.openVideo,
     required this.isSelected,
     required this.onChannelTap,
+    required this.isAdLoading, // -->> مرر الحالة
   }) : super(key: key);
 
   List<Map<String, String>> _extractStreamLinks(List<dynamic>? streamLinks) {
@@ -265,40 +288,50 @@ class ChannelTile extends StatelessWidget {
       margin: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: InkWell(
         borderRadius: BorderRadius.circular(25.0),
-        onTap: () {
-          final scaffoldMessenger = ScaffoldMessenger.of(context);
-          onChannelTap(channelId);
+        onTap: isAdLoading
+            ? null
+            : () {
+                // -->> استخدم الحالة هنا لتعطيل الضغط
+                final scaffoldMessenger = ScaffoldMessenger.of(context);
+                onChannelTap(channelId);
 
-          List<Map<String, String>> streams = _extractStreamLinks(streamLinks);
+                List<Map<String, String>> streams =
+                    _extractStreamLinks(streamLinks);
 
-          if (streams.isNotEmpty) {
-            if (streams[0]['url'] is String) {
-              openVideo(
-                  context,
-                  streams[0]['url']!,
-                  streams.map((e) => Map<String, dynamic>.from(e)).toList(),
-                  'channels' // Added sourceSection
-                  );
-            } else {
-              scaffoldMessenger.showSnackBar(
-                  SnackBar(content: Text('Invalid Stream Format')));
-            }
-          } else {
-            scaffoldMessenger
-                .showSnackBar(SnackBar(content: Text("No stream available.")));
-          }
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Center(
-            child: Text(
-              channelName,
-              style: TextStyle(
-                color: Color(0xFF673ab7),
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+                if (streams.isNotEmpty) {
+                  if (streams[0]['url'] is String) {
+                    openVideo(
+                        context,
+                        streams[0]['url']!,
+                        streams
+                            .map((e) => Map<String, dynamic>.from(e))
+                            .toList(),
+                        'channels' // Added sourceSection
+                        );
+                  } else {
+                    scaffoldMessenger.showSnackBar(
+                        SnackBar(content: Text('Invalid Stream Format')));
+                  }
+                } else {
+                  scaffoldMessenger.showSnackBar(
+                      SnackBar(content: Text("No stream available.")));
+                }
+              },
+        child: Opacity(
+          // -->> قم بتخفيف لون العنصر بصرياً
+          opacity: isAdLoading ? 0.5 : 1.0,
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Center(
+              child: Text(
+                channelName,
+                style: TextStyle(
+                  color: Color(0xFF673ab7),
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
             ),
           ),
         ),
@@ -311,8 +344,12 @@ class ChannelTile extends StatelessWidget {
 class MatchesSection extends StatelessWidget {
   final Future<List<Match>> matches;
   final Function openVideo;
+  final bool isAdLoading; // -->> استقبل الحالة هنا
 
-  MatchesSection({required this.matches, required this.openVideo});
+  MatchesSection(
+      {required this.matches,
+      required this.openVideo,
+      required this.isAdLoading});
 
   @override
   Widget build(BuildContext context) {
@@ -367,18 +404,24 @@ class MatchesSection extends StatelessWidget {
             children: [
               if (liveMatches.isNotEmpty)
                 ...liveMatches
-                    .map(
-                        (match) => MatchBox(match: match, openVideo: openVideo))
+                    .map((match) => MatchBox(
+                        match: match,
+                        openVideo: openVideo,
+                        isAdLoading: isAdLoading)) // -->> مرر الحالة
                     .toList(),
               if (upcomingMatches.isNotEmpty)
                 ...upcomingMatches
-                    .map(
-                        (match) => MatchBox(match: match, openVideo: openVideo))
+                    .map((match) => MatchBox(
+                        match: match,
+                        openVideo: openVideo,
+                        isAdLoading: isAdLoading)) // -->> مرر الحالة
                     .toList(),
               if (finishedMatches.isNotEmpty)
                 ...finishedMatches
-                    .map(
-                        (match) => MatchBox(match: match, openVideo: openVideo))
+                    .map((match) => MatchBox(
+                        match: match,
+                        openVideo: openVideo,
+                        isAdLoading: isAdLoading)) // -->> مرر الحالة
                     .toList(),
             ],
           );
@@ -391,15 +434,15 @@ class MatchesSection extends StatelessWidget {
 class MatchBox extends StatelessWidget {
   final Match match;
   final Function openVideo;
+  final bool isAdLoading; // -->> استقبل الحالة هنا
 
-  MatchBox({required this.match, required this.openVideo});
+  MatchBox(
+      {required this.match,
+      required this.openVideo,
+      required this.isAdLoading});
 
   @override
   Widget build(BuildContext context) {
-    if (match == null) {
-      return SizedBox.shrink();
-    }
-
     final teamA = match.teamA;
     final teamB = match.teamB;
     String logoA = match.logoAUrl ?? ''; //  قد تكون فارغة
@@ -450,126 +493,133 @@ class MatchBox extends StatelessWidget {
       firstStreamUrl = streams[0]['url'] ?? '';
     }
     return GestureDetector(
-      onTap: () {
-        final scaffoldMessenger = ScaffoldMessenger.of(context);
-        if (streams.isNotEmpty) {
-          openVideo(
-              context,
-              firstStreamUrl,
-              streams.map((e) => Map<String, dynamic>.from(e)).toList(),
-              'matches' // Added sourceSection
-              );
-        } else {
-          scaffoldMessenger.showSnackBar(
-              SnackBar(content: Text('لا يوجد رابط للبث المباشر')));
-        }
-      },
-      child: Card(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(25.0),
-        ),
-        margin: EdgeInsets.all(9), // Medium margin
-        child: Padding(
-          padding: const EdgeInsets.all(9.0), // Medium padding
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: Column(
-                      children: [
-                        _buildTeamLogo(logoA, size: 52), // Medium logo size
-                        SizedBox(height: 4), // Kept smaller space
-                        Text(teamA,
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15) // Medium font size
-                            ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 7), // Medium padding
-                    decoration: BoxDecoration(
-                      color: borderColor,
-                      borderRadius: BorderRadius.circular(9), // Medium radius
-                    ),
-                    child: Text(
-                      timeStatus,
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13, // Medium font size
-                          color: Colors.white),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  Expanded(
-                    child: Column(
-                      children: [
-                        _buildTeamLogo(logoB, size: 52), // Medium logo size
-                        SizedBox(height: 4), // Kept smaller space
-                        Text(teamB,
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15) // Medium font size
-                            ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 9), // Medium space
-              // Details Row (Commentator, Channel)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  // Commentator
-                  Row(
-                    children: [
-                      Icon(Icons.mic,
-                          size: 18, color: Colors.grey), // Medium icon size
-                      SizedBox(width: 4), // Kept smaller space
-                      Text(commentator,
-                          style: TextStyle(
-                              color: Colors.grey,
-                              fontSize: 12)), // Medium font size
-                    ],
-                  ),
-                  // Channel
-                  Row(
-                    children: [
-                      Icon(Icons.tv,
-                          size: 18, color: Colors.grey), // Medium icon size
-                      SizedBox(width: 4), // Kept smaller space
-                      Text(channel,
-                          style: TextStyle(
-                              color: Colors.grey,
-                              fontSize: 12)), // Medium font size
-                    ],
-                  ),
-                ],
-              ),
-              // Champion (moved below)
-              Padding(
-                padding: const EdgeInsets.only(top: 7.0), // Medium padding
-                child: Row(
-                  mainAxisAlignment:
-                      MainAxisAlignment.center, // Center the champion
+      onTap: isAdLoading
+          ? null
+          : () {
+              // -->> استخدم الحالة هنا لتعطيل الضغط
+              final scaffoldMessenger = ScaffoldMessenger.of(context);
+              if (streams.isNotEmpty) {
+                openVideo(
+                    context,
+                    firstStreamUrl,
+                    streams.map((e) => Map<String, dynamic>.from(e)).toList(),
+                    'matches' // Added sourceSection
+                    );
+              } else {
+                scaffoldMessenger.showSnackBar(
+                    SnackBar(content: Text('لا يوجد رابط للبث المباشر')));
+              }
+            },
+      child: Opacity(
+        // -->> قم بتخفيف لون العنصر بصرياً
+        opacity: isAdLoading ? 0.5 : 1.0,
+        child: Card(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(25.0),
+          ),
+          margin: EdgeInsets.all(9), // Medium margin
+          child: Padding(
+            padding: const EdgeInsets.all(9.0), // Medium padding
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.emoji_events,
-                        size: 18,
-                        color: Colors.grey), // Changed from Icons.stars
-                    SizedBox(width: 4), // Kept smaller space
-                    Text(champion,
+                    Expanded(
+                      child: Column(
+                        children: [
+                          _buildTeamLogo(logoA, size: 52), // Medium logo size
+                          SizedBox(height: 4), // Kept smaller space
+                          Text(teamA,
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15) // Medium font size
+                              ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 7), // Medium padding
+                      decoration: BoxDecoration(
+                        color: borderColor,
+                        borderRadius: BorderRadius.circular(9), // Medium radius
+                      ),
+                      child: Text(
+                        timeStatus,
                         style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey)), // Medium font size
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13, // Medium font size
+                            color: Colors.white),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          _buildTeamLogo(logoB, size: 52), // Medium logo size
+                          SizedBox(height: 4), // Kept smaller space
+                          Text(teamB,
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15) // Medium font size
+                              ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
-              ),
-            ],
+                SizedBox(height: 9), // Medium space
+                // Details Row (Commentator, Channel)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    // Commentator
+                    Row(
+                      children: [
+                        Icon(Icons.mic,
+                            size: 18, color: Colors.grey), // Medium icon size
+                        SizedBox(width: 4), // Kept smaller space
+                        Text(commentator,
+                            style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 12)), // Medium font size
+                      ],
+                    ),
+                    // Channel
+                    Row(
+                      children: [
+                        Icon(Icons.tv,
+                            size: 18, color: Colors.grey), // Medium icon size
+                        SizedBox(width: 4), // Kept smaller space
+                        Text(channel,
+                            style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 12)), // Medium font size
+                      ],
+                    ),
+                  ],
+                ),
+                // Champion (moved below)
+                Padding(
+                  padding: const EdgeInsets.only(top: 7.0), // Medium padding
+                  child: Row(
+                    mainAxisAlignment:
+                        MainAxisAlignment.center, // Center the champion
+                    children: [
+                      Icon(Icons.emoji_events,
+                          size: 18,
+                          color: Colors.grey), // Changed from Icons.stars
+                      SizedBox(width: 4), // Kept smaller space
+                      Text(champion,
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey)), // Medium font size
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -606,14 +656,16 @@ class MatchBox extends StatelessWidget {
 class NewsSection extends StatelessWidget {
   final Future<List<dynamic>> newsArticles;
   final Function openVideo;
+  final bool isAdLoading; // -->> استقبل الحالة هنا
 
-  NewsSection({required this.newsArticles, required this.openVideo});
+  NewsSection(
+      {required this.newsArticles,
+      required this.openVideo,
+      required this.isAdLoading});
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width; // Get screen width
-    final titleFontSize =
-        (screenWidth * 0.05).clamp(16.0, 24.0); // Calculate dynamic size
+    // Removed unused variables screenWidth and titleFontSize
 
     return FutureBuilder<List<dynamic>>(
       future: newsArticles,
@@ -672,7 +724,10 @@ class NewsSection extends StatelessWidget {
                   itemCount: articles.length,
                   itemBuilder: (context, index) {
                     final article = articles[index];
-                    return NewsBox(article: article, openVideo: openVideo);
+                    return NewsBox(
+                        article: article,
+                        openVideo: openVideo,
+                        isAdLoading: isAdLoading); // -->> مرر الحالة
                   },
                 ),
               ),
@@ -687,8 +742,12 @@ class NewsSection extends StatelessWidget {
 class NewsBox extends StatelessWidget {
   final dynamic article;
   final Function openVideo;
+  final bool isAdLoading; // -->> استقبل الحالة هنا
 
-  NewsBox({required this.article, required this.openVideo});
+  NewsBox(
+      {required this.article,
+      required this.openVideo,
+      required this.isAdLoading});
 
   List<Map<String, String>> _extractStreamLinks(List<dynamic>? links) {
     List<Map<String, String>> extractedLinks = [];
@@ -739,78 +798,86 @@ class NewsBox extends StatelessWidget {
     }
 
     return GestureDetector(
-      onTap: () {
-        final scaffoldMessenger = ScaffoldMessenger.of(context);
-        List<Map<String, String>> streams = _extractStreamLinks(links);
-        if (streams.isNotEmpty) {
-          String firstStreamUrl =
-              streams[0]['url'] ?? ''; // Access the first link
-          openVideo(
-              context,
-              firstStreamUrl, // Pass the URL
-              streams
-                  .map((e) => Map<String, dynamic>.from(e))
-                  .toList(), // Pass all links (in the correct format)
-              'news' // Added sourceSection
-              );
-        } else {
-          scaffoldMessenger.showSnackBar(
-            SnackBar(
-                content: Text('No video link found for this news article.')),
-          );
-        }
-      },
-      child: Card(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(25.0)),
-        clipBehavior: Clip.antiAlias,
-        margin: EdgeInsets.all(10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Always attempt CachedNetworkImage, rely on errorWidget for null/bad URLs
-            CachedNetworkImage(
-              imageUrl: imageUrl ?? '', // Pass url or empty string
-              placeholder: (context, url) => Center(
-                  child:
-                      CircularProgressIndicator()), // Keep placeholder for loading
-              errorWidget: (context, url, error) =>
-                  _buildPlaceholder(), // Use placeholder on error/null url
-              height: 200,
-              width: double.infinity,
-              fit: BoxFit.cover,
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 20,
-                      color: Theme.of(context).primaryColor,
-                    ),
-                  ),
-                  SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        date,
-                        style: TextStyle(
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+      onTap: isAdLoading
+          ? null
+          : () {
+              // -->> استخدم الحالة هنا لتعطيل الضغط
+              final scaffoldMessenger = ScaffoldMessenger.of(context);
+              List<Map<String, String>> streams = _extractStreamLinks(links);
+              if (streams.isNotEmpty) {
+                String firstStreamUrl =
+                    streams[0]['url'] ?? ''; // Access the first link
+                openVideo(
+                    context,
+                    firstStreamUrl, // Pass the URL
+                    streams
+                        .map((e) => Map<String, dynamic>.from(e))
+                        .toList(), // Pass all links (in the correct format)
+                    'news' // Added sourceSection
+                    );
+              } else {
+                scaffoldMessenger.showSnackBar(
+                  SnackBar(
+                      content:
+                          Text('No video link found for this news article.')),
+                );
+              }
+            },
+      child: Opacity(
+        // -->> قم بتخفيف لون العنصر بصرياً
+        opacity: isAdLoading ? 0.5 : 1.0,
+        child: Card(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(25.0)),
+          clipBehavior: Clip.antiAlias,
+          margin: EdgeInsets.all(10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Always attempt CachedNetworkImage, rely on errorWidget for null/bad URLs
+              CachedNetworkImage(
+                imageUrl: imageUrl ?? '', // Pass url or empty string
+                placeholder: (context, url) => Center(
+                    child:
+                        CircularProgressIndicator()), // Keep placeholder for loading
+                errorWidget: (context, url, error) =>
+                    _buildPlaceholder(), // Use placeholder on error/null url
+                height: 200,
+                width: double.infinity,
+                fit: BoxFit.cover,
               ),
-            ),
-          ],
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20,
+                        color: Theme.of(context).primaryColor,
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          date,
+                          style: TextStyle(
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -832,18 +899,18 @@ class GoalsSection extends StatelessWidget {
   final Future<List<dynamic>> goalsArticles;
   final Function(BuildContext, String, List<Map<String, dynamic>>, String)
       openVideo;
+  final bool isAdLoading; // -->> استقبل الحالة هنا
 
   const GoalsSection({
     super.key,
     required this.goalsArticles,
     required this.openVideo,
+    required this.isAdLoading, // -->> استقبل الحالة هنا
   });
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width; // Get screen width
-    final titleFontSize =
-        (screenWidth * 0.05).clamp(16.0, 24.0); // Calculate dynamic size
+    // Removed unused variables screenWidth and titleFontSize
 
     return FutureBuilder<List<dynamic>>(
       future: goalsArticles,
@@ -935,69 +1002,75 @@ class GoalsSection extends StatelessWidget {
                   }
 
                   return GestureDetector(
-                    onTap: () {
-                      if (streamLinks.isNotEmpty) {
-                        openVideo(context, streamLinks[0]['url'], streamLinks,
-                            'goals');
-                      }
-                    },
-                    child: Card(
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(25.0)),
-                      clipBehavior: Clip.antiAlias,
-                      margin: const EdgeInsets.only(bottom: 16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (imageUrl != null)
-                            CachedNetworkImage(
-                              imageUrl:
-                                  imageUrl ?? '', // Pass url or empty string
-                              height: 200,
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) => Container(
+                    onTap: isAdLoading
+                        ? null
+                        : () {
+                            // -->> استخدم الحالة هنا لتعطيل الضغط
+                            if (streamLinks.isNotEmpty) {
+                              openVideo(context, streamLinks[0]['url'],
+                                  streamLinks, 'goals');
+                            }
+                          },
+                    child: Opacity(
+                      // -->> قم بتخفيف لون العنصر بصرياً
+                      opacity: isAdLoading ? 0.5 : 1.0,
+                      child: Card(
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(25.0)),
+                        clipBehavior: Clip.antiAlias,
+                        margin: const EdgeInsets.only(bottom: 16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (imageUrl != null)
+                              CachedNetworkImage(
+                                imageUrl: imageUrl, // Pass url or empty string
                                 height: 200,
-                                color: Colors.grey[300],
-                                child: const Center(
-                                    child: CircularProgressIndicator()),
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                                placeholder: (context, url) => Container(
+                                  height: 200,
+                                  color: Colors.grey[300],
+                                  child: const Center(
+                                      child: CircularProgressIndicator()),
+                                ),
+                                errorWidget: (context, url, error) => Container(
+                                  height: 200,
+                                  color: Colors.grey[300],
+                                  child: const Icon(Icons.error),
+                                ),
                               ),
-                              errorWidget: (context, url, error) => Container(
-                                height: 200,
-                                color: Colors.grey[300],
-                                child: const Icon(Icons.error),
+                            Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    title,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 18,
+                                      color: Theme.of(context)
+                                          .textTheme
+                                          .bodyLarge!
+                                          .color,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    time,
+                                    style: TextStyle(
+                                      color: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium!
+                                          .color,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  title,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 18,
-                                    color: Theme.of(context)
-                                        .textTheme
-                                        .bodyLarge!
-                                        .color,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  time,
-                                  style: TextStyle(
-                                    color: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium!
-                                        .color,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   );
@@ -1008,93 +1081,5 @@ class GoalsSection extends StatelessWidget {
         );
       },
     );
-  }
-}
-
-Widget _buildScoreOrTime(
-    BuildContext context, String? score, String? time, String status,
-    {double iconSize = 16.0}) {
-  if (status == 'FT' ||
-      status == 'HT' ||
-      score != null && score.contains('-')) {
-    // Final Score - Use larger font, different color if needed
-    return Text(
-      score ?? '-', // Show score if available, else fallback
-      style: TextStyle(
-        fontSize: 18.0, // Larger font for final score
-        fontWeight: FontWeight.bold,
-        color:
-            Theme.of(context).colorScheme.secondary, // Distinct color for score
-      ),
-    );
-  } else if (status == 'NS' || time == null || time.isEmpty) {
-    // Not Started or No Time - Use a placeholder icon
-    // Replace Image.asset with Icon
-    return Icon(
-      Icons.sports_soccer, // Placeholder icon
-      size: iconSize + 4, // Slightly larger icon
-      color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
-    );
-    /* Original Image.asset
-    return Image.asset(
-      'assets/ball.png', // Use the correct path
-      width: iconSize + 4, // Slightly larger icon
-      height: iconSize + 4,
-      color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
-    );
-    */
-  } else {
-    // In-progress or Scheduled Time - Regular time display
-    return Text(
-      time,
-      style: TextStyle(
-        fontSize: 14.0,
-        color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.9),
-      ),
-    );
-  }
-}
-
-Widget _buildLiveIndicator(BuildContext context, String status) {
-  if (status == 'LIVE' ||
-      status == 'HT' ||
-      (status.contains('') && status != 'FT' && status != 'NS')) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: Colors.redAccent,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: const Text(
-        'LIVE',
-        style: TextStyle(
-            color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-      ),
-    );
-  } else if (status == 'NS') {
-    // Replace Image.asset with Icon for Not Started status
-    return Image.asset(
-      'assets/no-image.png', // Use the specified asset
-      width: 16, // Consistent size
-      height: 16,
-      color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
-    );
-    /* Original Icon
-    return Icon(
-      Icons.sports_soccer, // Placeholder icon
-      size: 16, // Consistent size
-      color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
-    );
-    */
-    /* Original Image.asset
-    return Image.asset(
-      'assets/ball.png', // Use the correct path
-      width: 16,
-      height: 16,
-      color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
-    );
-    */
-  } else {
-    return const SizedBox.shrink(); // Return empty space if not LIVE or NS
   }
 }

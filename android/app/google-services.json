@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "415589112214",
-    "project_id": "hesen-notification",
-    "storage_bucket": "hesen-notification.firebasestorage.app"
+    "project_number": "555639744428",
+    "project_id": "esen-notifications",
+    "storage_bucket": "esen-notifications.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:415589112214:android:a0f1ba51f5e2ba82da65b7",
+        "mobilesdk_app_id": "1:555639744428:android:e93a3fc58589d76d7d3c09",
         "android_client_info": {
           "package_name": "tv.hesen.com"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBGl78gOw94X-vaFVL8uQgfDjW_DXBQNoM"
+          "current_key": "AIzaSyAKwpXThAROTbtOjmGN7KgYERHvUaKdDGw"
         }
       ],
       "services": {

@@ -3,7 +3,7 @@ description: "A new Flutter project."
 
 publish_to: 'none'
 
-version: 2.0.0
+version: 3.0.0
 environment:
   sdk: '>=2.17.0 <4.0.0'
 
@@ -11,15 +11,15 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_local_notifications: ^19.3.0
-  firebase_messaging: ^15.2.5
-  firebase_analytics: ^11.4.5
-  firebase_core: ^3.13.0
+  firebase_messaging: ^16.0.0
+  firebase_analytics: ^12.0.0
+  firebase_core: ^4.0.0
   http: any
   video_player: ^2.4.5
   intl: ^0.20.0
   permission_handler: ^12.0.0+1
   url_launcher: ^6.2.5
-  font_awesome_flutter: any
+  font_awesome_flutter: ^10.9.1
   cached_network_image: ^3.2.3
   wakelock_plus: ^1.2.8
   chewie: ^1.2.2 # Using chewie as it's a bit simpler
@@ -27,9 +27,9 @@ dependencies:
   day_night_switch: ^1.0.4
   uuid: ^4.3.3
   shared_preferences: ^2.5.3
-  connectivity_plus: ^6.1.4
+  connectivity_plus: ^6.1.5
   timezone: ^0.10.1 # Add timezone package
-  flutter_dotenv: ^5.1.0 # Add dotenv for environment variables
+  flutter_dotenv: ^6.0.0 # Add dotenv for environment variables
   unity_ads_plugin: ^0.3.25
   android_pip: ^2.0.1
   provider: ^6.1.2
@@ -48,7 +48,7 @@ dev_dependencies:
 
   flutter_test:
     sdk: flutter
-  flutter_lints: ^5.0.0
+  flutter_lints: ^6.0.0
   flutter_native_splash: ^2.4.4
 
 flutter:

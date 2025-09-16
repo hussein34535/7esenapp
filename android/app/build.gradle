@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "tv.hesen.com"
-    compileSdk = 35
+    compileSdk = 36
     ndkVersion = "29.0.13113456"
 
     defaultConfig {
@@ -17,13 +17,14 @@ android {
         // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-gradle-build-configuration.
         minSdk = 26
         targetSdk = 34
-        versionCode = 7
-        versionName = "7"
+        versionCode = 9
+        versionName = "9"
     }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        coreLibraryDesugaringEnabled true
     }
 
     kotlinOptions {
@@ -59,4 +60,5 @@ dependencies {
     // Add the specific Firebase dependencies you need here, without versions
     // e.g., implementation 'com.google.firebase:firebase-analytics'
     implementation 'com.unity3d.ads:unity-ads:4.9.3' // Added Unity Ads SDK
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
 }

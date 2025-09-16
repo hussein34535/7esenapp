@@ -1,3 +1,23 @@
+// المسار: android/build.gradle
+
+buildscript {
+    //  <<<--- التغيير الأول هنا
+    ext.kotlin_version = "2.2.0" 
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        //  <<<--- التغيير الثاني هنا
+        classpath 'com.android.tools.build:gradle:8.6.0'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+// =========================================================
+//  هذا هو الجزء الذي أرسلته أنت، وهو صحيح ولا يحتاج لتعديل
+// =========================================================
 allprojects {
     repositories {
         google()

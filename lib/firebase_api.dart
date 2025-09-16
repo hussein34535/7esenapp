@@ -17,7 +17,7 @@ class FirebaseApi {
     } else {
       await _firebseMessaging.requestPermission();
       String? token = await _firebseMessaging.getToken();
-      // print("token: $token");
+      print("token: $token");
     }
   }
 

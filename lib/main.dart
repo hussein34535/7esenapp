@@ -11,11 +11,9 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:hesen/services/api_service.dart';
 import 'package:hesen/models/match_model.dart';
 import 'package:uuid/uuid.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:day_night_switch/day_night_switch.dart';
 import 'package:hesen/video_player_screen.dart';
-import 'package:intl/intl.dart';
 import 'package:hesen/widgets.dart';
 import 'dart:async';
 import 'package:hesen/privacy_policy_page.dart';
@@ -23,14 +21,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:hesen/telegram_dialog.dart';
 import 'package:unity_ads_plugin/unity_ads_plugin.dart';
-import 'dart:math' as math;
-import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:hesen/theme_customization_screen.dart';
+import 'dart:io';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -61,17 +56,36 @@ SharedPreferences? prefs;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: './.env');
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  await FirebaseApi().initNotification();
+
+  // التحقق من عدم تهيئة التطبيق قبل الاستدعاء
+  try {
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    }
+  } on FirebaseException catch (e) {
+    if (e.code == 'duplicate-app') {
+      // Firebase app already initialized, safe to ignore
+    } else {
+      rethrow; // Re-throw other Firebase exceptions
+    }
+  }
+  if (!kIsWeb) {
+    final firebaseApi = FirebaseApi();
+    await firebaseApi.initNotification();
+  }
   tz.initializeTimeZones();
   prefs = await SharedPreferences.getInstance();
 
-  await UnityAds.init(
-    gameId: '5840220',
-    testMode: false,
-    onComplete: () {},
-    onFailed: (error, message) {},
-  );
+  if (!kIsWeb) {
+    await UnityAds.init(
+      gameId: '5840220',
+      testMode: false,
+      onComplete: () {},
+      onFailed: (error, message) {},
+    );
+  }
 
   runApp(
     ChangeNotifierProvider(
@@ -106,8 +120,9 @@ class _MyAppState extends State<MyApp> {
       theme: ThemeData(
         brightness: Brightness.light,
         primaryColor: themeProvider.getPrimaryColor(false),
-        scaffoldBackgroundColor:
-            themeProvider.getScaffoldBackgroundColor(false),
+        scaffoldBackgroundColor: themeProvider.getScaffoldBackgroundColor(
+          false,
+        ),
         cardColor: themeProvider.getCardColor(false),
         colorScheme: ColorScheme.light(
           primary: themeProvider.getPrimaryColor(false),
@@ -178,7 +193,8 @@ class _MyAppState extends State<MyApp> {
               key: const ValueKey('home'),
               onThemeChanged: (isDarkMode) {
                 themeProvider.setThemeMode(
-                    isDarkMode ? ThemeMode.dark : ThemeMode.light);
+                  isDarkMode ? ThemeMode.dark : ThemeMode.light,
+                );
               },
             ),
         '/Notification_screen': (context) => const NotificationPage(),
@@ -236,8 +252,9 @@ Future<Map<String, dynamic>> _processFetchedData(List<dynamic> results) async {
 
       for (var channelData in originalChannels) {
         if (channelData is Map) {
-          Map<String, dynamic> newChannel =
-              Map<String, dynamic>.from(channelData);
+          Map<String, dynamic> newChannel = Map<String, dynamic>.from(
+            channelData,
+          );
           if (newChannel['id'] == null) {
             newChannel['id'] = uuid.v4();
           }
@@ -299,6 +316,8 @@ class _HomePageState extends State<HomePage>
   final String _interstitialPlacementId = 'Interstitial_Android';
   final String _rewardedPlacementId = 'Rewarded_Android';
 
+  bool _isAdShowing = false; // -->> أضف هذا المتغير. هذا هو القفل الخاص بنا
+
   @override
   void initState() {
     super.initState();
@@ -308,7 +327,10 @@ class _HomePageState extends State<HomePage>
     requestNotificationPermission();
 
     // Load the flag and schedule the dialog if needed
-    _checkAndShowTelegramDialog();
+    // _checkAndShowTelegramDialog(); // Removed this line
+
+    // Add this line to call the update check function
+    checkForUpdate();
   }
 
   @override
@@ -397,13 +419,16 @@ class _HomePageState extends State<HomePage>
 
   Future<void> checkForUpdate() async {
     try {
-      final response = await http.get(Uri.parse(
-          'https://raw.githubusercontent.com/hussein34535/forceupdate/refs/heads/main/update.json'));
+      final response = await http.get(
+        Uri.parse(
+          'https://raw.githubusercontent.com/hussein34535/forceupdate/refs/heads/main/update.json',
+        ),
+      );
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final latestVersion = data['version'];
         final updateUrl = data['update_url'];
-        const currentVersion = '2.0.0';
+        const currentVersion = '3.0.0';
 
         if (latestVersion != null &&
             updateUrl != null &&
@@ -416,13 +441,126 @@ class _HomePageState extends State<HomePage>
         } else {
           // print('No update required or update data incomplete.');
         }
-      } else {
-        // print(
-        //     'Failed to fetch update check. Status code: ${response.statusCode}');
+      } else if (mounted) {
+        // If status code is not 200, show the Telegram dialog
+        showTelegramDialog();
       }
     } catch (e) {
       // print('Error during update check: $e');
+      if (e is http.ClientException || e is SocketException) {
+        if (mounted) {
+          showTelegramDialog();
+        }
+      }
     }
+  }
+
+  void showTelegramDialog() {
+    if (!mounted) return;
+
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withAlpha((0.8 * 255).round()),
+      transitionDuration: const Duration(milliseconds: 200),
+      pageBuilder: (
+        BuildContext buildContext,
+        Animation<double> animation,
+        Animation<double> secondaryAnimation,
+      ) {
+        return PopScope(
+          canPop: false,
+          child: Scaffold(
+            backgroundColor: Theme.of(
+              context,
+            ).scaffoldBackgroundColor.withAlpha((255 * 0.9).round()),
+            body: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24.0),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: <Widget>[
+                        Text(
+                          "⚠️ تحديث تجريبي",
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineSmall
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 20),
+                        Text(
+                          "تحديث تجريبي به خلل. انضم لقناة التيليجرام للتأكد من التحديثات.",
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 30),
+                        ElevatedButton(
+                          onPressed: () async {
+                            final Uri uri = Uri.parse(
+                              'https://t.me/tv_7esen',
+                            );
+                            try {
+                              if (await canLaunchUrl(uri)) {
+                                await launchUrl(
+                                  uri,
+                                  mode: LaunchMode.externalApplication,
+                                );
+                              } else {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(
+                                    context,
+                                  ).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'لا يمكن فتح رابط التيليجرام.',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'حدث خطأ عند فتح رابط التيليجرام.',
+                                    ),
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Theme.of(context).primaryColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 40,
+                              vertical: 15,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: const Text(
+                            "الانضمام لقناة التيليجرام",
+                            style: TextStyle(fontSize: 16),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void showUpdateDialog(String updateUrl) {
@@ -433,14 +571,17 @@ class _HomePageState extends State<HomePage>
       barrierDismissible: false,
       barrierColor: Colors.black.withAlpha((0.8 * 255).round()),
       transitionDuration: const Duration(milliseconds: 200),
-      pageBuilder: (BuildContext buildContext, Animation<double> animation,
-          Animation<double> secondaryAnimation) {
+      pageBuilder: (
+        BuildContext buildContext,
+        Animation<double> animation,
+        Animation<double> secondaryAnimation,
+      ) {
         return PopScope(
           canPop: false,
           child: Scaffold(
-            backgroundColor: Theme.of(context)
-                .scaffoldBackgroundColor
-                .withAlpha((255 * 0.9).round()),
+            backgroundColor: Theme.of(
+              context,
+            ).scaffoldBackgroundColor.withAlpha((255 * 0.9).round()),
             body: Center(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24.0),
@@ -471,31 +612,47 @@ class _HomePageState extends State<HomePage>
                             final Uri uri = Uri.parse(updateUrl);
                             try {
                               if (await canLaunchUrl(uri)) {
-                                await launchUrl(uri,
-                                    mode: LaunchMode.externalApplication);
+                                await launchUrl(
+                                  uri,
+                                  mode: LaunchMode.externalApplication,
+                                );
                               } else {
                                 if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                          content: Text(
-                                              'لا يمكن فتح رابط التحديث.')));
+                                  ScaffoldMessenger.of(
+                                    context,
+                                  ).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'لا يمكن فتح رابط التحديث.',
+                                      ),
+                                    ),
+                                  );
                                 }
                               }
                             } catch (e) {
                               if (mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                        content:
-                                            Text('حدث خطأ عند فتح الرابط.')));
+                                  const SnackBar(
+                                    content: Text(
+                                      'حدث خطأ عند فتح الرابط.',
+                                    ),
+                                  ),
+                                );
                               }
                             }
                           },
                           child: const Padding(
                             padding: EdgeInsets.symmetric(
-                                horizontal: 25, vertical: 12),
-                            child: Text("تحديث الآن",
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold, fontSize: 18)),
+                              horizontal: 25,
+                              vertical: 12,
+                            ),
+                            child: Text(
+                              "تحديث الآن",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -517,8 +674,33 @@ class _HomePageState extends State<HomePage>
     }
   }
 
-  void openVideo(BuildContext context, String initialUrl,
-      List<Map<String, dynamic>> streamLinks, String sourceSection) async {
+  void openVideo(
+    BuildContext context,
+    String initialUrl,
+    List<Map<String, dynamic>> streamLinks,
+    String sourceSection,
+  ) async {
+    // -->> الخطوة 1: تحقق من القفل في البداية
+    if (_isAdShowing) {
+      print("Ad is already in progress. Ignoring new request.");
+      return; // اخرج من الدالة إذا كان هناك إعلان قيد التشغيل بالفعل
+    }
+
+    // -->> الخطوة 2: قم بتفعيل القفل
+    setState(() {
+      _isAdShowing = true;
+    });
+
+    // --- دالة مساعدة لإعادة ضبط القفل (لتقليل تكرار الكود) ---
+    void _resetAdLock() {
+      if (mounted) {
+        setState(() {
+          _isAdShowing = false;
+        });
+      }
+    }
+    // -----------------------------------------------------------
+
     final bool isRewardedSection =
         sourceSection == 'news' || sourceSection == 'goals';
     final String placementId =
@@ -527,7 +709,6 @@ class _HomePageState extends State<HomePage>
     // --- State variables for this specific call ---
     bool adLoadFinished = false; // True if load completes or fails
     bool navigationDone = false; // True if navigation to player screen happened
-    String? loadedPlacementIdIfReady; // Stores placementId if load completes
     Timer? loadTimer; // Timer for the 4-second timeout
     // ----
 
@@ -578,8 +759,11 @@ class _HomePageState extends State<HomePage>
           if (isRewardedSection) {
             // Still show message even if it's an overlay
             BuildContext effectiveContext = capturedNavigatorContext ?? context;
-            ScaffoldMessenger.of(effectiveContext).showSnackBar(const SnackBar(
-                content: Text('يجب مشاهدة الإعلان كاملاً للوصول للمحتوى.')));
+            ScaffoldMessenger.of(effectiveContext).showSnackBar(
+              const SnackBar(
+                content: Text('يجب مشاهدة الإعلان كاملاً للوصول للمحتوى.'),
+              ),
+            );
           }
         },
       );
@@ -588,9 +772,10 @@ class _HomePageState extends State<HomePage>
 
     // Start the 4-second timer
     loadTimer = Timer(const Duration(seconds: 4), () {
-      // print("Ad load timer expired.");
+      print("Ad load timer expired.");
+      _resetAdLock(); // <-- أعد ضبط القفل هنا
       if (!adLoadFinished) {
-        // print("Timeout occurred before ad load finished. Navigating early.");
+        print("Timeout occurred before ad load finished. Navigating early.");
         dismissAndNavigate(); // Navigate early, ad load continues
       }
     });
@@ -605,7 +790,6 @@ class _HomePageState extends State<HomePage>
             return; // Already handled (e.g., by failure or previous complete)
           adLoadFinished = true;
           loadTimer?.cancel();
-          loadedPlacementIdIfReady = loadedPlacementId;
 
           if (navigationDone) {
             // Navigation already happened due to timeout
@@ -623,25 +807,31 @@ class _HomePageState extends State<HomePage>
             await UnityAds.showVideoAd(
               placementId: loadedPlacementId,
               onComplete: (completedPlacementId) {
+                _resetAdLock(); // <-- أعد ضبط القفل هنا
                 // print("Pre-Nav Ad $completedPlacementId Complete. Navigating.");
                 dismissAndNavigate(); // Navigate after completion
               },
               onFailed: (failedPlacementId, error, message) {
+                _resetAdLock(); // <-- أعد ضبط القفل هنا
                 // print("Pre-Nav Ad $failedPlacementId Failed: $error $message. Navigating.");
                 dismissAndNavigate(); // Navigate even on failure to show
               },
               onStart: (startPlacementId) => {},
               onClick: (clickPlacementId) => {},
               onSkipped: (skippedPlacementId) {
+                _resetAdLock(); // <-- أعد ضبط القفل هنا
                 // print("Pre-Nav Ad $skippedPlacementId Skipped.");
                 if (isRewardedSection) {
                   // Don't navigate for skipped rewarded ad, just show message
                   BuildContext effectiveContext =
                       capturedNavigatorContext ?? context;
                   ScaffoldMessenger.of(effectiveContext).showSnackBar(
-                      const SnackBar(
-                          content: Text(
-                              'يجب مشاهدة الإعلان كاملاً للوصول للمحتوى.')));
+                    const SnackBar(
+                      content: Text(
+                        'يجب مشاهدة الإعلان كاملاً للوصول للمحتوى.',
+                      ),
+                    ),
+                  );
                   // Ensure navigationDone is set so subsequent checks work correctly
                   navigationDone = true;
                 } else {
@@ -658,6 +848,8 @@ class _HomePageState extends State<HomePage>
           adLoadFinished = true;
           loadTimer?.cancel();
 
+          _resetAdLock(); // <-- أعد ضبط القفل هنا
+
           if (!navigationDone) {
             // print("Ad load failed WITHIN timeout. Navigating.");
             dismissAndNavigate(); // Navigate if load failed before timeout
@@ -667,7 +859,8 @@ class _HomePageState extends State<HomePage>
       );
     } catch (e) {
       // print("Error during UnityAds.load call: $e");
-      loadTimer?.cancel();
+      loadTimer.cancel();
+      _resetAdLock(); // <-- أعد ضبط القفل هنا
       if (!navigationDone) {
         // print("Error occurred WITHIN timeout. Navigating.");
         dismissAndNavigate(); // Navigate on error before timeout
@@ -676,15 +869,16 @@ class _HomePageState extends State<HomePage>
     }
   }
 
-  void _navigateToVideoPlayer(BuildContext context, String initialUrl,
-      List<Map<String, dynamic>> streamLinks) {
+  void _navigateToVideoPlayer(
+    BuildContext context,
+    String initialUrl,
+    List<Map<String, dynamic>> streamLinks,
+  ) {
     // Use the root navigator key to push the route
     navigatorKey.currentState?.push(
       MaterialPageRoute(
-        builder: (context) => VideoPlayerScreen(
-          initialUrl: initialUrl,
-          streamLinks: streamLinks,
-        ),
+        builder: (context) =>
+            VideoPlayerScreen(initialUrl: initialUrl, streamLinks: streamLinks),
       ),
     );
   }
@@ -727,10 +921,10 @@ class _HomePageState extends State<HomePage>
             color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-                color: Theme.of(context)
-                    .colorScheme
-                    .secondary
-                    .withAlpha((0.5 * 255).round())),
+              color: Theme.of(
+                context,
+              ).colorScheme.secondary.withAlpha((0.5 * 255).round()),
+            ),
           ),
           child: Row(
             children: [
@@ -740,22 +934,30 @@ class _HomePageState extends State<HomePage>
                   decoration: InputDecoration(
                     hintText: 'بحث عن قناة...',
                     hintStyle: TextStyle(
-                        color: Theme.of(context).textTheme.bodySmall?.color),
-                    prefixIcon: Icon(Icons.search,
-                        color: Theme.of(context).colorScheme.secondary),
+                      color: Theme.of(context).textTheme.bodySmall?.color,
+                    ),
+                    prefixIcon: Icon(
+                      Icons.search,
+                      color: Theme.of(context).colorScheme.secondary,
+                    ),
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 14),
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                     isDense: true,
                   ),
                   onChanged: _filterChannels,
                   style: TextStyle(
-                      color: Theme.of(context).textTheme.bodyLarge!.color),
+                    color: Theme.of(context).textTheme.bodyLarge!.color,
+                  ),
                 ),
               ),
               IconButton(
-                icon: Icon(Icons.close,
-                    color: Theme.of(context).textTheme.bodyLarge!.color),
+                icon: Icon(
+                  Icons.close,
+                  color: Theme.of(context).textTheme.bodyLarge!.color,
+                ),
                 onPressed: () {
                   if (!mounted) return;
                   setState(() {
@@ -792,9 +994,9 @@ class _HomePageState extends State<HomePage>
               return dateA.compareTo(dateB);
             } catch (e) {
               // Handle potential parsing errors, fallback to string compare
-              return a['createdAt']
-                  .toString()
-                  .compareTo(b['createdAt'].toString());
+              return a['createdAt'].toString().compareTo(
+                    b['createdAt'].toString(),
+                  );
             }
           });
 
@@ -803,8 +1005,9 @@ class _HomePageState extends State<HomePage>
           List<Map<String, dynamic>> processedChannels = [];
           for (var categoryData in fetchedChannels) {
             if (categoryData is Map) {
-              Map<String, dynamic> newCategory =
-                  Map<String, dynamic>.from(categoryData);
+              Map<String, dynamic> newCategory = Map<String, dynamic>.from(
+                categoryData,
+              );
 
               // Assign UUID if category id is null
               if (newCategory['id'] == null) {
@@ -819,8 +1022,9 @@ class _HomePageState extends State<HomePage>
                 // Assign UUIDs to channels if needed and create new maps
                 for (var channelData in originalChannels) {
                   if (channelData is Map) {
-                    Map<String, dynamic> newChannel =
-                        Map<String, dynamic>.from(channelData);
+                    Map<String, dynamic> newChannel = Map<String, dynamic>.from(
+                      channelData,
+                    );
                     if (newChannel['id'] == null) {
                       newChannel['id'] = uuid.v4();
                     }
@@ -837,9 +1041,9 @@ class _HomePageState extends State<HomePage>
                     final dateB = DateTime.parse(b['createdAt'].toString());
                     return dateA.compareTo(dateB);
                   } catch (e) {
-                    return a['createdAt']
-                        .toString()
-                        .compareTo(b['createdAt'].toString());
+                    return a['createdAt'].toString().compareTo(
+                          b['createdAt'].toString(),
+                        );
                   }
                 });
                 newCategory['channels'] = sortedChannelsList;
@@ -880,15 +1084,15 @@ class _HomePageState extends State<HomePage>
   }
 
   // --- Show Telegram Dialog Logic ---
-  Future<void> _checkAndShowTelegramDialog() async {
-    // Always schedule the dialog to show after the first frame
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        // Check if the widget is still mounted
-        showTelegramDialog(context);
-      }
-    });
-  }
+  // Future<void> _checkAndShowTelegramDialog() async { // Removed this function
+  //   // Always schedule the dialog to show after the first frame
+  //   WidgetsBinding.instance.addPostFrameCallback((_) {
+  //     if (mounted) {
+  //       // Check if the widget is still mounted
+  //       showTelegramDialog();
+  //     }
+  //   });
+  // }
 
   void _handleTabSelection() {
     if (!mounted) return;
@@ -900,8 +1104,7 @@ class _HomePageState extends State<HomePage>
   @override
   Widget build(BuildContext context) {
     final appBarHeight = AppBar().preferredSize.height;
-    final additionalOffset = MediaQuery.of(context).padding.top + 2.0;
-    final totalOffset = appBarHeight + additionalOffset;
+    // final additionalOffset = MediaQuery.of(context).padding.top + 2.0; // Removed
 
     return Scaffold(
       appBar: PreferredSize(
@@ -922,18 +1125,15 @@ class _HomePageState extends State<HomePage>
           child: AppBar(
             elevation: 0,
             leading: IconButton(
-              icon: Icon(
-                Icons.menu_rounded,
-                color: Colors.white,
-                size: 28,
-              ),
+              icon: Icon(Icons.menu_rounded, color: Colors.white, size: 28),
               onPressed: () {
                 showModalBottomSheet(
                   context: context,
                   backgroundColor: Theme.of(context).cardColor,
                   shape: RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.vertical(top: Radius.circular(16)),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(16),
+                    ),
                   ),
                   builder: (BuildContext context) {
                     return Padding(
@@ -942,15 +1142,19 @@ class _HomePageState extends State<HomePage>
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
                           ListTile(
-                            leading: Icon(Icons.color_lens,
-                                color: Theme.of(context).colorScheme.secondary),
-                            title: Text('تخصيص الألوان',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Theme.of(context)
-                                        .textTheme
-                                        .bodyLarge!
-                                        .color)),
+                            leading: Icon(
+                              Icons.color_lens,
+                              color: Theme.of(context).colorScheme.secondary,
+                            ),
+                            title: Text(
+                              'تخصيص الألوان',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(
+                                  context,
+                                ).textTheme.bodyLarge!.color,
+                              ),
+                            ),
                             onTap: () {
                               Navigator.pop(context);
                               Navigator.push(
@@ -963,28 +1167,37 @@ class _HomePageState extends State<HomePage>
                             },
                           ),
                           ListTile(
-                            leading: Icon(FontAwesomeIcons.telegram,
-                                color: Theme.of(context).colorScheme.secondary),
-                            title: Text('Telegram',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Theme.of(context)
-                                        .textTheme
-                                        .bodyLarge!
-                                        .color)),
+                            leading: Icon(
+                              FontAwesomeIcons.telegram,
+                              color: Theme.of(context).colorScheme.secondary,
+                            ),
+                            title: Text(
+                              'Telegram',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(
+                                  context,
+                                ).textTheme.bodyLarge!.color,
+                              ),
+                            ),
                             onTap: () async {
                               Navigator.pop(context);
-                              final Uri telegramUri =
-                                  Uri.parse('https://t.me/tv_7esen');
+                              final Uri telegramUri = Uri.parse(
+                                'https://t.me/tv_7esen',
+                              );
                               try {
-                                await launchUrl(telegramUri,
-                                    mode: LaunchMode.externalApplication);
+                                await launchUrl(
+                                  telegramUri,
+                                  mode: LaunchMode.externalApplication,
+                                );
                               } catch (e) {
                                 // print(
                                 //     'Error launching URL in external app: $e');
                                 try {
-                                  await launchUrl(telegramUri,
-                                      mode: LaunchMode.inAppWebView);
+                                  await launchUrl(
+                                    telegramUri,
+                                    mode: LaunchMode.inAppWebView,
+                                  );
                                 } catch (e) {
                                   // print('Error launching URL in browser: $e');
                                 }
@@ -992,15 +1205,19 @@ class _HomePageState extends State<HomePage>
                             },
                           ),
                           ListTile(
-                            leading: Icon(Icons.search,
-                                color: Theme.of(context).colorScheme.secondary),
-                            title: Text('البحث',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Theme.of(context)
-                                        .textTheme
-                                        .bodyLarge!
-                                        .color)),
+                            leading: Icon(
+                              Icons.search,
+                              color: Theme.of(context).colorScheme.secondary,
+                            ),
+                            title: Text(
+                              'البحث',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(
+                                  context,
+                                ).textTheme.bodyLarge!.color,
+                              ),
+                            ),
                             onTap: () {
                               Navigator.pop(context);
                               setState(() {
@@ -1009,15 +1226,19 @@ class _HomePageState extends State<HomePage>
                             },
                           ),
                           ListTile(
-                            leading: Icon(Icons.privacy_tip_rounded,
-                                color: Theme.of(context).colorScheme.secondary),
-                            title: Text('سياسة الخصوصية',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Theme.of(context)
-                                        .textTheme
-                                        .bodyLarge!
-                                        .color)),
+                            leading: Icon(
+                              Icons.privacy_tip_rounded,
+                              color: Theme.of(context).colorScheme.secondary,
+                            ),
+                            title: Text(
+                              'سياسة الخصوصية',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(
+                                  context,
+                                ).textTheme.bodyLarge!.color,
+                              ),
+                            ),
                             onTap: () {
                               Navigator.pop(context);
                               Navigator.push(
@@ -1056,12 +1277,13 @@ class _HomePageState extends State<HomePage>
                   return Center(child: CircularProgressIndicator());
                 } else if (snapshot.hasError) {
                   return Center(
-                      child: Text('Error loading data',
-                          style: TextStyle(
-                              color: Theme.of(context)
-                                  .textTheme
-                                  .bodyLarge!
-                                  .color)));
+                    child: Text(
+                      'Error loading data',
+                      style: TextStyle(
+                        color: Theme.of(context).textTheme.bodyLarge!.color,
+                      ),
+                    ),
+                  );
                 } else {
                   return RefreshIndicator(
                     color: Theme.of(context).colorScheme.secondary,
@@ -1072,28 +1294,35 @@ class _HomePageState extends State<HomePage>
                       child: IndexedStack(
                         index: _selectedIndex,
                         children: [
-                          Builder(builder: (context) {
-                            // print(
-                            //     "--- HomePage build - Passing to ChannelsSection: ---");
-                            // print(_filteredChannels);
-                            // print(
-                            //     "-----------------------------------------------------");
-                            return ChannelsSection(
-                              channelCategories: _filteredChannels,
-                              openVideo: openVideo,
-                            );
-                          }),
+                          Builder(
+                            builder: (context) {
+                              // print(
+                              //     "--- HomePage build - Passing to ChannelsSection: ---");
+                              // print(_filteredChannels);
+                              // print(
+                              //     "-----------------------------------------------------");
+                              return ChannelsSection(
+                                channelCategories: _filteredChannels,
+                                openVideo: openVideo,
+                                isAdLoading:
+                                    _isAdShowing, // -->> مرر حالة القفل
+                              );
+                            },
+                          ),
                           NewsSection(
                             newsArticles: Future.value(news),
                             openVideo: openVideo,
+                            isAdLoading: _isAdShowing, // -->> مرر حالة القفل
                           ),
                           GoalsSection(
                             goalsArticles: Future.value(goals),
                             openVideo: openVideo,
+                            isAdLoading: _isAdShowing, // -->> مرر حالة القفل
                           ),
                           MatchesSection(
                             matches: Future.value(matches),
                             openVideo: openVideo,
+                            isAdLoading: _isAdShowing, // -->> مرر حالة القفل
                           ),
                         ],
                       ),
@@ -1109,12 +1338,24 @@ class _HomePageState extends State<HomePage>
         animationDuration: const Duration(milliseconds: 300),
         items: [
           Icon(Icons.tv, size: 30, color: Colors.white),
-          Image.asset('assets/replay.png',
-              width: 30, height: 30, color: Colors.white),
-          Image.asset('assets/goal.png',
-              width: 30, height: 30, color: Colors.white),
-          Image.asset('assets/table.png',
-              width: 30, height: 30, color: Colors.white),
+          Image.asset(
+            'assets/replay.png',
+            width: 30,
+            height: 30,
+            color: Colors.white,
+          ),
+          Image.asset(
+            'assets/goal.png',
+            width: 30,
+            height: 30,
+            color: Colors.white,
+          ),
+          Image.asset(
+            'assets/table.png',
+            width: 30,
+            height: 30,
+            color: Colors.white,
+          ),
         ],
         index: _selectedIndex,
         onTap: (index) {

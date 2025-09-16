@@ -69,7 +69,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       -1; // Index in _fetchedApiQualities, -1 if none selected/applicable
 
   VideoSize _currentVideoSize = VideoSize.ratio16_9;
-  double? _initialAspectRatio;
 
   Timer? _hideControlsTimer;
   Timer? _playbackTimeoutTimer;
@@ -78,6 +77,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
   late final AndroidPIP
       _androidPIP; // Modified: late final to init in initState
+
+  List<Map<String, dynamic>> _validStreamLinks = [];
 
   @override
   void initState() {
@@ -126,7 +127,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     );
 
     // Enable automatic PiP mode when the app is minimized (Android only, API 31+)
-    _initializeAutoPipMode(); // Call an async helper function
+    // _initializeAutoPipMode(); // Call an async helper function
 
     _animationController = AnimationController(
       vsync: this,
@@ -178,20 +179,29 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   }
 
   void _prepareAndInitializePlayer() {
+    // 1. قم بتنقية قائمة السيرفرات أولاً
+    _validStreamLinks = widget.streamLinks.where((link) {
+      final name = link['name']?.toString();
+      final url = link['url']?.toString();
+      // السيرفر صالح فقط إذا كان الاسم والرابط موجودين وغير فارغين
+      return name != null && name.isNotEmpty && url != null && url.isNotEmpty;
+    }).toList();
+
+    // 2. استخدم القائمة النقية (_validStreamLinks) في كل المنطق التالي
     // print("_prepareAndInitializePlayer: START");
     // 1. Determine initial stream index based on initialUrl or first link
-    _selectedStreamIndex =
-        _findUrlIndexInList(widget.initialUrl, widget.streamLinks);
-    if (_selectedStreamIndex == -1 && widget.streamLinks.isNotEmpty) {
+    _selectedStreamIndex = _findUrlIndexInList(
+        widget.initialUrl, _validStreamLinks); // استخدم القائمة الجديدة
+    if (_selectedStreamIndex == -1 && _validStreamLinks.isNotEmpty) {
+      // استخدم القائمة الجديدة
       _selectedStreamIndex =
           0; // Fallback to the first stream if initialUrl not found
-    } else if (widget.streamLinks.isEmpty) {
+    } else if (_validStreamLinks.isEmpty) {
+      // استخدم القائمة الجديدة
       // Handle case with no stream links (perhaps only initialUrl?)
       // print("_prepareAndInitializePlayer: No stream links provided.");
       // If initialUrl is the only source, treat it as a single stream link
       // This logic might need adjustment based on how you handle single URLs
-      widget.streamLinks.add({'name': 'Stream 1', 'url': widget.initialUrl});
-      _selectedStreamIndex = 0;
       // If initialUrl is empty too, we have a problem
       if (widget.initialUrl.isEmpty) {
         // print("_prepareAndInitializePlayer: ERROR - No initial URL or stream links.");
@@ -207,9 +217,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
     // 2. Get the current stream URL and determine if it's an API link
     if (_selectedStreamIndex >= 0 &&
-        _selectedStreamIndex < widget.streamLinks.length) {
-      _currentStreamUrl =
-          widget.streamLinks[_selectedStreamIndex]['url']?.toString();
+        _selectedStreamIndex < _validStreamLinks.length) {
+      // استخدم القائمة الجديدة
+      _currentStreamUrl = _validStreamLinks[_selectedStreamIndex]['url']
+          ?.toString(); // استخدم القائمة الجديدة
       if (_currentStreamUrl != null) {
         _isCurrentStreamApi =
             _currentStreamUrl!.startsWith('https://7esentv-match.vercel.app');
@@ -333,9 +344,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
     String videoUrlToLoad;
     Map<String, String> httpHeaders = {
+      'User-Agent': '7eSenTV_App_v1_SecretKey_987xyz',
       'Accept':
           'application/vnd.apple.mpegurl,application/x-mpegurl,video/mp4,application/mp4,video/MP2T,*/*',
-      // 'User-Agent': 'MyFlutterApp/1.0', // Default
     };
     bool fetchedApiThisRun =
         false; // Flag to update state only if API was fetched
@@ -346,9 +357,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       // Loading a specific quality URL selected by the user
       videoUrlToLoad = specificQualityUrl;
       // Use API User-Agent if the original source was API
-      httpHeaders['User-Agent'] = _isCurrentStreamApi
-          ? 'Mozilla/5.0 (Linux; Android 10; SM-G975F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.106 Mobile Safari/537.36'
-          : 'MyFlutterApp/1.0';
+      // httpHeaders['User-Agent'] = _isCurrentStreamApi
+      //     ? 'Mozilla/5.0 (Linux; Android 10; SM-G975F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.106 Mobile Safari/537.36'
+      //     : 'MyFlutterApp/1.0';
     } else if (_isCurrentStreamApi) {
       // print("_initializePlayerInternal: Current stream is API, fetching qualities from: $sourceUrl");
       // Initial load for an API stream source, need to fetch qualities
@@ -409,8 +420,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
             currentSelectedApiQualityIndex = -1;
           }
           // Always use API User-Agent when interacting with the API source
-          httpHeaders['User-Agent'] =
-              'Mozilla/5.0 (Linux; Android 10; SM-G975F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.106 Mobile Safari/537.36';
+          // httpHeaders['User-Agent'] =
+          //     'Mozilla/5.0 (Linux; Android 10; SM-G975F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.106 Mobile Safari/537.36';
         } else {
           // print("_initializePlayerInternal: API fetch failed (${response.statusCode}). Using source URL: $sourceUrl");
           videoUrlToLoad = sourceUrl; // Fallback
@@ -466,8 +477,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         _videoPlayerController?.dispose();
         return;
       }
-
-      _initialAspectRatio = _videoPlayerController!.value.aspectRatio;
 
       // Create Chewie controller
       _chewieController = ChewieController(
@@ -580,7 +589,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       // print("_changeStream: Aborting - Not mounted or same index ($newStreamIndex)");
       return;
     }
-    if (newStreamIndex < 0 || newStreamIndex >= widget.streamLinks.length) {
+    if (newStreamIndex < 0 || newStreamIndex >= _validStreamLinks.length) {
       // print("_changeStream: Aborting - Invalid index ($newStreamIndex)");
       return;
     }
@@ -588,7 +597,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     _cancelAllTimers();
 
     // Update state for the new stream source
-    final newStreamData = widget.streamLinks[newStreamIndex];
+    final newStreamData = _validStreamLinks[newStreamIndex];
     final newStreamUrl = newStreamData['url']?.toString();
 
     if (newStreamUrl == null || newStreamUrl.isEmpty) {
@@ -707,25 +716,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   }
 
   int _findNextViableStreamIndex() {
-    // print("_findNextViableStreamIndex: Searching from index: $_selectedStreamIndex");
-    final int totalStreams = widget.streamLinks.length;
+    // >>-- تعديل: استخدم القائمة الجديدة
+    final int totalStreams = _validStreamLinks.length;
     if (totalStreams <= 1) return -1;
 
+    // بما أن القائمة تحتوي فقط على سيرفرات صالحة، لم نعد بحاجة للتحقق من الرابط
+    // لكن للإبقاء على المنطق، سنغير اسم المتغير فقط
     for (int i = _selectedStreamIndex + 1; i < totalStreams; i++) {
-      if (widget.streamLinks[i]['url'] != null &&
-          widget.streamLinks[i]['url'].isNotEmpty) {
-        // print("_findNextViableStreamIndex: Found forward, index: $i, URL: ${widget.streamLinks[i]['url']}");
-        return i;
-      }
+      return i;
     }
     for (int i = 0; i < _selectedStreamIndex; i++) {
-      if (widget.streamLinks[i]['url'] != null &&
-          widget.streamLinks[i]['url'].isNotEmpty) {
-        // print("_findNextViableStreamIndex: Found looping back, index: $i, URL: ${widget.streamLinks[i]['url']}");
-        return i;
-      }
+      return i;
     }
-    // print("_findNextViableStreamIndex: No other viable stream found.");
     return -1;
   }
 
@@ -805,7 +807,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   Widget _buildStreamSelector() {
     // print("_buildStreamSelector: Building for ${_selectedStreamIndex}");
     // Always appears if more than one stream link exists
-    if (widget.streamLinks.length <= 1) {
+    // >>-- تعديل: استخدم القائمة الجديدة
+    if (_validStreamLinks.length <= 1) {
       return const SizedBox.shrink();
     }
 
@@ -819,12 +822,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         scrollDirection: Axis.horizontal,
         child: Row(
           mainAxisSize: MainAxisSize.min,
-          children: widget.streamLinks.asMap().entries.map<Widget>((entry) {
-            // Use widget.streamLinks
+          // >>-- تعديل: استخدم القائمة الجديدة
+          children: _validStreamLinks.asMap().entries.map<Widget>((entry) {
             final index = entry.key;
             final link = entry.value;
-            final streamName =
-                link['name']?.toString() ?? 'Stream ${index + 1}';
+            // >>-- تعديل: أزل الاسم الافتراضي. نحن نضمن وجود اسم الآن
+            final streamName = link['name']!.toString();
             final streamUrl = link['url']?.toString();
             // Highlight based on _selectedStreamIndex
             final isActive = index == _selectedStreamIndex;

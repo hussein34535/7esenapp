@@ -106,7 +106,9 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    _createNotificationChannel();
+    if (!kIsWeb) {
+      _createNotificationChannel();
+    }
   }
 
   @override
@@ -114,7 +116,7 @@ class _MyAppState extends State<MyApp> {
     final themeProvider = Provider.of<ThemeProvider>(context);
 
     return MaterialApp(
-      title: '7eSen TV',
+      title: 'Hesen TV',
       debugShowCheckedModeBanner: false,
       themeMode: themeProvider.themeMode,
       theme: ThemeData(

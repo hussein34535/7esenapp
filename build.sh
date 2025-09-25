@@ -1,3 +1,3 @@
 #!/bin/bash
 set -e
-flutter build web --release
+./flutter/bin/flutter build web --release

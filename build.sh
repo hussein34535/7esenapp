@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Add git safe directory config to avoid ownership errors
+git config --global --add safe.directory '*'
+
 # Download and extract Flutter
 echo "Downloading Flutter..."
 curl -o flutter_linux_3.22.2-stable.tar.xz https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.22.2-stable.tar.xz

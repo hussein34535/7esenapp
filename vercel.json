@@ -5,7 +5,6 @@
       "src": "build.sh",
       "use": "@vercel/static-build",
       "config": {
-        "installCommand": "chmod +x ./install_flutter.sh && /bin/bash ./install_flutter.sh",
         "buildCommand": "/bin/bash ./build.sh",
         "outputDirectory": "build/web"
       }

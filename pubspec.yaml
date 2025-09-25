@@ -65,6 +65,5 @@ flutter:
     - assets/icon/
     - assets/goal.png
     - assets/table.png
-    - .env
 
  # Place you logo there

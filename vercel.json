@@ -2,11 +2,11 @@
   "version": 2,
   "builds": [
     {
-      "src": "pubspec.yaml",
+      "src": "build.sh",
       "use": "@vercel/static-build",
       "config": {
         "installCommand": "chmod +x ./install_flutter.sh && /bin/bash ./install_flutter.sh",
-        "buildCommand": "flutter build web --release",
+        "buildCommand": "/bin/bash ./build.sh",
         "outputDirectory": "build/web"
       }
     }

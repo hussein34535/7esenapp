@@ -26,6 +26,7 @@ import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:hesen/theme_customization_screen.dart';
 import 'dart:io';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -451,7 +452,13 @@ class _HomePageState extends State<HomePage>
       // print('Error during update check: $e');
       if (e is http.ClientException || e is SocketException) {
         if (mounted) {
-          showTelegramDialog();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'فشل التحقق من التحديث. يرجى التحقق من اتصالك بالإنترنت.'),
+              backgroundColor: Colors.red,
+            ),
+          );
         }
       }
     }
@@ -738,10 +745,25 @@ class _HomePageState extends State<HomePage>
       if (navigationDone) return; // Prevent multiple navigations
       navigationDone = true;
       BuildContext effectiveContext = capturedNavigatorContext ?? context;
+
+      // Dismiss the loading dialog if it's still visible
       if (Navigator.canPop(effectiveContext)) {
         Navigator.pop(effectiveContext);
       }
       _navigateToVideoPlayer(effectiveContext, initialUrl, streamLinks);
+    }
+
+    // --- Helper function to cancel and dismiss everything without navigating ---
+    void cancelAdAndDismiss() {
+      if (navigationDone) return; // Don't do anything if we already navigated
+      navigationDone =
+          true; // Mark as done to prevent other paths from navigating
+      _resetAdLock();
+      loadTimer?.cancel();
+      BuildContext effectiveContext = capturedNavigatorContext ?? context;
+      if (Navigator.canPop(effectiveContext)) {
+        Navigator.pop(effectiveContext); // Just close the loading dialog
+      }
     }
     // ----
 
@@ -772,10 +794,10 @@ class _HomePageState extends State<HomePage>
     }
     // ----
 
-    // Start the 4-second timer
-    loadTimer = Timer(const Duration(seconds: 4), () {
+    // Start the 10-second timer
+    loadTimer = Timer(const Duration(seconds: 10), () {
       print("Ad load timer expired.");
-      _resetAdLock(); // <-- أعد ضبط القفل هنا
+      _resetAdLock(); // <-- Reset the lock here
       if (!adLoadFinished) {
         print("Timeout occurred before ad load finished. Navigating early.");
         dismissAndNavigate(); // Navigate early, ad load continues
@@ -805,40 +827,43 @@ class _HomePageState extends State<HomePage>
               Navigator.pop(effectiveContext); // Dismiss dialog FIRST
             }
 
+            DateTime? adStartTime; // Variable to store when the ad started
+
             // Show the ad, and navigate AFTER it finishes/fails/skips
             await UnityAds.showVideoAd(
               placementId: loadedPlacementId,
               onComplete: (completedPlacementId) {
-                _resetAdLock(); // <-- أعد ضبط القفل هنا
+                _resetAdLock(); // <-- Reset the lock here
                 // print("Pre-Nav Ad $completedPlacementId Complete. Navigating.");
                 dismissAndNavigate(); // Navigate after completion
               },
               onFailed: (failedPlacementId, error, message) {
-                _resetAdLock(); // <-- أعد ضبط القفل هنا
+                _resetAdLock(); // <-- Reset the lock here
                 // print("Pre-Nav Ad $failedPlacementId Failed: $error $message. Navigating.");
                 dismissAndNavigate(); // Navigate even on failure to show
               },
-              onStart: (startPlacementId) => {},
+              onStart: (startPlacementId) {
+                // Record the time when the ad video actually starts playing
+                adStartTime = DateTime.now();
+              },
               onClick: (clickPlacementId) => {},
               onSkipped: (skippedPlacementId) {
-                _resetAdLock(); // <-- أعد ضبط القفل هنا
-                // print("Pre-Nav Ad $skippedPlacementId Skipped.");
-                if (isRewardedSection) {
-                  // Don't navigate for skipped rewarded ad, just show message
-                  BuildContext effectiveContext =
-                      capturedNavigatorContext ?? context;
-                  ScaffoldMessenger.of(effectiveContext).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'يجب مشاهدة الإعلان كاملاً للوصول للمحتوى.',
-                      ),
-                    ),
-                  );
-                  // Ensure navigationDone is set so subsequent checks work correctly
-                  navigationDone = true;
+                _resetAdLock(); // <-- Reset the lock here
+                print("Pre-Nav Ad $skippedPlacementId Skipped.");
+
+                final adWatchDuration = adStartTime != null
+                    ? DateTime.now().difference(adStartTime!)
+                    : Duration.zero;
+
+                // If the ad was skipped in less than 6 seconds, it's likely a back press.
+                if (adWatchDuration.inSeconds < 6) {
+                  print(
+                      "Skipped early (likely back press). Cancelling navigation.");
+                  cancelAdAndDismiss(); // Cancel the process entirely
                 } else {
-                  // Navigate for skipped non-rewarded ad
-                  dismissAndNavigate();
+                  // If skipped after 4 seconds, it's likely a deliberate skip.
+                  print("Skipped after threshold. Navigating to player.");
+                  dismissAndNavigate(); // Navigate to the player
                 }
               },
             );
@@ -850,7 +875,7 @@ class _HomePageState extends State<HomePage>
           adLoadFinished = true;
           loadTimer?.cancel();
 
-          _resetAdLock(); // <-- أعد ضبط القفل هنا
+          _resetAdLock(); // <-- Reset the lock here
 
           if (!navigationDone) {
             // print("Ad load failed WITHIN timeout. Navigating.");
@@ -862,7 +887,7 @@ class _HomePageState extends State<HomePage>
     } catch (e) {
       // print("Error during UnityAds.load call: $e");
       loadTimer.cancel();
-      _resetAdLock(); // <-- أعد ضبط القفل هنا
+      _resetAdLock(); // <-- Reset the lock here
       if (!navigationDone) {
         // print("Error occurred WITHIN timeout. Navigating.");
         dismissAndNavigate(); // Navigate on error before timeout

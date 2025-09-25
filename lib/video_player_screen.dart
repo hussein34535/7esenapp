@@ -465,9 +465,19 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
     // Create VideoPlayerController
     try {
+      VideoFormat? formatHint;
+      if (!_isCurrentStreamApi &&
+          !videoUrlToLoad.toLowerCase().endsWith('.mp4') &&
+          !videoUrlToLoad.toLowerCase().endsWith('.webm')) {
+        // If the URL is not from our API and doesn't have a common video file extension,
+        // provide a hint to the player that it's likely an HLS stream.
+        formatHint = VideoFormat.hls;
+      }
+
       _videoPlayerController = VideoPlayerController.networkUrl(
         Uri.parse(videoUrlToLoad),
         httpHeaders: httpHeaders,
+        formatHint: formatHint,
       );
 
       _videoPlayerController!.addListener(_videoPlayerListener);
@@ -554,6 +564,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     }
 
     if (_videoPlayerController!.value.hasError) {
+      print(
+          "Video Player Error: ${_videoPlayerController!.value.errorDescription}"); // طباعة الخطأ
       if (mounted /*&& !_isTryingNextStream*/) {
         // print("VideoPlayerListener: Error detected. State: $_hasError");
         // Error is now primarily handled by the Chewie errorBuilder

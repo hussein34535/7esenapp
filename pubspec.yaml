@@ -33,7 +33,7 @@ dependencies:
   unity_ads_plugin: ^0.3.25
   android_pip: ^2.0.1
   provider: ^6.1.2
-  flex_color_picker: ^3.7.1
+  flex_color_picker: ^3.6.0
 
 
   

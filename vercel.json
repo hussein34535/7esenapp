@@ -1,18 +1,20 @@
 {
-    "version": 2,
-    "builds": [
-        {
-            "src": "build/web/**",
-            "use": "@vercel/static"
-        }
-    ],
-    "routes": [
-        {
-            "handle": "filesystem"
-        },
-        {
-            "src": "/(.*)",
-            "dest": "/index.html"
-        }
-    ]
+  "version": 2,
+  "builds": [
+    {
+      "src": "pubspec.yaml",
+      "use": "@vercel/static-build",
+      "config": {
+        "installCommand": "chmod +x ./install_flutter.sh && /bin/bash ./install_flutter.sh",
+        "buildCommand": "flutter build web --release",
+        "outputDirectory": "build/web"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
 } 

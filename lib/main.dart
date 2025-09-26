@@ -25,8 +25,11 @@ import 'package:unity_ads_plugin/unity_ads_plugin.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:hesen/theme_customization_screen.dart';
-import 'dart:io';
+// import 'dart:io'; // Removed as it's not supported on web
 import 'package:connectivity_plus/connectivity_plus.dart';
+
+// Conditionally import dart:io for SocketException if needed for non-web platforms
+import 'dart:io' if (dart.library.html) 'dart:html';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -448,19 +451,29 @@ class _HomePageState extends State<HomePage>
         // If status code is not 200, show the Telegram dialog
         showTelegramDialog();
       }
-    } catch (e) {
-      // print('Error during update check: $e');
-      if (e is http.ClientException || e is SocketException) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                  'فشل التحقق من التحديث. يرجى التحقق من اتصالك بالإنترنت.'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+    } on http.ClientException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content:
+                Text('فشل التحقق من التحديث. يرجى التحقق من اتصالك بالإنترنت.'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
+    } on SocketException catch (e) {
+      if (!kIsWeb && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content:
+                Text('فشل التحقق من التحديث. يرجى التحقق من اتصالك بالإنترنت.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      // Generic catch-all for other errors
+      debugPrint('Error during update check: $e');
     }
   }
 

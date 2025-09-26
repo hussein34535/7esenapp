@@ -34,7 +34,6 @@ dependencies:
   android_pip: ^2.0.1
   provider: ^6.1.2
   flex_color_picker: ^3.6.0
-  flutter_inappwebview: ^6.0.0
   path_provider: ^2.0.15
 
 

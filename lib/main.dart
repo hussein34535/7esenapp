@@ -451,29 +451,20 @@ class _HomePageState extends State<HomePage>
         // If status code is not 200, show the Telegram dialog
         showTelegramDialog();
       }
-    } on http.ClientException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content:
-                Text('فشل التحقق من التحديث. يرجى التحقق من اتصالك بالإنترنت.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } on SocketException catch (e) {
-      if (!kIsWeb && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content:
-                Text('فشل التحقق من التحديث. يرجى التحقق من اتصالك بالإنترنت.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     } catch (e) {
       // Generic catch-all for other errors
       debugPrint('Error during update check: $e');
+      if (e is SocketException && !kIsWeb) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'فشل التحقق من التحديث. يرجى التحقق من اتصالك بالإنترنت.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 

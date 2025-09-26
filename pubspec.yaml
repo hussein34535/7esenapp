@@ -14,27 +14,26 @@ dependencies:
   firebase_messaging: ^16.0.0
   firebase_analytics: ^12.0.0
   firebase_core: ^4.0.0
-  http: ^1.2.2
+  http: any
   video_player: ^2.4.5
   intl: ^0.20.0
-  permission_handler: ^11.3.1
-  url_launcher: ^6.3.0
-  font_awesome_flutter: 10.7.0
+  permission_handler: ^12.0.0+1
+  url_launcher: ^6.2.5
+  font_awesome_flutter: ^10.9.1
   cached_network_image: ^3.2.3
   wakelock_plus: ^1.2.8
-  chewie: 1.7.5 # Using chewie as it's a bit simpler
+  chewie: ^1.2.2 # Using chewie as it's a bit simpler
   curved_navigation_bar: ^1.0.6
   day_night_switch: ^1.0.4
   uuid: ^4.3.3
-  shared_preferences: ^2.2.3
+  shared_preferences: ^2.5.3
   connectivity_plus: ^6.1.5
   timezone: ^0.10.1 # Add timezone package
-  flutter_dotenv: ^5.1.0 # Add dotenv for environment variables
+  flutter_dotenv: ^6.0.0 # Add dotenv for environment variables
   unity_ads_plugin: ^0.3.25
   android_pip: ^2.0.1
   provider: ^6.1.2
-  flex_color_picker: ^3.6.0
-  path_provider: ^2.0.15
+  flex_color_picker: ^3.7.1
 
 
   
@@ -49,8 +48,8 @@ dev_dependencies:
 
   flutter_test:
     sdk: flutter
-  flutter_lints: ^4.0.0
-  flutter_native_splash: ^2.4.1
+  flutter_lints: ^6.0.0
+  flutter_native_splash: ^2.4.4
 
 flutter:
   uses-material-design: true
@@ -64,5 +63,6 @@ flutter:
     - assets/icon/
     - assets/goal.png
     - assets/table.png
+    - .env
 
  # Place you logo there

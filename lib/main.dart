@@ -25,11 +25,8 @@ import 'package:unity_ads_plugin/unity_ads_plugin.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:hesen/theme_customization_screen.dart';
-// import 'dart:io'; // Removed as it's not supported on web
+import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
-
-// Conditionally import dart:io for SocketException if needed for non-web platforms
-import 'dart:io' if (dart.library.html) 'dart:html';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -452,9 +449,8 @@ class _HomePageState extends State<HomePage>
         showTelegramDialog();
       }
     } catch (e) {
-      // Generic catch-all for other errors
-      debugPrint('Error during update check: $e');
-      if (e is SocketException && !kIsWeb) {
+      // print('Error during update check: $e');
+      if (e is http.ClientException || e is SocketException) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(

@@ -8,7 +8,9 @@ class FirebaseApi {
   Future<void> initNotification() async {
     if (kIsWeb) {
       try {
-        await _firebseMessaging.getToken();
+        await _firebseMessaging.getToken(
+          vapidKey: 'YOUR_VAPID_KEY', // Get this from Firebase Console
+        );
       } catch (e) {
         // print('Web notification error: $e');
       }

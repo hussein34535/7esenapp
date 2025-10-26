@@ -8,13 +8,14 @@ class ChannelsSection extends StatefulWidget {
   final Function openVideo;
   final bool isAdLoading; // -->> استقبل الحالة هنا
 
-  ChannelsSection(
-      {required this.channelCategories,
+  const ChannelsSection(
+      {super.key,
+      required this.channelCategories,
       required this.openVideo,
       required this.isAdLoading});
 
   @override
-  _ChannelsSectionState createState() => _ChannelsSectionState();
+  State<ChannelsSection> createState() => _ChannelsSectionState();
 }
 
 class _ChannelsSectionState extends State<ChannelsSection> {
@@ -34,9 +35,7 @@ class _ChannelsSectionState extends State<ChannelsSection> {
               return LayoutBuilder(
                 builder: (context, constraints) {
                   // Calculate item height *only* once
-                  if (_itemHeight == null) {
-                    _itemHeight = 72; // Keep this consistent
-                  }
+                  _itemHeight ??= 72; // Keep this consistent
 
                   return GridView.builder(
                     key: _gridKey,
@@ -79,8 +78,9 @@ class ChannelBox extends StatelessWidget {
   final Function openVideo;
   final bool isAdLoading; // -->> استقبل الحالة هنا
 
-  ChannelBox(
-      {required this.category,
+  const ChannelBox(
+      {super.key,
+      required this.category,
       required this.openVideo,
       required this.isAdLoading});
 
@@ -139,8 +139,9 @@ class CategoryChannelsScreen extends StatefulWidget {
   final Function openVideo;
   final bool isAdLoading; // -->> استقبل الحالة هنا
 
-  CategoryChannelsScreen(
-      {required this.channels,
+  const CategoryChannelsScreen(
+      {super.key,
+      required this.channels,
       required this.openVideo,
       required this.isAdLoading});
 
@@ -168,9 +169,7 @@ class _CategoryChannelsScreenState extends State<CategoryChannelsScreen> {
           _gridKey = UniqueKey(); // Regenerate the key
           return LayoutBuilder(builder: (context, constraints) {
             //  Calculate the item height *only* once.  VERY IMPORTANT.
-            if (_itemHeight == null) {
-              _itemHeight = 72; // Or get it from your original ChannelBox
-            }
+            _itemHeight ??= 72; // Or get it from your original ChannelBox
 
             return GridView.builder(
               key: _gridKey,
@@ -231,14 +230,14 @@ class ChannelTile extends StatelessWidget {
   final Function(String) onChannelTap;
   final bool isAdLoading; // -->> استقبل الحالة هنا
 
-  ChannelTile({
-    required Key key,
+  const ChannelTile({
+    required super.key,
     required this.channel,
     required this.openVideo,
     required this.isSelected,
     required this.onChannelTap,
     required this.isAdLoading, // -->> مرر الحالة
-  }) : super(key: key);
+  });
 
   List<Map<String, String>> _extractStreamLinks(List<dynamic>? streamLinks) {
     List<Map<String, String>> streams = [];
@@ -260,7 +259,7 @@ class ChannelTile extends StatelessWidget {
                     textChild['text']?.toString() ?? 'Unknown Stream';
                 if (streamUrl != null && streamUrl.isNotEmpty) {
                   if (!streamUrl.startsWith('http')) {
-                    streamUrl = 'https://st9.onrender.com' + streamUrl;
+                    streamUrl = 'https://st9.onrender.com$streamUrl';
                   }
                   streams.add({'name': streamName, 'url': streamUrl});
                 }
@@ -291,31 +290,24 @@ class ChannelTile extends StatelessWidget {
         onTap: isAdLoading
             ? null
             : () {
-                // -->> استخدم الحالة هنا لتعطيل الضغط
                 final scaffoldMessenger = ScaffoldMessenger.of(context);
                 onChannelTap(channelId);
 
                 List<Map<String, String>> streams =
                     _extractStreamLinks(streamLinks);
 
-                if (streams.isNotEmpty) {
-                  if (streams[0]['url'] is String) {
-                    openVideo(
-                        context,
-                        streams[0]['url']!,
-                        streams
-                            .map((e) => Map<String, dynamic>.from(e))
-                            .toList(),
-                        'channels' // Added sourceSection
-                        );
-                  } else {
-                    scaffoldMessenger.showSnackBar(
-                        SnackBar(content: Text('Invalid Stream Format')));
-                  }
-                } else {
+                if (streams.isEmpty) {
                   scaffoldMessenger.showSnackBar(
-                      SnackBar(content: Text("No stream available.")));
+                    const SnackBar(content: Text("No stream available.")),
+                  );
+                  return;
                 }
+
+                openVideo(
+                    context,
+                    streams.first['url']!,
+                    streams.map((e) => Map<String, dynamic>.from(e)).toList(),
+                    'channels');
               },
         child: Opacity(
           // -->> قم بتخفيف لون العنصر بصرياً
@@ -346,8 +338,9 @@ class MatchesSection extends StatelessWidget {
   final Function openVideo;
   final bool isAdLoading; // -->> استقبل الحالة هنا
 
-  MatchesSection(
-      {required this.matches,
+  const MatchesSection(
+      {super.key,
+      required this.matches,
       required this.openVideo,
       required this.isAdLoading});
 
@@ -436,8 +429,9 @@ class MatchBox extends StatelessWidget {
   final Function openVideo;
   final bool isAdLoading; // -->> استقبل الحالة هنا
 
-  MatchBox(
-      {required this.match,
+  const MatchBox(
+      {super.key,
+      required this.match,
       required this.openVideo,
       required this.isAdLoading});
 
@@ -455,10 +449,10 @@ class MatchBox extends StatelessWidget {
 
     // إضافة البادئة إذا لزم الأمر
     if (logoA.isNotEmpty && !logoA.startsWith('http')) {
-      logoA = 'https://st9.onrender.com' + logoA;
+      logoA = 'https://st9.onrender.com$logoA';
     }
     if (logoB.isNotEmpty && !logoB.startsWith('http')) {
-      logoB = 'https://st9.onrender.com' + logoB;
+      logoB = 'https://st9.onrender.com$logoB';
     }
 
     // Use local time for comparison
@@ -482,33 +476,37 @@ class MatchBox extends StatelessWidget {
       timeStatus = DateFormat('hh:mm a').format(matchDateTimeWithToday);
       borderColor = Colors.blueAccent;
     }
+
     List<Map<String, String>> streams = [];
     for (var streamLinkItem in streamLink) {
-      if (streamLinkItem.url.isNotEmpty) {
-        streams.add({'name': streamLinkItem.name, 'url': streamLinkItem.url});
-      }
+      // The name now comes directly from the parsed data, which might be cleaner.
+      // Let's ensure we use a fallback if it's missing.
+      streams.add({
+        'name': streamLinkItem.name.isNotEmpty
+            ? streamLinkItem.name
+            : 'Stream', // Use name from StreamLink, fallback to 'Stream'
+        'url': streamLinkItem.url
+      });
     }
-    String firstStreamUrl = '';
-    if (streams.isNotEmpty) {
-      firstStreamUrl = streams[0]['url'] ?? '';
-    }
+
     return GestureDetector(
       onTap: isAdLoading
           ? null
           : () {
-              // -->> استخدم الحالة هنا لتعطيل الضغط
               final scaffoldMessenger = ScaffoldMessenger.of(context);
-              if (streams.isNotEmpty) {
-                openVideo(
-                    context,
-                    firstStreamUrl,
-                    streams.map((e) => Map<String, dynamic>.from(e)).toList(),
-                    'matches' // Added sourceSection
-                    );
-              } else {
+              if (streams.isEmpty) {
                 scaffoldMessenger.showSnackBar(
-                    SnackBar(content: Text('لا يوجد رابط للبث المباشر')));
+                  const SnackBar(content: Text('لا يوجد رابط للبث المباشر')),
+                );
+                return;
               }
+
+              openVideo(
+                context,
+                streams.first['url']!,
+                streams.map((e) => Map<String, dynamic>.from(e)).toList(),
+                'matches',
+              );
             },
       child: Opacity(
         // -->> قم بتخفيف لون العنصر بصرياً
@@ -658,8 +656,9 @@ class NewsSection extends StatelessWidget {
   final Function openVideo;
   final bool isAdLoading; // -->> استقبل الحالة هنا
 
-  NewsSection(
-      {required this.newsArticles,
+  const NewsSection(
+      {super.key,
+      required this.newsArticles,
       required this.openVideo,
       required this.isAdLoading});
 
@@ -712,7 +711,7 @@ class NewsSection extends StatelessWidget {
           );
         } else {
           final articles =
-              snapshot.data!.reversed.toList(); // Reverse the list here
+              snapshot.data!; // Removed .reversed.toList()
           return Column(
             // Wrap ListView in a Column
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -744,8 +743,9 @@ class NewsBox extends StatelessWidget {
   final Function openVideo;
   final bool isAdLoading; // -->> استقبل الحالة هنا
 
-  NewsBox(
-      {required this.article,
+  const NewsBox(
+      {super.key,
+      required this.article,
       required this.openVideo,
       required this.isAdLoading});
 
@@ -793,7 +793,7 @@ class NewsBox extends StatelessWidget {
       final imageData = article['image'][0];
       imageUrl = imageData['url'];
       if (imageUrl != null && !imageUrl.startsWith('http')) {
-        imageUrl = 'https://st9.onrender.com' + imageUrl;
+        imageUrl = 'https://st9.onrender.com$imageUrl';
       }
     }
 
@@ -866,7 +866,7 @@ class NewsBox extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          date,
+                          date, // Display the new formattedDate
                           style: TextStyle(
                             color: Colors.grey,
                           ),
@@ -981,7 +981,7 @@ class GoalsSection extends StatelessWidget {
 
                   // Add base URL if the image URL is relative
                   if (imageUrl != null && !imageUrl.startsWith('http')) {
-                    imageUrl = 'https://st9.onrender.com' + imageUrl;
+                    imageUrl = 'https://st9.onrender.com$imageUrl';
                   }
 
                   List<Map<String, dynamic>> streamLinks = [];
@@ -1050,10 +1050,7 @@ class GoalsSection extends StatelessWidget {
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 18,
-                                      color: Theme.of(context)
-                                          .textTheme
-                                          .bodyLarge!
-                                          .color,
+                                      color: Theme.of(context).primaryColor, // Changed to primaryColor
                                     ),
                                   ),
                                   const SizedBox(height: 8),

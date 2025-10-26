@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart'; // Import FontAwesome
 
-void showTelegramDialog(BuildContext context) {
+void showTelegramDialog(BuildContext context, {String? userName}) {
   final theme = Theme.of(context); // Get theme data
+  final isDarkMode = theme.brightness == Brightness.dark;
 
   showDialog(
     context: context,
@@ -17,43 +18,58 @@ void showTelegramDialog(BuildContext context) {
               color: theme.colorScheme.secondary.withOpacity(0.5),
               width: 1), // Add border
         ),
-        title: Center(
-          // Center the title Row
-          child: Row(
-            mainAxisSize:
-                MainAxisSize.min, // Ensure Row takes minimum space needed
-            // Add Telegram icon next to title
-            children: [
-              Icon(FontAwesomeIcons.telegramPlane,
-                  color: Colors.blue, // Set icon color to blue
-                  size: 24),
-              SizedBox(width: 10),
-              // Re-add Expanded to prevent overflow
-              Expanded(
-                child: Text(
-                  'انضم لقناتنا على التيليجرام',
-                  style: TextStyle(
-                    color: theme
-                        .textTheme.bodyLarge!.color, // Use theme text color
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center, // Keep text centered
-                ),
-              ),
-            ],
-          ),
-        ), // End Center
         content: Column(
           // Use Column to display text on separate lines
           mainAxisSize: MainAxisSize.min, // Ensure Column takes minimum space
           children: [
-            Text(
-              'تابع آخر الأخبار والتحديثات!',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: theme.textTheme.bodyMedium!.color),
-            ),
-            SizedBox(height: 8), // Add some space between the texts
-            // Wrap the second Text in a Container for styling
+            // Display user name if available
+            if (userName != null && userName.isNotEmpty)
+              Flexible( // Wrap with Flexible to allow text to wrap/ellipsis
+                child: Directionality(
+                  textDirection: TextDirection.rtl, // Force RTL direction
+                  child: FittedBox( // Added FittedBox to make text shrink to fit
+                    fit: BoxFit.scaleDown,
+                    child: RichText(
+                      textAlign: TextAlign.center,
+                      // Removed maxLines and overflow as FittedBox will handle scaling
+                      // maxLines: 1,
+                      // overflow: TextOverflow.ellipsis,
+                      text: TextSpan(
+                        // Default style for all parts of the text
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: theme.textTheme.bodyLarge?.color,
+                        ),
+                        children: [
+                          TextSpan(
+                            text: 'كيف حالك يا ',
+                          ),
+                          TextSpan(
+                            text: userName,
+                            style: TextStyle(
+                              color: Colors.purple.shade400, // Purple color
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              // Removed overflow as FittedBox will handle scaling
+                              // overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          TextSpan(
+                            text: ' أتمنى أن تكون بخير ❤️',
+                            style: TextStyle(
+                              fontSize: 18, // Slightly smaller for the trailing text
+                              color: theme.textTheme.bodyLarge?.color,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            SizedBox(height: 16),
+            // "Pray upon the Prophet" container
             Container(
               padding: EdgeInsets.symmetric(
                   horizontal: 16.0, vertical: 8.0), // Add padding
@@ -62,14 +78,16 @@ void showTelegramDialog(BuildContext context) {
                     .withOpacity(0.3), // Transparent background
                 borderRadius: BorderRadius.circular(20.0), // Oval shape
               ),
-              child: Text(
-                'اللهم صل وسلم وبارك على سيدنا محمد',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  // Use a color that contrasts with the new background
-                  color: theme.colorScheme.onSecondaryContainer,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
+              child: FittedBox( // Added FittedBox to make text shrink to fit
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  'اللهم صل وسلم وبارك على سيدنا محمد',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: theme.colorScheme.onSecondaryContainer,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ),
@@ -79,7 +97,7 @@ void showTelegramDialog(BuildContext context) {
         actions: <Widget>[
           TextButton(
             child: Text(
-              'لاحقاً', // Changed text to "Later"
+              'إغلاق', // Changed text from "لاحقاً" to "إغلاق"
               style: TextStyle(
                   color: Colors.blue), // Set button text color to blue
             ),
@@ -90,7 +108,8 @@ void showTelegramDialog(BuildContext context) {
           SizedBox(width: 10), // Add space between buttons
           ElevatedButton.icon(
             // Use ElevatedButton.icon for Join button
-            icon: Icon(Icons.send_rounded, size: 18), // Add send icon
+            icon: Icon(FontAwesomeIcons.telegram,
+                size: 18), // Add telegram icon
             label: Text('انضم للتيليجرام'),
             style: ElevatedButton.styleFrom(
               backgroundColor:

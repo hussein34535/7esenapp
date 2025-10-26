@@ -5,19 +5,22 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 class FirebaseApi {
   final _firebseMessaging = FirebaseMessaging.instance;
 
-  Future<void> initNotification() async {
+  Future<String?> initNotification() async {
     if (kIsWeb) {
       try {
         await _firebseMessaging.getToken(
           vapidKey: 'YOUR_VAPID_KEY', // Get this from Firebase Console
         );
+        return null; // Token handling for web is different
       } catch (e) {
         // print('Web notification error: $e');
+        return null;
       }
     } else {
       await _firebseMessaging.requestPermission();
       String? token = await _firebseMessaging.getToken();
-      print("token: $token");
+      print("FCM Token: $token");
+      return token;
     }
   }
 

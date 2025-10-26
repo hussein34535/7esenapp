@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:hesen/firebase_api.dart';
-import 'package:hesen/notification_page.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -26,63 +25,44 @@ import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:hesen/theme_customization_screen.dart';
 import 'dart:io';
-import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:hesen/telegram_dialog.dart';
+import 'package:hesen/notification_page.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
-Future<void> _createNotificationChannel() async {
-  var android = const AndroidInitializationSettings('@mipmap/ic_launcher');
-  var iOS = const DarwinInitializationSettings();
-  var initSettings = InitializationSettings(android: android, iOS: iOS);
-  await flutterLocalNotificationsPlugin.initialize(initSettings);
-
-  var androidNotificationChannel = const AndroidNotificationChannel(
-    'high_importance_channel',
-    'High Importance Notifications',
-    description: 'This channel is used for important notifications.',
-    importance: Importance.max,
-  );
-
-  await flutterLocalNotificationsPlugin
-      .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>()
-      ?.createNotificationChannel(androidNotificationChannel);
-}
-
 SharedPreferences? prefs;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: './.env');
+    await dotenv.load(fileName: './.env');
 
-  // التحقق من عدم تهيئة التطبيق قبل الاستدعاء
-  try {
-    if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
-    }
-  } on FirebaseException catch (e) {
+    try {
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
+      }
+    } on FirebaseException catch (e) {
     if (e.code == 'duplicate-app') {
       // Firebase app already initialized, safe to ignore
     } else {
-      rethrow; // Re-throw other Firebase exceptions
+        rethrow;
+      }
     }
-  }
-  if (!kIsWeb) {
-    final firebaseApi = FirebaseApi();
-    await firebaseApi.initNotification();
-  }
-  tz.initializeTimeZones();
-  prefs = await SharedPreferences.getInstance();
+    if (!kIsWeb) {
+      final firebaseApi = FirebaseApi();
+      await firebaseApi.initNotification();
+    }
+    tz.initializeTimeZones();
+    prefs = await SharedPreferences.getInstance();
 
-  if (!kIsWeb) {
-    await UnityAds.init(
-      gameId: '5840220',
-      testMode: false,
+    if (!kIsWeb) {
+      await UnityAds.init(
+        gameId: '5840220',
+        testMode: false,
       onComplete: () {},
       onFailed: (error, message) {},
     );
@@ -92,133 +72,19 @@ Future<void> main() async {
     ChangeNotifierProvider(
       create: (context) => ThemeProvider(),
       child: const MyApp(),
-    ),
-  );
-}
-
-class MyApp extends StatefulWidget {
-  const MyApp({super.key});
-
-  @override
-  State<MyApp> createState() => _MyAppState();
-}
-
-class _MyAppState extends State<MyApp> {
-  @override
-  void initState() {
-    super.initState();
-    if (!kIsWeb) {
-      _createNotificationChannel();
+        ),
+      );
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-
-    return MaterialApp(
-      title: 'Hesen TV',
-      debugShowCheckedModeBanner: false,
-      themeMode: themeProvider.themeMode,
-      theme: ThemeData(
-        brightness: Brightness.light,
-        primaryColor: themeProvider.getPrimaryColor(false),
-        scaffoldBackgroundColor: themeProvider.getScaffoldBackgroundColor(
-          false,
-        ),
-        cardColor: themeProvider.getCardColor(false),
-        colorScheme: ColorScheme.light(
-          primary: themeProvider.getPrimaryColor(false),
-          secondary: themeProvider.getSecondaryColor(false),
-          surface: Colors.white,
-          background: themeProvider.getScaffoldBackgroundColor(false),
-          error: Colors.red,
-          onPrimary: Colors.white,
-          onSecondary: Colors.white,
-          onSurface: Colors.black,
-          onBackground: Colors.black,
-          onError: Colors.white,
-          brightness: Brightness.light,
-        ),
-        appBarTheme: AppBarTheme(
-          backgroundColor: themeProvider.getAppBarBackgroundColor(false),
-          foregroundColor: Colors.white,
-          iconTheme: const IconThemeData(color: Colors.white),
-          titleTextStyle: const TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        textTheme: const TextTheme(
-          bodyLarge: TextStyle(color: Colors.black),
-          bodyMedium: TextStyle(color: Colors.black),
-          bodySmall: TextStyle(color: Colors.black),
-        ),
-      ),
-      darkTheme: ThemeData(
-        brightness: Brightness.dark,
-        primaryColor: themeProvider.getPrimaryColor(true),
-        scaffoldBackgroundColor: themeProvider.getScaffoldBackgroundColor(true),
-        cardColor: themeProvider.getCardColor(true),
-        colorScheme: ColorScheme.dark(
-          primary: themeProvider.getPrimaryColor(true),
-          secondary: themeProvider.getSecondaryColor(true),
-          surface: const Color(0xFF1C1C1C),
-          background: themeProvider.getScaffoldBackgroundColor(true),
-          error: Colors.red,
-          onPrimary: Colors.white,
-          onSecondary: Colors.white,
-          onSurface: Colors.white,
-          onBackground: Colors.white,
-          onError: Colors.white,
-          brightness: Brightness.dark,
-        ),
-        appBarTheme: AppBarTheme(
-          backgroundColor: themeProvider.getAppBarBackgroundColor(true),
-          foregroundColor: Colors.white,
-          iconTheme: const IconThemeData(color: Colors.white),
-          titleTextStyle: const TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        textTheme: const TextTheme(
-          bodyLarge: TextStyle(color: Colors.white),
-          bodyMedium: TextStyle(color: Colors.white),
-          bodySmall: TextStyle(color: Colors.white),
-        ),
-      ),
-      initialRoute: '/home',
-      routes: {
-        '/home': (context) => HomePage(
-              key: const ValueKey('home'),
-              onThemeChanged: (isDarkMode) {
-                themeProvider.setThemeMode(
-                  isDarkMode ? ThemeMode.dark : ThemeMode.light,
-                );
-              },
-            ),
-        '/Notification_screen': (context) => const NotificationPage(),
-      },
-      navigatorKey: navigatorKey,
-    );
-  }
-}
 
 // --- Top-level function for background processing ---
 Future<Map<String, dynamic>> _processFetchedData(List<dynamic> results) async {
-  final fetchedChannels = results[0] as List<dynamic>;
-  final fetchedNews = results[1] as List<dynamic>;
-  final fetchedMatches = results[2] as List<Match>;
-  final fetchedGoals = results[3] as List<dynamic>;
+  final List<dynamic> fetchedChannels = (results[0] as List<dynamic>?) ?? [];
+  final List<dynamic> fetchedNews = (results[1] as List<dynamic>?) ?? [];
+  final List<Match> fetchedMatches = (results[2] as List<Match>?) ?? [];
+  final List<dynamic> fetchedGoals = (results[3] as List<dynamic>?) ?? [];
 
   final uuid = Uuid();
-  // print("--- BACKGROUND: Processing Channels --- ");
 
-  // Sort categories by createdAt
-  // Use try-catch for robust parsing
   List<Map<String, dynamic>> sortedCategories = [];
   for (var categoryData in fetchedChannels) {
     if (categoryData is Map) {
@@ -236,23 +102,15 @@ Future<Map<String, dynamic>> _processFetchedData(List<dynamic> results) async {
     }
   });
 
-  // Process categories: assign IDs and sort channels
   List<Map<String, dynamic>> processedChannels = [];
   for (var categoryData in sortedCategories) {
-    // Iterate sorted categories
-    Map<String, dynamic> newCategory =
-        categoryData; // Already a new map if needed
-
-    // Assign UUID if category id is null
+    Map<String, dynamic> newCategory = categoryData;
     if (newCategory['id'] == null) {
       newCategory['id'] = uuid.v4();
     }
-
-    // Sort channels within the category by creation date
     if (newCategory['channels'] is List) {
       List originalChannels = newCategory['channels'];
       List<Map<String, dynamic>> sortedChannelsList = [];
-
       for (var channelData in originalChannels) {
         if (channelData is Map) {
           Map<String, dynamic> newChannel = Map<String, dynamic>.from(
@@ -264,8 +122,6 @@ Future<Map<String, dynamic>> _processFetchedData(List<dynamic> results) async {
           sortedChannelsList.add(newChannel);
         }
       }
-
-      // Sort the new list of channel maps by createdAt
       sortedChannelsList.sort((a, b) {
         if (a['createdAt'] == null || b['createdAt'] == null) return 0;
         try {
@@ -273,7 +129,9 @@ Future<Map<String, dynamic>> _processFetchedData(List<dynamic> results) async {
           final dateB = DateTime.parse(b['createdAt'].toString());
           return dateA.compareTo(dateB);
         } catch (e) {
-          return a['createdAt'].toString().compareTo(b['createdAt'].toString());
+          return a['createdAt'].toString().compareTo(
+                b['createdAt'].toString(),
+              );
         }
       });
       newCategory['channels'] = sortedChannelsList;
@@ -282,7 +140,42 @@ Future<Map<String, dynamic>> _processFetchedData(List<dynamic> results) async {
     }
     processedChannels.add(newCategory);
   }
-  // print("--- BACKGROUND: Processing Complete --- ");
+
+  fetchedNews.sort((a, b) {
+    final bool aHasDate = a is Map && a['date'] != null;
+    final bool bHasDate = b is Map && b['date'] != null;
+    if (!aHasDate && !bHasDate) return 0;
+    if (!aHasDate) return 1;
+    if (!bHasDate) return -1;
+    try {
+      final dateA = DateTime.parse(a['date'].toString());
+      final dateB = DateTime.parse(b['date'].toString());
+      return dateB.compareTo(dateA);
+    } catch (e) {
+      if (aHasDate && bHasDate) return 0;
+      if (aHasDate) return 1;
+      if (bHasDate) return -1;
+      return 0;
+    }
+  });
+
+  fetchedGoals.sort((a, b) {
+    final bool aHasDate = a is Map && a['createdAt'] != null;
+    final bool bHasDate = b is Map && b['createdAt'] != null;
+    if (!aHasDate && !bHasDate) return 0;
+    if (!aHasDate) return 1;
+    if (!bHasDate) return -1;
+    try {
+      final dateA = DateTime.parse(a['createdAt'].toString());
+      final dateB = DateTime.parse(b['createdAt'].toString());
+      return dateB.compareTo(dateA);
+    } catch (e) {
+      if (aHasDate && bHasDate) return 0;
+      if (aHasDate) return 1;
+      if (bHasDate) return -1;
+      return 0;
+    }
+  });
 
   return {
     'channels': processedChannels,
@@ -290,6 +183,221 @@ Future<Map<String, dynamic>> _processFetchedData(List<dynamic> results) async {
     'matches': fetchedMatches,
     'goals': fetchedGoals,
   };
+}
+
+// --- New top-level functions for background processing during refresh ---
+Future<List<Map<String, dynamic>>> _processRefreshedChannelsData(
+    List<dynamic> fetchedChannels) async {
+  final uuid = Uuid();
+  List<Map<String, dynamic>> sortedCategories = [];
+  for (var categoryData in fetchedChannels) {
+    if (categoryData is Map) {
+      sortedCategories.add(Map<String, dynamic>.from(categoryData));
+    }
+  }
+  sortedCategories.sort((a, b) {
+    if (a['createdAt'] == null || b['createdAt'] == null) return 0;
+    try {
+      final dateA = DateTime.parse(a['createdAt'].toString());
+      final dateB = DateTime.parse(b['createdAt'].toString());
+      return dateA.compareTo(dateB);
+    } catch (e) {
+      return a['createdAt'].toString().compareTo(b['createdAt'].toString());
+    }
+  });
+
+  List<Map<String, dynamic>> processedChannels = [];
+  for (var categoryData in sortedCategories) {
+    Map<String, dynamic> newCategory = Map<String, dynamic>.from(categoryData);
+    if (newCategory['id'] == null) {
+      newCategory['id'] = uuid.v4();
+    }
+    if (newCategory['channels'] is List) {
+      List originalChannels = newCategory['channels'];
+      List<Map<String, dynamic>> sortedChannelsList = [];
+      for (var channelData in originalChannels) {
+        if (channelData is Map) {
+          Map<String, dynamic> newChannel =
+              Map<String, dynamic>.from(channelData);
+          if (newChannel['id'] == null) {
+            newChannel['id'] = uuid.v4();
+          }
+          sortedChannelsList.add(newChannel);
+        }
+      }
+      sortedChannelsList.sort((a, b) {
+        if (a['createdAt'] == null || b['createdAt'] == null) return 0;
+        try {
+          final dateA = DateTime.parse(a['createdAt'].toString());
+          final dateB = DateTime.parse(b['createdAt'].toString());
+          return dateA.compareTo(dateB);
+        } catch (e) {
+          return a['createdAt']
+              .toString()
+              .compareTo(b['createdAt'].toString());
+        }
+      });
+      newCategory['channels'] = sortedChannelsList;
+    } else {
+      newCategory['channels'] = [];
+    }
+    processedChannels.add(newCategory);
+  }
+  return processedChannels;
+}
+
+Future<List<dynamic>> _processRefreshedNewsData(
+    List<dynamic> fetchedNews) async {
+  fetchedNews.sort((a, b) {
+    final bool aHasDate = a is Map && a['date'] != null;
+    final bool bHasDate = b is Map && b['date'] != null;
+    if (!aHasDate && !bHasDate) return 0;
+    if (!aHasDate) return 1;
+    if (!bHasDate) return -1;
+    try {
+      final dateA = DateTime.parse(a['date'].toString());
+      final dateB = DateTime.parse(b['date'].toString());
+      return dateB.compareTo(dateA);
+    } catch (e) {
+      if (aHasDate && bHasDate) return 0;
+      if (aHasDate) return 1;
+      if (bHasDate) return -1;
+      return 0;
+    }
+  });
+  return fetchedNews;
+}
+
+Future<List<dynamic>> _processRefreshedGoalsData(
+    List<dynamic> fetchedGoals) async {
+  fetchedGoals.sort((a, b) {
+    final bool aHasDate = a is Map && a['createdAt'] != null;
+    final bool bHasDate = b is Map && b['createdAt'] != null;
+    if (!aHasDate && !bHasDate) return 0;
+    if (!aHasDate) return 1;
+    if (!bHasDate) return -1;
+    try {
+      final dateA = DateTime.parse(a['createdAt'].toString());
+      final dateB = DateTime.parse(b['createdAt'].toString());
+      return dateB.compareTo(dateA);
+    } catch (e) {
+      if (aHasDate && bHasDate) return 0;
+      if (aHasDate) return 1;
+      if (bHasDate) return -1;
+      return 0;
+    }
+  });
+  return fetchedGoals;
+}
+
+class MyApp extends StatefulWidget {
+  const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    if (!kIsWeb) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+        final themeProvider = Provider.of<ThemeProvider>(context);
+
+        return MaterialApp(
+          title: 'Hesen TV',
+          debugShowCheckedModeBanner: false,
+          themeMode: themeProvider.themeMode,
+          theme: ThemeData(
+            brightness: Brightness.light,
+            primaryColor: themeProvider.getPrimaryColor(false),
+            scaffoldBackgroundColor: themeProvider.getScaffoldBackgroundColor(
+              false,
+            ),
+            cardColor: themeProvider.getCardColor(false),
+            colorScheme: ColorScheme.light(
+              primary: themeProvider.getPrimaryColor(false),
+              secondary: themeProvider.getSecondaryColor(false),
+              surface: Colors.white,
+              background: themeProvider.getScaffoldBackgroundColor(false),
+              error: Colors.red,
+              onPrimary: Colors.white,
+              onSecondary: Colors.white,
+              onSurface: Colors.black,
+              onBackground: Colors.black,
+              onError: Colors.white,
+              brightness: Brightness.light,
+            ),
+            appBarTheme: AppBarTheme(
+              backgroundColor: themeProvider.getAppBarBackgroundColor(false),
+              foregroundColor: Colors.white,
+              iconTheme: const IconThemeData(color: Colors.white),
+              titleTextStyle: const TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            textTheme: const TextTheme(
+              bodyLarge: TextStyle(color: Colors.black),
+              bodyMedium: TextStyle(color: Colors.black),
+              bodySmall: TextStyle(color: Colors.black),
+            ),
+          ),
+          darkTheme: ThemeData(
+            brightness: Brightness.dark,
+            primaryColor: themeProvider.getPrimaryColor(true),
+            scaffoldBackgroundColor:
+                themeProvider.getScaffoldBackgroundColor(true),
+            cardColor: themeProvider.getCardColor(true),
+            colorScheme: ColorScheme.dark(
+              primary: themeProvider.getPrimaryColor(true),
+              secondary: themeProvider.getSecondaryColor(true),
+              surface: const Color(0xFF1C1C1C),
+              background: themeProvider.getScaffoldBackgroundColor(true),
+              error: Colors.red,
+              onPrimary: Colors.white,
+              onSecondary: Colors.white,
+              onSurface: Colors.white,
+              onBackground: Colors.white,
+              onError: Colors.white,
+              brightness: Brightness.dark,
+            ),
+            appBarTheme: AppBarTheme(
+              backgroundColor: themeProvider.getAppBarBackgroundColor(true),
+              foregroundColor: Colors.white,
+              iconTheme: const IconThemeData(color: Colors.white),
+              titleTextStyle: const TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            textTheme: const TextTheme(
+              bodyLarge: TextStyle(color: Colors.white),
+              bodyMedium: TextStyle(color: Colors.white),
+              bodySmall: TextStyle(color: Colors.white),
+            ),
+          ),
+          initialRoute: '/home',
+          routes: {
+            '/home': (context) => HomePage(
+                  key: const ValueKey('home'),
+                  onThemeChanged: (isDarkMode) {
+                    themeProvider.setThemeMode(
+                      isDarkMode ? ThemeMode.dark : ThemeMode.light,
+                    );
+                  },
+                ),
+            '/Notification_screen': (context) => const NotificationPage(),
+          },
+          navigatorKey: navigatorKey,
+    );
+  }
 }
 
 class HomePage extends StatefulWidget {
@@ -301,8 +409,9 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage>
-    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
+  String? _userName;
+  String? _fcmToken;
   List<Match> matches = [];
   List<dynamic> channels = [];
   List<dynamic> news = [];
@@ -313,13 +422,16 @@ class _HomePageState extends State<HomePage>
   List<dynamic> _filteredChannels = [];
   late bool _isDarkMode;
   bool _isSearchBarVisible = false;
-  late TabController _tabController;
+  bool _isLoading = true;
+  bool _hasError = false;
+  bool _channelsHasError = false;
+  bool _newsHasError = false;
+  bool _goalsHasError = false;
+  bool _matchesHasError = false;
 
-  // Unity Ad Placement IDs
   final String _interstitialPlacementId = 'Interstitial_Android';
   final String _rewardedPlacementId = 'Rewarded_Android';
-
-  bool _isAdShowing = false; // -->> أضف هذا المتغير. هذا هو القفل الخاص بنا
+  bool _isAdShowing = false;
 
   @override
   void initState() {
@@ -327,52 +439,273 @@ class _HomePageState extends State<HomePage>
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     _isDarkMode = themeProvider.themeMode == ThemeMode.dark;
     _dataFuture = _initData();
-    requestNotificationPermission();
-
-    // Load the flag and schedule the dialog if needed
-    // _checkAndShowTelegramDialog(); // Removed this line
-
-    // Add this line to call the update check function
-    checkForUpdate();
+    _initNotifications();
+    checkForUpdate().then((_) => _checkAndAskForName());
   }
 
   @override
   void dispose() {
     _searchController.dispose();
-    _tabController.dispose();
     super.dispose();
   }
 
-  Future<void> _initData() async {
-    try {
-      // Step 1: Fetch data concurrently (remains the same)
-      final results = await Future.wait([
-        ApiService.fetchChannelCategories(),
-        ApiService.fetchNews(),
-        ApiService.fetchMatches(),
-        ApiService.fetchGoals(),
-      ]);
+  Future<void> _initNotifications() async {
+    final firebaseApi = FirebaseApi();
+    _fcmToken = await firebaseApi.initNotification();
+    if (_userName != null && _userName!.isNotEmpty) {
+      _sendDeviceInfoToServer(name: _userName!, token: _fcmToken);
+    }
+  }
 
-      // Step 2: Process data in the background using compute
-      // print("--- Starting background data processing ---");
-      final processedData = await compute(_processFetchedData, results);
-      // print("--- Finished background data processing ---");
+  void _sendDeviceInfoToServer({required String name, required String? token}) {
+    if (token == null) {
+      print('Cannot send user info to server: FCM token is null.');
+      return;
+    }
+    print('--- SENDING USER INFO TO SERVER (SIMULATION) ---');
+    print('User Name: $name');
+    print('FCM Token: $token');
+    print('-------------------------------------------------');
+  }
 
-      // Step 3: Update state with processed data (only if mounted)
+  Future<void> _checkAndAskForName() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userName = prefs.getString('user_name');
+    if (userName == null || userName.isEmpty) {
+      if (mounted) {
+        _showNameInputDialog();
+      }
+    } else {
       if (mounted) {
         setState(() {
-          channels = processedData['channels'];
-          news = processedData['news'];
-          matches = processedData['matches'];
-          goals = processedData['goals'];
-          _filteredChannels = channels; // Initialize filtered channels
-          _tabController = TabController(length: channels.length, vsync: this);
-          _tabController.addListener(_handleTabSelection);
+          _userName = userName;
+        });
+        if (_fcmToken != null) {
+          _sendDeviceInfoToServer(name: _userName!, token: _fcmToken);
+        }
+      }
+    }
+  }
+
+  Future<void> _showNameInputDialog() async {
+    final nameController = TextEditingController();
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('مرحباً بك!', textAlign: TextAlign.center),
+          content: SingleChildScrollView(
+            child: ListBody(
+              children: <Widget>[
+                Text(
+                  'لتقديم تجربة أفضل، الرجاء إدخال اسمك الأول.',
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 15),
+                TextField(
+                  controller: nameController,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    hintText: 'الاسم الأول',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: Text('حفظ'),
+              onPressed: () async {
+                if (nameController.text.isNotEmpty) {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setString('user_name', nameController.text);
+                  if (mounted) {
+                    setState(() {
+                      _userName = nameController.text;
+                    });
+                    _sendDeviceInfoToServer(
+                        name: _userName!, token: _fcmToken);
+                    Navigator.of(context).pop();
+                  }
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _showEditNameDialog() async {
+    final nameController = TextEditingController(text: _userName);
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('تعديل اسمك', textAlign: TextAlign.center),
+          content: TextField(
+            controller: nameController,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: 'الاسم الجديد',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: Text('إلغاء'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: Text('حفظ'),
+              onPressed: () async {
+                if (nameController.text.isNotEmpty) {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setString('user_name', nameController.text);
+                  if (mounted) {
+                    setState(() {
+                      _userName = nameController.text;
+                    });
+                    Navigator.of(context).pop();
+                  }
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _initData() async {
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+      _channelsHasError = false;
+      _newsHasError = false;
+      _goalsHasError = false;
+      _matchesHasError = false;
+    });
+
+    List<dynamic> fetchedResults = List.filled(4, null);
+
+    try {
+      fetchedResults[0] = await ApiService.fetchChannelCategories();
+    } catch (e) {
+      debugPrint('Error fetching channels: $e');
+      if (mounted) setState(() => _channelsHasError = true);
+    }
+    try {
+      fetchedResults[1] = await ApiService.fetchNews();
+    } catch (e) {
+      debugPrint('Error fetching news: $e');
+      if (mounted) setState(() => _newsHasError = true);
+    }
+    try {
+      fetchedResults[2] = await ApiService.fetchMatches();
+    } catch (e) {
+      debugPrint('Error fetching matches: $e');
+      if (mounted) setState(() => _matchesHasError = true);
+    }
+    try {
+      fetchedResults[3] = await ApiService.fetchGoals();
+    } catch (e) {
+      debugPrint('Error fetching goals: $e');
+      if (mounted) setState(() => _goalsHasError = true);
+    }
+
+    if (_channelsHasError &&
+        _newsHasError &&
+        _matchesHasError &&
+        _goalsHasError) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+        });
+      }
+      return;
+    }
+
+    try {
+      final processedData = await compute(_processFetchedData, fetchedResults);
+      if (mounted) {
+        setState(() {
+          channels = processedData['channels'] ?? [];
+          news = processedData['news'] ?? [];
+          matches = processedData['matches'] ?? [];
+          goals = processedData['goals'] ?? [];
+          _filteredChannels = channels;
+          _isLoading = false;
+          _hasError = false;
+          _channelsHasError = false;
+          _newsHasError = false;
+          _goalsHasError = false;
+          _matchesHasError = false;
         });
       }
     } catch (e) {
-      // Handle errors
-      debugPrint('Error initializing data: $e');
+      debugPrint('Error processing data with compute: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+        });
+      }
+    }
+  }
+
+  void _retryLoadingData() {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _hasError = false;
+        _channelsHasError = false;
+        _newsHasError = false;
+        _goalsHasError = false;
+        _matchesHasError = false;
+        _dataFuture = _initData();
+      });
+    }
+  }
+
+  void _retryChannels() {
+    if (mounted) {
+      setState(() {
+        _channelsHasError = false;
+      });
+      _refreshSection(0);
+    }
+  }
+
+  void _retryNews() {
+    if (mounted) {
+      setState(() {
+        _newsHasError = false;
+      });
+      _refreshSection(1);
+    }
+  }
+
+  void _retryGoals() {
+    if (mounted) {
+      setState(() {
+        _goalsHasError = false;
+      });
+      _refreshSection(2);
+    }
+  }
+
+  void _retryMatches() {
+    if (mounted) {
+      setState(() {
+        _matchesHasError = false;
+      });
+      _refreshSection(3);
     }
   }
 
@@ -385,11 +718,9 @@ class _HomePageState extends State<HomePage>
         _filteredChannels = channels.where((channelCategory) {
           if (channelCategory is Map) {
             String categoryName = channelCategory['name']?.toLowerCase() ?? '';
-
             if (categoryName.contains(query.toLowerCase())) {
               return true;
             }
-
             if (channelCategory['channels'] is List) {
               return channelCategory['channels'].any((channel) {
                 if (channel is Map) {
@@ -410,7 +741,8 @@ class _HomePageState extends State<HomePage>
   int compareVersions(String version1, String version2) {
     List<String> v1Parts = version1.split('.');
     List<String> v2Parts = version2.split('.');
-    int len = v1Parts.length > v2Parts.length ? v1Parts.length : v2Parts.length;
+    int len =
+        v1Parts.length > v2Parts.length ? v1Parts.length : v2Parts.length;
     for (int i = 0; i < len; i++) {
       int v1 = i < v1Parts.length ? int.tryParse(v1Parts[i]) ?? 0 : 0;
       int v2 = i < v2Parts.length ? int.tryParse(v2Parts[i]) ?? 0 : 0;
@@ -442,14 +774,16 @@ class _HomePageState extends State<HomePage>
             }
           });
         } else {
-          // print('No update required or update data incomplete.');
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              showTelegramDialog(context, userName: _userName);
+            }
+          });
         }
       } else if (mounted) {
-        // If status code is not 200, show the Telegram dialog
-        showTelegramDialog();
+        showTelegramDialog(context, userName: _userName);
       }
     } catch (e) {
-      // print('Error during update check: $e');
       if (e is http.ClientException || e is SocketException) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -462,114 +796,6 @@ class _HomePageState extends State<HomePage>
         }
       }
     }
-  }
-
-  void showTelegramDialog() {
-    if (!mounted) return;
-
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: false,
-      barrierColor: Colors.black.withAlpha((0.8 * 255).round()),
-      transitionDuration: const Duration(milliseconds: 200),
-      pageBuilder: (
-        BuildContext buildContext,
-        Animation<double> animation,
-        Animation<double> secondaryAnimation,
-      ) {
-        return PopScope(
-          canPop: false,
-          child: Scaffold(
-            backgroundColor: Theme.of(
-              context,
-            ).scaffoldBackgroundColor.withAlpha((255 * 0.9).round()),
-            body: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24.0),
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: <Widget>[
-                        Text(
-                          "⚠️ تحديث تجريبي",
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineSmall
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 20),
-                        Text(
-                          "تحديث تجريبي به خلل. انضم لقناة التيليجرام للتأكد من التحديثات.",
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                        const SizedBox(height: 30),
-                        ElevatedButton(
-                          onPressed: () async {
-                            final Uri uri = Uri.parse(
-                              'https://t.me/tv_7esen',
-                            );
-                            try {
-                              if (await canLaunchUrl(uri)) {
-                                await launchUrl(
-                                  uri,
-                                  mode: LaunchMode.externalApplication,
-                                );
-                              } else {
-                                if (mounted) {
-                                  ScaffoldMessenger.of(
-                                    context,
-                                  ).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'لا يمكن فتح رابط التيليجرام.',
-                                      ),
-                                    ),
-                                  );
-                                }
-                              }
-                            } catch (e) {
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'حدث خطأ عند فتح رابط التيليجرام.',
-                                    ),
-                                  ),
-                                );
-                              }
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Theme.of(context).primaryColor,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 40,
-                              vertical: 15,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          child: const Text(
-                            "الانضمام لقناة التيليجرام",
-                            style: TextStyle(fontSize: 16),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
   }
 
   void showUpdateDialog(String updateUrl) {
@@ -689,18 +915,49 @@ class _HomePageState extends State<HomePage>
     List<Map<String, dynamic>> streamLinks,
     String sourceSection,
   ) async {
-    // -->> الخطوة 1: تحقق من القفل في البداية
     if (_isAdShowing) {
       print("Ad is already in progress. Ignoring new request.");
-      return; // اخرج من الدالة إذا كان هناك إعلان قيد التشغيل بالفعل
+      return;
     }
 
-    // -->> الخطوة 2: قم بتفعيل القفل
+    // Filter out any stream links that don't have a valid name or url.
+    final validStreamLinks = streamLinks.where((link) {
+      final name = link['name']?.toString();
+      final url = link['url']?.toString();
+
+      // Basic validation: must have a URL and a non-empty name
+      if (name == null || name.trim().isEmpty || url == null || url.isEmpty || name.trim().toLowerCase() == 'stream') {
+        return false;
+      }
+
+      // Advanced validation: check for empty JSON rich text names like [{"text":""}]
+      if (name.trim().startsWith('[') && name.trim().endsWith(']')) {
+        try {
+          final List<dynamic> nameParts = jsonDecode(name);
+          if (nameParts.isNotEmpty) {
+            bool allPartsEmpty = nameParts.every((part) {
+              if (part is Map && part.containsKey('text')) {
+                final text = part['text']?.toString();
+                return text == null || text.trim().isEmpty;
+              }
+              return false; // Invalid part structure, treat as empty
+            });
+            if (allPartsEmpty) {
+              return false; // It's an empty rich text, ignore it.
+            }
+          }
+        } catch (e) {
+          // Not valid JSON, so it's a regular name. Let it pass.
+        }
+      }
+      
+      return true; // The link is valid
+    }).toList();
+
     setState(() {
       _isAdShowing = true;
     });
 
-    // --- دالة مساعدة لإعادة ضبط القفل (لتقليل تكرار الكود) ---
     void _resetAdLock() {
       if (mounted) {
         setState(() {
@@ -708,20 +965,16 @@ class _HomePageState extends State<HomePage>
         });
       }
     }
-    // -----------------------------------------------------------
 
     final bool isRewardedSection =
         sourceSection == 'news' || sourceSection == 'goals';
     final String placementId =
         isRewardedSection ? _rewardedPlacementId : _interstitialPlacementId;
 
-    // --- State variables for this specific call ---
-    bool adLoadFinished = false; // True if load completes or fails
-    bool navigationDone = false; // True if navigation to player screen happened
-    Timer? loadTimer; // Timer for the 4-second timeout
-    // ----
+    bool adLoadFinished = false;
+    bool navigationDone = false;
+    Timer? loadTimer;
 
-    // Show loading dialog
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -740,48 +993,37 @@ class _HomePageState extends State<HomePage>
 
     final BuildContext? capturedNavigatorContext = navigatorKey.currentContext;
 
-    // --- Helper function to safely dismiss dialog and navigate ---
     void dismissAndNavigate() {
-      if (navigationDone) return; // Prevent multiple navigations
+      if (navigationDone) return;
       navigationDone = true;
       BuildContext effectiveContext = capturedNavigatorContext ?? context;
 
-      // Dismiss the loading dialog if it's still visible
       if (Navigator.canPop(effectiveContext)) {
         Navigator.pop(effectiveContext);
       }
-      _navigateToVideoPlayer(effectiveContext, initialUrl, streamLinks);
+      _navigateToVideoPlayer(effectiveContext, initialUrl, validStreamLinks);
     }
 
-    // --- Helper function to cancel and dismiss everything without navigating ---
     void cancelAdAndDismiss() {
-      if (navigationDone) return; // Don't do anything if we already navigated
-      navigationDone =
-          true; // Mark as done to prevent other paths from navigating
+      if (navigationDone) return;
+      navigationDone = true;
       _resetAdLock();
       loadTimer?.cancel();
       BuildContext effectiveContext = capturedNavigatorContext ?? context;
       if (Navigator.canPop(effectiveContext)) {
-        Navigator.pop(effectiveContext); // Just close the loading dialog
+        Navigator.pop(effectiveContext);
       }
     }
-    // ----
 
-    // --- Helper function to show ad AFTER navigation ---
     void showAdOverlay(String adPlacementId) {
-      // print("showAdOverlay: Showing ad $adPlacementId over video player.");
       UnityAds.showVideoAd(
         placementId: adPlacementId,
-        // These callbacks DON'T navigate
-        onComplete: (pid) {}, // print("Overlay Ad $pid Complete"),
-        onFailed:
-            (pid, err, msg) {}, // print("Overlay Ad $pid Failed: $err $msg"),
-        onStart: (pid) {}, // print("Overlay Ad $pid Start"),
-        onClick: (pid) {}, // print("Overlay Ad $pid Click"),
+        onComplete: (pid) {},
+        onFailed: (pid, err, msg) {},
+        onStart: (pid) {},
+        onClick: (pid) {},
         onSkipped: (pid) {
-          // print("Overlay Ad $pid Skipped");
           if (isRewardedSection) {
-            // Still show message even if it's an overlay
             BuildContext effectiveContext = capturedNavigatorContext ?? context;
             ScaffoldMessenger.of(effectiveContext).showSnackBar(
               const SnackBar(
@@ -792,107 +1034,86 @@ class _HomePageState extends State<HomePage>
         },
       );
     }
-    // ----
 
-    // Start the 10-second timer
     loadTimer = Timer(const Duration(seconds: 10), () {
       print("Ad load timer expired.");
-      _resetAdLock(); // <-- Reset the lock here
+      _resetAdLock();
       if (!adLoadFinished) {
         print("Timeout occurred before ad load finished. Navigating early.");
-        dismissAndNavigate(); // Navigate early, ad load continues
+        dismissAndNavigate();
       }
     });
 
-    // Attempt to load the ad
     try {
       UnityAds.load(
         placementId: placementId,
         onComplete: (loadedPlacementId) async {
-          // print("UnityAds.load complete: $loadedPlacementId");
-          if (adLoadFinished)
-            return; // Already handled (e.g., by failure or previous complete)
+          if (adLoadFinished) return;
           adLoadFinished = true;
           loadTimer?.cancel();
 
           if (navigationDone) {
-            // Navigation already happened due to timeout
-            // print("Ad loaded AFTER timeout/navigation. Showing as overlay.");
             showAdOverlay(loadedPlacementId);
           } else {
-            // Ad loaded within the 4-second timeout
-            // print("Ad loaded WITHIN timeout. Dismissing dialog and showing ad now.");
             BuildContext effectiveContext = capturedNavigatorContext ?? context;
             if (Navigator.canPop(effectiveContext)) {
-              Navigator.pop(effectiveContext); // Dismiss dialog FIRST
+              Navigator.pop(effectiveContext);
             }
 
-            DateTime? adStartTime; // Variable to store when the ad started
+            DateTime? adStartTime;
 
-            // Show the ad, and navigate AFTER it finishes/fails/skips
             await UnityAds.showVideoAd(
               placementId: loadedPlacementId,
               onComplete: (completedPlacementId) {
-                _resetAdLock(); // <-- Reset the lock here
-                // print("Pre-Nav Ad $completedPlacementId Complete. Navigating.");
-                dismissAndNavigate(); // Navigate after completion
+                _resetAdLock();
+                dismissAndNavigate();
               },
               onFailed: (failedPlacementId, error, message) {
-                _resetAdLock(); // <-- Reset the lock here
-                // print("Pre-Nav Ad $failedPlacementId Failed: $error $message. Navigating.");
-                dismissAndNavigate(); // Navigate even on failure to show
+                _resetAdLock();
+                dismissAndNavigate();
               },
               onStart: (startPlacementId) {
-                // Record the time when the ad video actually starts playing
                 adStartTime = DateTime.now();
               },
               onClick: (clickPlacementId) => {},
               onSkipped: (skippedPlacementId) {
-                _resetAdLock(); // <-- Reset the lock here
+                _resetAdLock();
                 print("Pre-Nav Ad $skippedPlacementId Skipped.");
 
                 final adWatchDuration = adStartTime != null
                     ? DateTime.now().difference(adStartTime!)
                     : Duration.zero;
 
-                // If the ad was skipped in less than 6 seconds, it's likely a back press.
                 if (adWatchDuration.inSeconds < 6) {
                   print(
                       "Skipped early (likely back press). Cancelling navigation.");
-                  cancelAdAndDismiss(); // Cancel the process entirely
+                  cancelAdAndDismiss();
                 } else {
-                  // If skipped after 4 seconds, it's likely a deliberate skip.
                   print("Skipped after threshold. Navigating to player.");
-                  dismissAndNavigate(); // Navigate to the player
+                  dismissAndNavigate();
                 }
               },
             );
           }
         },
         onFailed: (failedPlacementId, error, message) {
-          // print("UnityAds.load failed: $failedPlacementId, $error, $message");
           if (adLoadFinished) return;
           adLoadFinished = true;
           loadTimer?.cancel();
 
-          _resetAdLock(); // <-- Reset the lock here
+          _resetAdLock();
 
           if (!navigationDone) {
-            // print("Ad load failed WITHIN timeout. Navigating.");
-            dismissAndNavigate(); // Navigate if load failed before timeout
+            dismissAndNavigate();
           }
-          // If navigationDone is true, do nothing (timeout already handled navigation)
         },
       );
     } catch (e) {
-      // print("Error during UnityAds.load call: $e");
-      loadTimer.cancel();
-      _resetAdLock(); // <-- Reset the lock here
+      loadTimer?.cancel();
+      _resetAdLock();
       if (!navigationDone) {
-        // print("Error occurred WITHIN timeout. Navigating.");
-        dismissAndNavigate(); // Navigate on error before timeout
+        dismissAndNavigate();
       }
-      // If navigationDone is true, do nothing (timeout already handled navigation)
     }
   }
 
@@ -901,7 +1122,6 @@ class _HomePageState extends State<HomePage>
     String initialUrl,
     List<Map<String, dynamic>> streamLinks,
   ) {
-    // Use the root navigator key to push the route
     navigatorKey.currentState?.push(
       MaterialPageRoute(
         builder: (context) =>
@@ -915,7 +1135,7 @@ class _HomePageState extends State<HomePage>
 
     actions.add(
       Transform.scale(
-        scale: 0.3,
+        scale: 0.35,
         child: DayNightSwitch(
           value: _isDarkMode,
           moonImage: AssetImage('assets/moon.png'),
@@ -927,9 +1147,9 @@ class _HomePageState extends State<HomePage>
             widget.onThemeChanged(value);
           },
           dayColor: Color(0xFFF8F8F8),
-          nightColor: Color.fromARGB(255, 27, 27, 27),
-          sunColor: Color(0xFFF8F8F8),
-          moonColor: Color(0xFF0A0A0A),
+          nightColor: Color.fromARGB(255, 10, 10, 80),
+          sunColor: Colors.amberAccent,
+          moonColor: Colors.white,
         ),
       ),
     );
@@ -1001,137 +1221,124 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  // Add this function to handle refresh
   Future<void> _refreshSection(int index) async {
+    if (!mounted) return;
+
+    setState(() {
+      switch (index) {
+        case 0:
+          _channelsHasError = false;
+          break;
+        case 1:
+          _newsHasError = false;
+          break;
+        case 2:
+          _goalsHasError = false;
+          break;
+        case 3:
+          _matchesHasError = false;
+          break;
+      }
+    });
+
     try {
       switch (index) {
-        case 0: // Channels
+        case 0:
+          try {
           final fetchedChannels = await ApiService.fetchChannelCategories();
-          // print("--- REFRESHED CHANNELS DATA ---");
+            final processedChannels =
+                await compute(_processRefreshedChannelsData, fetchedChannels);
 
-          // Sort the fetched categories first by their creation date
-          fetchedChannels.sort((a, b) {
-            if (a is! Map ||
-                b is! Map ||
-                a['createdAt'] == null ||
-                b['createdAt'] == null) return 0;
-            try {
-              final dateA = DateTime.parse(a['createdAt'].toString());
-              final dateB = DateTime.parse(b['createdAt'].toString());
-              return dateA.compareTo(dateB);
-            } catch (e) {
-              // Handle potential parsing errors, fallback to string compare
-              return a['createdAt'].toString().compareTo(
-                    b['createdAt'].toString(),
-                  );
+            if (mounted) {
+              setState(() {
+                channels = processedChannels;
+                _filterChannels(_searchController.text);
+                _channelsHasError = false;
+              });
             }
-          });
-
-          // Process categories: assign IDs and create new maps with channels sorted by createdAt
-          final uuid = Uuid();
-          List<Map<String, dynamic>> processedChannels = [];
-          for (var categoryData in fetchedChannels) {
-            if (categoryData is Map) {
-              Map<String, dynamic> newCategory = Map<String, dynamic>.from(
-                categoryData,
-              );
-
-              // Assign UUID if category id is null
-              if (newCategory['id'] == null) {
-                newCategory['id'] = uuid.v4();
-              }
-
-              // Sort channels within the category by creation date, creating a new list
-              if (newCategory['channels'] is List) {
-                List originalChannels = newCategory['channels'];
-                List<Map<String, dynamic>> sortedChannelsList = [];
-
-                // Assign UUIDs to channels if needed and create new maps
-                for (var channelData in originalChannels) {
-                  if (channelData is Map) {
-                    Map<String, dynamic> newChannel = Map<String, dynamic>.from(
-                      channelData,
-                    );
-                    if (newChannel['id'] == null) {
-                      newChannel['id'] = uuid.v4();
-                    }
-                    sortedChannelsList.add(newChannel);
-                  }
-                }
-
-                // Sort the new list of channel maps by createdAt
-                sortedChannelsList.sort((a, b) {
-                  if (a['createdAt'] == null || b['createdAt'] == null)
-                    return 0;
-                  try {
-                    final dateA = DateTime.parse(a['createdAt'].toString());
-                    final dateB = DateTime.parse(b['createdAt'].toString());
-                    return dateA.compareTo(dateB);
-                  } catch (e) {
-                    return a['createdAt'].toString().compareTo(
-                          b['createdAt'].toString(),
-                        );
-                  }
-                });
-                newCategory['channels'] = sortedChannelsList;
-              } else {
-                newCategory['channels'] = [];
-              }
-              processedChannels.add(newCategory);
+          } catch (e) {
+            debugPrint('Error refreshing channels: $e');
+            if (mounted) {
+              setState(() {
+                _channelsHasError = true;
+                channels = [];
+                _filterChannels('');
+              });
             }
           }
-          // print("--- SORTED REFRESHED CHANNELS DATA ---");
-          // print(processedChannels);
-          // print("-------------------------------------");
+          break;
+        case 1:
+          try {
+            final fetchedNews = await ApiService.fetchNews();
+            final processedNews =
+                await compute(_processRefreshedNewsData, fetchedNews);
 
+            if (mounted) {
+              setState(() {
+                news = processedNews;
+                _newsHasError = false;
+              });
+            }
+          } catch (e) {
+            debugPrint('Error refreshing news: $e');
+            if (mounted) {
+              setState(() {
+                _newsHasError = true;
+                news = [];
+              });
+            }
+          }
+          break;
+        case 2:
+          try {
+            final fetchedGoals = await ApiService.fetchGoals();
+            final processedGoals =
+                await compute(_processRefreshedGoalsData, fetchedGoals);
+
+            if (mounted) {
+              setState(() {
+                goals = processedGoals;
+                _goalsHasError = false;
+              });
+            }
+          } catch (e) {
+            debugPrint('Error refreshing goals: $e');
+            if (mounted) {
+              setState(() {
+                _goalsHasError = true;
+                goals = [];
+              });
+            }
+          }
+          break;
+        case 3:
+          try {
+            final fetchedMatches = await ApiService.fetchMatches();
+            if (mounted) {
+              setState(() {
+                matches = fetchedMatches;
+                _matchesHasError = false;
+              });
+            }
+          } catch (e) {
+            debugPrint('Error refreshing matches: $e');
           if (mounted) {
             setState(() {
-              channels = processedChannels; // Use the processed list
-              _filterChannels(_searchController.text);
+                _matchesHasError = true;
+                matches = [];
             });
+            }
           }
-          break;
-        case 1: // News
-          final fetchedNews = await ApiService.fetchNews();
-          if (mounted) setState(() => news = fetchedNews);
-          break;
-        case 2: // Goals
-          final fetchedGoals = await ApiService.fetchGoals();
-          if (mounted) setState(() => goals = fetchedGoals);
-          break;
-        case 3: // Matches
-          final fetchedMatches = await ApiService.fetchMatches();
-          if (mounted) setState(() => matches = fetchedMatches);
           break;
       }
     } catch (e) {
-      // Handle or log error if needed
-      // print("Error refreshing section $index: $e");
+      debugPrint('Unexpected error during section refresh: $e');
     }
-  }
-
-  // --- Show Telegram Dialog Logic ---
-  // Future<void> _checkAndShowTelegramDialog() async { // Removed this function
-  //   // Always schedule the dialog to show after the first frame
-  //   WidgetsBinding.instance.addPostFrameCallback((_) {
-  //     if (mounted) {
-  //       // Check if the widget is still mounted
-  //       showTelegramDialog();
-  //     }
-  //   });
-  // }
-
-  void _handleTabSelection() {
-    if (!mounted) return;
-    setState(() {
-      _selectedIndex = _tabController.index;
-    });
   }
 
   @override
   Widget build(BuildContext context) {
     final appBarHeight = AppBar().preferredSize.height;
-    // final additionalOffset = MediaQuery.of(context).padding.top + 2.0; // Removed
 
     return Scaffold(
       appBar: PreferredSize(
@@ -1168,11 +1375,34 @@ class _HomePageState extends State<HomePage>
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
+                          if (_userName != null)
                           ListTile(
                             leading: Icon(
-                              Icons.color_lens,
+                                Icons.person,
                               color: Theme.of(context).colorScheme.secondary,
                             ),
+                              title: Text(
+                                _userName!,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Theme.of(
+                                    context,
+                                  ).textTheme.bodyLarge!.color,
+                                ),
+                              ),
+                              trailing: Icon(Icons.edit,
+                                  color: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.color),
+                              onTap: () {
+                                Navigator.pop(context);
+                                _showEditNameDialog();
+                              },
+                            ),
+                          ListTile(
+                            leading: Icon(Icons.color_lens,
+                                color: Theme.of(context).colorScheme.secondary),
                             title: Text(
                               'تخصيص الألوان',
                               style: TextStyle(
@@ -1213,20 +1443,33 @@ class _HomePageState extends State<HomePage>
                                 'https://t.me/tv_7esen',
                               );
                               try {
-                                await launchUrl(
-                                  telegramUri,
-                                  mode: LaunchMode.externalApplication,
-                                );
-                              } catch (e) {
-                                // print(
-                                //     'Error launching URL in external app: $e');
-                                try {
+                                if (await canLaunchUrl(telegramUri)) {
                                   await launchUrl(
                                     telegramUri,
-                                    mode: LaunchMode.inAppWebView,
+                                    mode: LaunchMode.externalApplication,
                                   );
-                                } catch (e) {
-                                  // print('Error launching URL in browser: $e');
+                                } else {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(
+                                      context,
+                                    ).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'لا يمكن فتح رابط التحديث.',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                }
+                              } catch (e) {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'حدث خطأ عند فتح الرابط.',
+                                      ),
+                                    ),
+                                  );
                                 }
                               }
                             },
@@ -1283,13 +1526,66 @@ class _HomePageState extends State<HomePage>
                 );
               },
             ),
-            title: Text(
+            title: Row(
+              children: [
+                Expanded(
+                  child: Directionality(
+                    textDirection: TextDirection.rtl,
+                    child: _userName != null
+                        ? RichText(
+                            textAlign:
+                                Directionality.of(context) == TextDirection.rtl
+                                    ? TextAlign.right
+                                    : TextAlign.left,
+                            text: TextSpan(
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                              children: [
+                                const TextSpan(text: 'أهلاً بك '),
+                                TextSpan(
+                                  text: _userName,
+                                  style: TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    foreground: _isDarkMode
+                                        ? (Paint()
+                                          ..shader = LinearGradient(
+                                            colors: <Color>[
+                                              Colors.blue.shade800,
+                                              Colors.deepPurple.shade700,
+                                              Colors.blue.shade500,
+                                            ],
+                                            // --- >> START OF FIX << ---
+                                            begin: Alignment.centerLeft,
+                                            end: Alignment.centerRight,
+                                            // --- >> END OF FIX << ---
+                                          ).createShader(Rect.fromLTWH(
+                                              0.0, 0.0, 200.0, 70.0)))
+                                        : null,
+                                    color: _isDarkMode
+                                        ? null
+                                        : Color(0xFFF8F8F8),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : const Text(
               '7eSen TV',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 22,
                 color: Colors.white,
               ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                  ),
+                ),
+              ],
             ),
             actions: _buildAppBarActions(),
           ),
@@ -1302,15 +1598,8 @@ class _HomePageState extends State<HomePage>
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return Center(child: CircularProgressIndicator());
-                } else if (snapshot.hasError) {
-                  return Center(
-                    child: Text(
-                      'Error loading data',
-                      style: TextStyle(
-                        color: Theme.of(context).textTheme.bodyLarge!.color,
-                      ),
-                    ),
-                  );
+                } else if (_hasError) {
+                  return _buildGeneralErrorWidget();
                 } else {
                   return RefreshIndicator(
                     color: Theme.of(context).colorScheme.secondary,
@@ -1321,36 +1610,10 @@ class _HomePageState extends State<HomePage>
                       child: IndexedStack(
                         index: _selectedIndex,
                         children: [
-                          Builder(
-                            builder: (context) {
-                              // print(
-                              //     "--- HomePage build - Passing to ChannelsSection: ---");
-                              // print(_filteredChannels);
-                              // print(
-                              //     "-----------------------------------------------------");
-                              return ChannelsSection(
-                                channelCategories: _filteredChannels,
-                                openVideo: openVideo,
-                                isAdLoading:
-                                    _isAdShowing, // -->> مرر حالة القفل
-                              );
-                            },
-                          ),
-                          NewsSection(
-                            newsArticles: Future.value(news),
-                            openVideo: openVideo,
-                            isAdLoading: _isAdShowing, // -->> مرر حالة القفل
-                          ),
-                          GoalsSection(
-                            goalsArticles: Future.value(goals),
-                            openVideo: openVideo,
-                            isAdLoading: _isAdShowing, // -->> مرر حالة القفل
-                          ),
-                          MatchesSection(
-                            matches: Future.value(matches),
-                            openVideo: openVideo,
-                            isAdLoading: _isAdShowing, // -->> مرر حالة القفل
-                          ),
+                          _buildSectionContent(0), // Channels
+                          _buildSectionContent(1), // News
+                          _buildSectionContent(2), // Goals
+                          _buildSectionContent(3), // Matches
                         ],
                       ),
                     ),
@@ -1393,5 +1656,144 @@ class _HomePageState extends State<HomePage>
         height: 60,
       ),
     );
+  }
+
+  Widget _buildGeneralErrorWidget() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.error_outline,
+            color: Colors.red,
+            size: 60,
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'حدث خطأ أثناء تحميل البيانات.',
+            style: TextStyle(
+              color: Theme.of(context).textTheme.bodyLarge!.color,
+              fontSize: 18,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'الرجاء التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Theme.of(context).textTheme.bodyMedium!.color,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 30),
+          ElevatedButton.icon(
+            onPressed: _retryLoadingData,
+            icon: Icon(Icons.replay),
+            label: Text('إعادة المحاولة'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).primaryColor,
+              foregroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              textStyle: TextStyle(fontSize: 16),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionErrorWidget(String message, VoidCallback onRetry) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.error_outline,
+            color: Colors.red,
+            size: 50,
+          ),
+          const SizedBox(height: 15),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Theme.of(context).textTheme.bodyLarge!.color,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 25),
+          ElevatedButton.icon(
+            onPressed: onRetry,
+            icon: Icon(Icons.replay),
+            label: Text('إعادة المحاولة'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).primaryColor,
+              foregroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(horizontal: 25, vertical: 12),
+              textStyle: TextStyle(fontSize: 14),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionContent(int index) {
+    switch (index) {
+      case 0: // Channels
+        if (_channelsHasError) {
+          return _buildSectionErrorWidget(
+            'فشل تحميل القنوات. الرجاء المحاولة مرة أخرى.',
+            _retryChannels,
+          );
+        } else {
+          return ChannelsSection(
+            channelCategories: _filteredChannels,
+            openVideo: openVideo,
+            isAdLoading: _isAdShowing,
+          );
+        }
+      case 1: // News
+        if (_newsHasError) {
+          return _buildSectionErrorWidget(
+            'فشل تحميل الأخبار. الرجاء المحاولة مرة أخرى.',
+            _retryNews,
+          );
+        } else {
+          return NewsSection(
+            newsArticles: Future.value(news),
+            openVideo: openVideo,
+            isAdLoading: _isAdShowing,
+          );
+        }
+      case 2: // Goals
+        if (_goalsHasError) {
+          return _buildSectionErrorWidget(
+            'فشل تحميل الأهداف. الرجاء المحاولة مرة أخرى.',
+            _retryGoals,
+          );
+        } else {
+          return GoalsSection(
+            goalsArticles: Future.value(goals),
+            openVideo: openVideo,
+            isAdLoading: _isAdShowing,
+          );
+        }
+      case 3: // Matches
+        if (_matchesHasError) {
+          return _buildSectionErrorWidget(
+            'فشل تحميل المباريات. الرجاء المحاولة مرة أخرى.',
+            _retryMatches,
+          );
+        } else {
+          return MatchesSection(
+            matches: Future.value(matches),
+            openVideo: openVideo,
+            isAdLoading: _isAdShowing,
+          );
+        }
+      default:
+        return Center(child: Text('قسم غير معروف'));
+    }
   }
 }

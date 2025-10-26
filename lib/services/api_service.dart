@@ -6,58 +6,53 @@ class ApiService {
   static const String baseUrl = 'https://st9.onrender.com/api';
 
   static Future<List> fetchChannelCategories() async {
-    try {
-      final response = await http.get(Uri.parse(
-          '$baseUrl/channel-categories?populate[channels][sort][0]=createdAt:asc&sort=createdAt:asc'));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return List.from(data['data'] ?? []);
-      }
-    } catch (e) {}
-    return [];
+    final response = await http.get(Uri.parse(
+        '$baseUrl/channel-categories?populate[channels][sort][0]=createdAt:asc&sort=createdAt:asc'));
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return List.from(data['data'] ?? []);
+    } else {
+      throw Exception('Failed to load channel categories: ${response.statusCode}');
+    }
   }
 
   static Future<List> fetchNews() async {
-    try {
-      final response = await http.get(Uri.parse('$baseUrl/news?populate=*'));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return List.from(data['data'] ?? []);
-      } else {}
-    } catch (e) {}
-    return [];
+    final response = await http.get(Uri.parse('$baseUrl/news?populate=*'));
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return List.from(data['data'] ?? []);
+    } else {
+      throw Exception('Failed to load news: ${response.statusCode}');
+    }
   }
 
   static Future<List<Match>> fetchMatches() async {
-    try {
-      final response = await http.get(Uri.parse('$baseUrl/matches?populate=*'));
+    final response = await http.get(Uri.parse('$baseUrl/matches?populate=*'));
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final List matchesJson = data['data'] ?? [];
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final List matchesJson = data['data'] ?? [];
 
-        final matches = matchesJson.map((match) {
-          return Match.fromJson(match);
-        }).toList();
-        return matches;
-      }
-    } catch (e, stackTrace) {}
-    return [];
+      final matches = matchesJson.map((match) {
+        return Match.fromJson(match);
+      }).toList();
+      return matches;
+    } else {
+      throw Exception('Failed to load matches: ${response.statusCode}');
+    }
   }
 
   static Future<List<dynamic>> fetchGoals() async {
-    try {
-      final response = await http
-          .get(Uri.parse('https://st9.onrender.com/api/goals?populate=*'));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return data['data'] ?? [];
-      }
-      throw Exception('Failed to load goals');
-    } catch (e) {
-      // Handle potential network or parsing errors
-      // print('Error fetching goals: $e');
-      return []; // Return empty list on error
+    final response =
+        await http.get(Uri.parse('https://st9.onrender.com/api/goals?populate=*'));
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['data'] ?? [];
+    } else {
+      throw Exception('Failed to load goals: ${response.statusCode}');
     }
   }
 }

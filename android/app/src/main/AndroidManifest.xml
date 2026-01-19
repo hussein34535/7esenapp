@@ -7,7 +7,7 @@
     <application
         android:label="7eSen TV"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@mipmap/launcher_icon"
         android:usesCleartextTraffic="true"
         android:enableOnBackInvokedCallback="true">
         <activity

@@ -43,13 +43,14 @@ dependencies:
 
   
 dev_dependencies:
-# flutter_launcher_icons: ^0.14.3
-# flutter_launcher_icons:
-#   android: "launcher_icon"
-#   ios: true
-#   image_path: "assets/icon/icon.png"
-#   min_sdk_android: 24
-#   remove_alpha_ios: true # As suggested by the flutter_launcher_icons output
+  flutter_launcher_icons: "^0.14.3"
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/icon/icon.png"
+  min_sdk_android: 24
+  remove_alpha_ios: true # As suggested by the flutter_launcher_icons output
 
   flutter_test:
     sdk: flutter

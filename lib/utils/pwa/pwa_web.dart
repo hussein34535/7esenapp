@@ -1,6 +1,7 @@
 import 'dart:js' as js;
 import 'package:flutter/foundation.dart';
 
+// PWA Web Implementation
 bool isPwaStandalone() {
   if (!kIsWeb) return true;
 

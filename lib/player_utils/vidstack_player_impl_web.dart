@@ -37,13 +37,14 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
               --video-spinner-color: #ffffff;
             }
             
-            /* FORCE BOTTOM RIGHT PLACEMENT [ALL SCREENS] to avoid Top UI & Seek Bar */
-            media-controls-group[data-position="top right"] {
+            /* FORCE ALL TOP CONTROLS (Left/Right) TO BOTTOM RIGHT */
+            media-controls-group[data-position^="top"] {
               display: flex !important;
               position: absolute !important;
               top: auto !important;
               bottom: 80px !important; /* Safe distance above timeline */
               right: 20px !important;
+              left: auto !important;   /* Override 'left' from top-left groups */
               flex-direction: row-reverse !important;
               z-index: 99 !important;
               pointer-events: auto !important;

@@ -41,7 +41,12 @@ SharedPreferences? prefs;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: ".env");
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint(
+        "Warning: .env file not found. Using defaults/environment variables.");
+  }
 
   try {
     if (Firebase.apps.isEmpty) {

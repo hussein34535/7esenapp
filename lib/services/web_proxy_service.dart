@@ -18,7 +18,7 @@ class WebProxyService {
         // REQUIRES: Chrome with --disable-web-security
         return urlWithCacheBuster;
       } else {
-        // Production: Use our own Vercel proxy
+        // Production: Use our own Vercel proxy for EVERYTHING to avoid Mixed Content (HTTPS vs HTTP)
         return '/api/proxy?url=' + Uri.encodeComponent(urlWithCacheBuster);
       }
     }

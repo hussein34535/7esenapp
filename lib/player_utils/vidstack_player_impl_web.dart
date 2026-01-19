@@ -34,15 +34,17 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             media-spinner {
               --video-spinner-color: #ffffff;
             }
-            /* Move settings/menu to bottom right */
-            media-menu {
+            /* Move top-right controls (Volume, Settings) to Bottom Right */
+            media-controls-group[data-position="top right"] {
               top: auto !important;
-              bottom: 80px !important; /* Above the control bar */
+              bottom: 60px !important; /* Move down near the bottom bar */
               right: 10px !important;
+              flex-direction: row-reverse !important; /* Keep order logical */
             }
-            /* Ensure controls are at the bottom */
-            media-controls {
-              opacity: 1;
+            
+            /* Hide the default top gradient if it obscures things */
+            .vds-controls-spacer { 
+              display: none !important; 
             }
           """;
           element.append(style);

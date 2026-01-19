@@ -61,15 +61,19 @@ Future<void> main() async {
       rethrow;
     }
   }
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => ThemeProvider(),
+      child: const MyApp(),
+    ),
+  );
+
+  // Initialize notifications AFTER the app starts to prevent freezing on splash screen
   if (!kIsWeb) {
     final firebaseApi = FirebaseApi();
-    await firebaseApi.initNotification();
-  } else {
-    // Register custom web players (Vidstack)
-    registerVidstackPlayer();
+    // Don't await here to avoid blocking the main thread/UI
+    firebaseApi.initNotification();
   }
-  tz.initializeTimeZones();
-  prefs = await SharedPreferences.getInstance();
 
   if (!kIsWeb) {
     await UnityAds.init(
@@ -80,13 +84,6 @@ Future<void> main() async {
       onFailed: (error, message) {},
     );
   }
-
-  runApp(
-    ChangeNotifierProvider(
-      create: (context) => ThemeProvider(),
-      child: const MyApp(),
-    ),
-  );
 }
 
 // --- Top-level function for background processing ---

@@ -625,27 +625,26 @@ class MatchBox extends StatelessWidget {
   }
 
   Widget _buildTeamLogo(String logoUrl, {double size = 60}) {
-    return Container(
+    return SizedBox(
       width: size,
       height: size,
       child: logoUrl.isNotEmpty
           ? CachedNetworkImage(
               imageUrl: logoUrl,
               fit: BoxFit.contain,
+              placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
               errorWidget: (context, url, error) => Image.asset(
                 'assets/no-image.png',
                 width: size * 0.8,
                 height: size * 0.8,
-                color: Colors.grey,
+                color: Colors.grey[600],
               ),
-              placeholder: (context, url) =>
-                  Center(child: CircularProgressIndicator()),
             )
           : Image.asset(
               'assets/no-image.png',
               width: size * 0.8,
               height: size * 0.8,
-              color: Colors.grey,
+              color: Colors.grey[600],
             ),
     );
   }

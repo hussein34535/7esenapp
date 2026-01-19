@@ -1,0 +1,45 @@
+const { createProxyMiddleware } = require('http-proxy-middleware');
+
+module.exports = (req, res) => {
+    // Handling CORS for all requests
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS, POST, PUT, DELETE');
+    res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Authorization, Origin, Accept');
+
+    // Handle Preflight Request
+    if (req.method === 'OPTIONS') {
+        res.status(200).end();
+        return;
+    }
+
+    let target = req.query.url;
+
+    if (!target) {
+        return res.status(400).json({ error: 'Missing "url" query parameter' });
+    }
+
+    // Ensure target is a valid URL
+    if (!target.startsWith('http')) {
+        // If it's just a path, assume the original API base
+        target = `https://st9.onrender.com${target.startsWith('/') ? '' : '/'}${target}`;
+    }
+
+    // Create the proxy middleware
+    const proxy = createProxyMiddleware({
+        target: target,
+        changeOrigin: true,
+        pathRewrite: (path, req) => {
+            // We are proxying the 'url' param, so the target IS the url.
+            return '';
+        },
+        router: () => target, // Force router to use the calculated target
+        onProxyRes: (proxyRes, req, res) => {
+            // Add CORS headers to the response from the target as well
+            proxyRes.headers['Access-Control-Allow-Origin'] = '*';
+            proxyRes.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS, POST, PUT, DELETE';
+            proxyRes.headers['Access-Control-Allow-Headers'] = 'X-Requested-With, Content-Type, Authorization, Origin, Accept';
+        },
+    });
+
+    return proxy(req, res);
+};

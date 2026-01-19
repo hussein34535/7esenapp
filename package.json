@@ -1,0 +1,7 @@
+{
+    "name": "hesen-proxy",
+    "version": "1.0.0",
+    "dependencies": {
+        "http-proxy-middleware": "^2.0.6"
+    }
+}

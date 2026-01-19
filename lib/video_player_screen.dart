@@ -9,16 +9,18 @@ import 'package:flutter/foundation.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:android_pip/android_pip.dart';
 import 'package:hesen/okru_stream_extractor.dart';
+import 'dart:convert'; // Added for jsonDecode
 
 import 'player_utils/hesentv_handler.dart';
 import 'player_utils/okru_playlist_parser.dart';
 import 'player_utils/youtube_handler.dart';
+import 'player_utils/vidstack_player_widget.dart'; // Added for Vidstack Web Player
 
-const String _userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64-x64)';
+const String _userAgent = 'VLC/3.0.18 LibVLC/3.0.18';
 
 enum VideoSize {
   fitWidth, // Default, fits width and maintains aspect ratio
-  cover,    // Fills the entire screen, might crop video
+  cover, // Fills the entire screen, might crop video
   ratio16_9,
   ratio18_9,
   ratio4_3,
@@ -60,11 +62,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   bool _isCurrentStreamApi = false;
   bool _isCurrentlyInPip = false;
   late AndroidPIP _androidPIP;
+  int _autoRetryAttempt = 0;
 
   List<Map<String, dynamic>> _fetchedApiQualities = [];
   int _selectedApiQualityIndex = -1;
 
-  VideoSize _currentVideoSize = VideoSize.fitWidth; // **MODIFIED:** New default aspect ratio
+  VideoSize _currentVideoSize =
+      VideoSize.fitWidth; // **MODIFIED:** New default aspect ratio
 
   Timer? _hideControlsTimer;
   Timer? _bufferingRetryTimer; // ADDED: To handle buffering timeouts
@@ -102,19 +106,23 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       onPipExited: () {
         if (!mounted) return;
         setState(() => _isCurrentlyInPip = false);
-        if (_videoPlayerController != null && !_videoPlayerController!.value.isPlaying) {
+        if (_videoPlayerController != null &&
+            !_videoPlayerController!.value.isPlaying) {
           _videoPlayerController!.play();
         }
       },
       onPipAction: (action) {
         if (!mounted || _videoPlayerController == null) return;
         final actionStr = action.toString();
-        if (actionStr.contains('play')) _videoPlayerController!.play();
+        if (actionStr.contains('play'))
+          _videoPlayerController!.play();
         else if (actionStr.contains('pause')) _videoPlayerController!.pause();
       },
     );
-    _animationController = AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
-    _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_animationController);
+    _animationController = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 300));
+    _opacityAnimation =
+        Tween<double>(begin: 0.0, end: 1.0).animate(_animationController);
     _initializeScreen();
   }
 
@@ -138,7 +146,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     final controller = _videoPlayerController;
     if (controller == null || !controller.value.isInitialized) return;
 
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
       if (controller.value.isPlaying && !_isCurrentlyInPip) controller.pause();
     } else if (state == AppLifecycleState.resumed) {
       if (!controller.value.isPlaying) controller.play();
@@ -153,7 +162,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   @override
   void didUpdateWidget(covariant VideoPlayerScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.initialUrl != oldWidget.initialUrl || !listEquals(widget.streamLinks, oldWidget.streamLinks)) {
+    if (widget.initialUrl != oldWidget.initialUrl ||
+        !listEquals(widget.streamLinks, oldWidget.streamLinks)) {
       _cancelAllTimers();
       _releaseControllers().then((_) {
         if (mounted) {
@@ -168,7 +178,38 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     _validStreamLinks = widget.streamLinks.where((link) {
       final name = link['name']?.toString();
       final url = link['url']?.toString();
-      return name != null && name.isNotEmpty && url != null && url.isNotEmpty;
+
+      // Basic validation: must have a URL and a non-empty name
+      if (name == null ||
+          name.trim().isEmpty ||
+          url == null ||
+          url.isEmpty ||
+          name.trim().toLowerCase() == 'stream') {
+        return false;
+      }
+
+      // Advanced validation: check for empty JSON rich text names like [{"text":""}]
+      if (name.trim().startsWith('[') && name.trim().endsWith(']')) {
+        try {
+          final List<dynamic> nameParts = jsonDecode(name);
+          if (nameParts.isNotEmpty) {
+            bool allPartsEmpty = nameParts.every((part) {
+              if (part is Map && part.containsKey('text')) {
+                final text = part['text']?.toString();
+                return text == null || text.trim().isEmpty;
+              }
+              return false; // Invalid part structure, treat as empty
+            });
+            if (allPartsEmpty) {
+              return false; // It's an empty rich text, ignore it.
+            }
+          }
+        } catch (e) {
+          // Not valid JSON, so it's a regular name. Let it pass.
+        }
+      }
+
+      return true; // The link is valid
     }).toList();
 
     String? urlToPlay;
@@ -177,7 +218,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     if (_validStreamLinks.isEmpty) {
       if (widget.initialUrl.isNotEmpty) urlToPlay = widget.initialUrl;
     } else {
-      final indexInList = _findUrlIndexInList(widget.initialUrl, _validStreamLinks);
+      final indexInList =
+          _findUrlIndexInList(widget.initialUrl, _validStreamLinks);
       if (indexInList != -1) {
         _selectedStreamIndex = indexInList;
         urlToPlay = _validStreamLinks[_selectedStreamIndex]['url']?.toString();
@@ -188,25 +230,32 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     }
 
     if (urlToPlay == null || urlToPlay.isEmpty) {
-      if (mounted) setState(() { _isLoading = false; _hasError = true; });
+      if (mounted)
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+        });
       return;
     }
 
     _currentStreamUrl = urlToPlay;
-    _isCurrentStreamApi = _currentStreamUrl!.startsWith('https://7esentv-match.vercel.app') ||
+    _isCurrentStreamApi =
+        _currentStreamUrl!.startsWith('https://7esentv-match.vercel.app') ||
             _currentStreamUrl!.startsWith('https://okru-api.vercel.app/api') ||
-            _currentStreamUrl!.startsWith('https://ok.ru/video/') ||
+            _currentStreamUrl!.contains('ok.ru/video/') ||
+            _currentStreamUrl!.contains('ok.ru/live/') ||
             _currentStreamUrl!.contains('youtube.com') ||
             _currentStreamUrl!.contains('youtu.be') ||
-        (_currentStreamUrl!.contains('okcdn.ru') && _currentStreamUrl!.split('?')[0].endsWith('.m3u8'));
+            (_currentStreamUrl!.contains('okcdn.ru') &&
+                _currentStreamUrl!.split('?')[0].endsWith('.m3u8'));
 
     _fetchedApiQualities = [];
     _selectedApiQualityIndex = -1;
 
     if (mounted) {
       setState(() {});
-        _initializePlayerInternal(_currentStreamUrl!);
-      }
+      _initializePlayerInternal(_currentStreamUrl!);
+    }
   }
 
   int _findUrlIndexInList(String url, List<Map<String, dynamic>> list) {
@@ -214,61 +263,127 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     return list.indexWhere((item) => item['url'] == url);
   }
 
-  Future<void> _initializePlayerInternal(String sourceUrl, {String? specificQualityUrl, Duration? startAt}) async {
+  Future<void> _initializePlayerInternal(String sourceUrl,
+      {String? specificQualityUrl, Duration? startAt}) async {
     if (!mounted) return;
-    debugPrint('[HESEN PLAYER] Initializing player with sourceUrl: $sourceUrl and specificQualityUrl: $specificQualityUrl');
+    debugPrint(
+        '[HESEN PLAYER] Initializing player with sourceUrl: $sourceUrl and specificQualityUrl: $specificQualityUrl');
     await _releaseControllers();
     await Future.delayed(const Duration(milliseconds: 250));
     if (!mounted) return;
     if (!_isLoading) setState(() => _isLoading = true);
 
-      String? videoUrlToLoad;
+    String? videoUrlToLoad;
     final String urlToProcess = specificQualityUrl ?? sourceUrl;
-    Map<String, String> httpHeaders = {'User-Agent': _userAgent};
+    Map<String, String> httpHeaders = {
+      'User-Agent': _userAgent,
+    };
 
     try {
-      if (urlToProcess.contains('youtube.com') || urlToProcess.contains('youtu.be')) {
-        debugPrint('[HESEN PLAYER] URL identified as YouTube. Processing in background...');
+      if (urlToProcess.contains('youtube.com') ||
+          urlToProcess.contains('youtu.be')) {
+        debugPrint(
+            '[HESEN PLAYER] URL identified as YouTube. Processing in background...');
         final streamDetails = await compute(handleYoutubeStream, urlToProcess);
         videoUrlToLoad = streamDetails.videoUrlToLoad;
-        if (mounted) setState(() { _fetchedApiQualities = streamDetails.fetchedQualities; _selectedApiQualityIndex = streamDetails.selectedQualityIndex; });
-      } else if (urlToProcess.contains('ok.ru/video/')) {
-        final videoId = urlToProcess.split('/video/').last;
+        if (mounted)
+          setState(() {
+            _fetchedApiQualities = streamDetails.fetchedQualities;
+            _selectedApiQualityIndex = streamDetails.selectedQualityIndex;
+          });
+      } else if (urlToProcess.contains('ok.ru/')) {
+        String? videoId;
+        if (urlToProcess.contains('/video/')) {
+          videoId = urlToProcess.split('/video/').last.split('?').first;
+        } else if (urlToProcess.contains('/live/')) {
+          videoId = urlToProcess.split('/live/').last.split('?').first;
+        }
+
+        if (videoId != null && videoId.isNotEmpty) {
           final streamUrl = await getOkruStreamUrl(videoId);
           if (streamUrl != null && streamUrl.isNotEmpty) {
-          videoUrlToLoad = streamUrl;
-          if (videoUrlToLoad.toLowerCase().contains('.m3u8')) {
-            final qualities = await parseOkruQualities(videoUrlToLoad);
-            if (mounted && qualities.isNotEmpty) setState(() { _fetchedApiQualities = qualities; _selectedApiQualityIndex = 0; });
+            videoUrlToLoad = streamUrl;
+            if (videoUrlToLoad.toLowerCase().contains('.m3u8')) {
+              final qualities = await parseOkruQualities(videoUrlToLoad);
+              if (mounted && qualities.isNotEmpty)
+                setState(() {
+                  _fetchedApiQualities = qualities;
+                  _selectedApiQualityIndex = 0;
+                });
+            }
+          } else {
+            throw Exception('Could not extract a playable URL from ok.ru');
           }
         } else {
-          throw Exception('Could not extract a playable URL from ok.ru');
+          videoUrlToLoad =
+              urlToProcess; // Not a recognized ok.ru format, play raw
         }
-      } else if (urlToProcess.contains('okcdn.ru') && urlToProcess.toLowerCase().contains('.m3u8')) {
+      } else if (urlToProcess.contains('okcdn.ru') &&
+          urlToProcess.toLowerCase().contains('.m3u8')) {
         videoUrlToLoad = urlToProcess;
         final qualities = await parseOkruQualities(videoUrlToLoad);
-        if (mounted && qualities.isNotEmpty) setState(() { _fetchedApiQualities = qualities; _selectedApiQualityIndex = 0; });
+        if (mounted && qualities.isNotEmpty)
+          setState(() {
+            _fetchedApiQualities = qualities;
+            _selectedApiQualityIndex = 0;
+          });
       } else if (urlToProcess.startsWith('https://7esentv-match.vercel.app')) {
         final streamDetails = await handleHesenTvStream(urlToProcess);
         videoUrlToLoad = streamDetails.videoUrlToLoad;
-        if (mounted) setState(() { _fetchedApiQualities = streamDetails.fetchedQualities; _selectedApiQualityIndex = streamDetails.selectedQualityIndex; });
-    } else {
-        debugPrint('[HESEN PLAYER] URL did not match any handler. Playing raw URL.');
-        videoUrlToLoad = urlToProcess;
+        if (mounted)
+          setState(() {
+            _fetchedApiQualities = streamDetails.fetchedQualities;
+            _selectedApiQualityIndex = streamDetails.selectedQualityIndex;
+          });
+      } else {
+        debugPrint(
+            '[HESEN PLAYER] URL did not match any handler. Playing raw URL.');
+        String urlToPlay = urlToProcess;
+        if (kIsWeb) {
+          debugPrint(
+              '[HESEN PLAYER] M3U8 link detected. Using Vidstack for Web.');
+        } else {
+          debugPrint(
+              '[HESEN PLAYER] M3U8 link detected. Skipping manual redirect resolution to let ExoPlayer handle it.');
+        }
+
+        videoUrlToLoad = urlToPlay;
       }
 
-      if (videoUrlToLoad == null || videoUrlToLoad.isEmpty) throw Exception('videoUrlToLoad could not be determined.');
+      if (videoUrlToLoad == null || videoUrlToLoad.isEmpty)
+        throw Exception('videoUrlToLoad could not be determined.');
+
+      // WEB SPECIFIC HANDLING: Vidstack
+      if (kIsWeb) {
+        if (mounted) {
+          setState(() {
+            _currentStreamUrl = videoUrlToLoad; // Update with resolved URL
+            _isLoading = false;
+            _hasError = false;
+          });
+          _showControls(); // Ensure controls (back button etc) are shown
+        }
+        return; // Skip native player initialization
+      }
 
       VideoFormat? formatHint;
-      if (videoUrlToLoad.startsWith('data:application/dash+xml')) formatHint = VideoFormat.dash;
-      else if (videoUrlToLoad.toLowerCase().contains('.m3u8')) formatHint = VideoFormat.hls;
+      if (videoUrlToLoad.startsWith('data:application/dash+xml'))
+        formatHint = VideoFormat.dash;
+      else if (videoUrlToLoad.toLowerCase().contains('.m3u8'))
+        formatHint = VideoFormat.hls;
 
-      _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(videoUrlToLoad), httpHeaders: httpHeaders, formatHint: formatHint);
+      _videoPlayerController = VideoPlayerController.networkUrl(
+          Uri.parse(videoUrlToLoad),
+          httpHeaders: httpHeaders,
+          formatHint: formatHint);
       _videoPlayerController!.addListener(_videoPlayerListener);
       await _videoPlayerController!.initialize();
       await _videoPlayerController!.setLooping(false);
 
-      if (!mounted) { _videoPlayerController?.dispose(); return; }
+      if (!mounted) {
+        _videoPlayerController?.dispose();
+        return;
+      }
 
       final aspectRatio = _videoPlayerController!.value.aspectRatio;
       _chewieController = ChewieController(
@@ -276,24 +391,42 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         autoPlay: true,
         looping: false,
         startAt: startAt,
-        aspectRatio: (aspectRatio <= 0 || aspectRatio.isNaN) ? 16 / 9 : aspectRatio,
+        aspectRatio:
+            (aspectRatio <= 0 || aspectRatio.isNaN) ? 16 / 9 : aspectRatio,
         showControls: false,
-        errorBuilder: (context, errorMessage) => _buildErrorWidget(errorMessage),
+        errorBuilder: (context, errorMessage) =>
+            _buildErrorWidget(errorMessage),
       );
 
       if (mounted) {
-        setState(() { _isLoading = false; _hasError = false; });
+        setState(() {
+          _isLoading = false;
+          _hasError = false;
+        });
+        _autoRetryAttempt = 0; // Reset counter on successful initialization
         _showControls();
       }
     } catch (e) {
       debugPrint('[HESEN PLAYER] ERROR in _initializePlayerInternal: $e');
       if (mounted) {
-        // If we have more than one link, just keep trying the next one indefinitely.
-        if (_validStreamLinks.length > 1) {
-        _tryNextStream();
+        if (_autoRetryAttempt < 1) {
+          _autoRetryAttempt++;
+          debugPrint(
+              '[HESEN PLAYER] Retrying same stream (attempt ${_autoRetryAttempt + 1})');
+          await Future.delayed(const Duration(milliseconds: 1000));
+          if (mounted) {
+            _initializePlayerInternal(sourceUrl,
+                specificQualityUrl: specificQualityUrl, startAt: startAt);
+          }
         } else {
-          // If there's only one link and it failed, show the error.
-          setState(() { _hasError = true; _isLoading = false; });
+          if (_validStreamLinks.length > 1) {
+            _tryNextStream();
+          } else {
+            setState(() {
+              _hasError = true;
+              _isLoading = false;
+            });
+          }
         }
       }
     }
@@ -313,10 +446,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   }
 
   void _videoPlayerListener() {
-    if (!mounted || _videoPlayerController == null || !_videoPlayerController!.value.isInitialized) return;
+    if (!mounted ||
+        _videoPlayerController == null ||
+        !_videoPlayerController!.value.isInitialized) return;
     if (_videoPlayerController!.value.hasError) {
-        if (!_hasError) {
-        setState(() { _hasError = true; _isLoading = false; });
+      if (!_hasError) {
+        setState(() {
+          _hasError = true;
+          _isLoading = false;
+        });
         _tryNextStream(); // Try next stream if an error occurs mid-play
       }
       return;
@@ -329,7 +467,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     if (isBuffering && !value.isPlaying) {
       // If buffering starts, and we don't already have a timer, start one.
       if (_bufferingRetryTimer == null || !_bufferingRetryTimer!.isActive) {
-        _bufferingRetryTimer = Timer(const Duration(seconds: 15), _handleBufferingTimeout);
+        _bufferingRetryTimer =
+            Timer(const Duration(seconds: 15), _handleBufferingTimeout);
       }
     } else {
       // If buffering stops (or video is playing), cancel the timer.
@@ -343,15 +482,16 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
   void _handleBufferingTimeout() {
     if (!mounted || _currentStreamUrl == null) return;
-    
+
     // Check if the player is still buffering and not playing
-    final isStuck = _videoPlayerController?.value.isBuffering == true && 
-                    _videoPlayerController?.value.isPlaying == false;
+    final isStuck = _videoPlayerController?.value.isBuffering == true &&
+        _videoPlayerController?.value.isPlaying == false;
 
     if (isStuck) {
-      debugPrint('[HESEN PLAYER] Buffering timed out. Retrying the same stream.');
+      debugPrint(
+          '[HESEN PLAYER] Buffering timed out. Retrying the same stream.');
       _showError('البث ضعيف، جاري محاولة إعادة الاتصال...');
-      
+
       // Store the last known position
       _lastPosition = _videoPlayerController?.value.position;
 
@@ -362,28 +502,51 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
   Future<void> _tryNextStream() async {
     if (!mounted || _validStreamLinks.length <= 1) return;
+    _autoRetryAttempt = 0; // Reset for the new stream
     final int nextIndex = (_selectedStreamIndex + 1) % _validStreamLinks.length;
     // Shortened delay
     await Future.delayed(const Duration(milliseconds: 500));
     if (mounted) {
       // _showError('البث الحالي لا يعمل، جاري محاولة البث التالي...'); // MODIFIED: Removed the toast message
       await Future.delayed(const Duration(milliseconds: 500));
-      if (mounted) _changeStream(nextIndex);
+      if (mounted) _changeStream(nextIndex, isAutoRetry: true);
     }
   }
 
-  Future<void> _changeStream(int newStreamIndex) async {
-    if (!mounted || newStreamIndex == _selectedStreamIndex || newStreamIndex < 0 || newStreamIndex >= _validStreamLinks.length) return;
+  Future<void> _changeStream(int newStreamIndex,
+      {bool isAutoRetry = false}) async {
+    if (!mounted ||
+        newStreamIndex == _selectedStreamIndex ||
+        newStreamIndex < 0 ||
+        newStreamIndex >= _validStreamLinks.length) return;
     final Duration? startAt = _videoPlayerController?.value.position;
+    if (!isAutoRetry) {
+      _autoRetryAttempt = 0;
+    }
     _cancelAllTimers();
     final newStreamData = _validStreamLinks[newStreamIndex];
     final newStreamUrl = newStreamData['url']?.toString();
-    if (newStreamUrl == null || newStreamUrl.isEmpty) { _showError("Selected stream has no valid URL."); return; }
+    if (newStreamUrl == null || newStreamUrl.isEmpty) {
+      _showError("Selected stream has no valid URL.");
+      return;
+    }
     setState(() {
-      _isLoading = true; _hasError = false; _selectedStreamIndex = newStreamIndex; _currentStreamUrl = newStreamUrl;
+      _isLoading = true;
+      _hasError = false;
+      _selectedStreamIndex = newStreamIndex;
+      _currentStreamUrl = newStreamUrl;
       _playerKey = UniqueKey();
-      _isCurrentStreamApi = _currentStreamUrl!.startsWith('https://7esentv-match.vercel.app') || _currentStreamUrl!.startsWith('https://okru-api.vercel.app/api') || _currentStreamUrl!.startsWith('https://ok.ru/video/') || _currentStreamUrl!.contains('youtube.com') || _currentStreamUrl!.contains('youtu.be') || (_currentStreamUrl!.contains('okcdn.ru') && _currentStreamUrl!.split('?')[0].endsWith('.m3u8'));
-      _fetchedApiQualities = []; _selectedApiQualityIndex = -1;
+      _isCurrentStreamApi = _currentStreamUrl!
+              .startsWith('https://7esentv-match.vercel.app') ||
+          _currentStreamUrl!.startsWith('https://okru-api.vercel.app/api') ||
+          _currentStreamUrl!.contains('ok.ru/video/') ||
+          _currentStreamUrl!.contains('ok.ru/live/') ||
+          _currentStreamUrl!.contains('youtube.com') ||
+          _currentStreamUrl!.contains('youtu.be') ||
+          (_currentStreamUrl!.contains('okcdn.ru') &&
+              _currentStreamUrl!.split('?')[0].endsWith('.m3u8'));
+      _fetchedApiQualities = [];
+      _selectedApiQualityIndex = -1;
     });
     await Future.delayed(const Duration(milliseconds: 50));
     if (!mounted) return;
@@ -391,37 +554,55 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   }
 
   Future<void> _changeApiQuality(int newQualityIndex) async {
-    if (!mounted || !_isCurrentStreamApi || newQualityIndex == _selectedApiQualityIndex || newQualityIndex < 0 || newQualityIndex >= _fetchedApiQualities.length) return;
+    if (!mounted ||
+        !_isCurrentStreamApi ||
+        newQualityIndex == _selectedApiQualityIndex ||
+        newQualityIndex < 0 ||
+        newQualityIndex >= _fetchedApiQualities.length) return;
     final Duration? startAt = _videoPlayerController?.value.position;
     final newQualityData = _fetchedApiQualities[newQualityIndex];
     final specificQualityUrl = newQualityData['url']?.toString();
-    if (specificQualityUrl == null || specificQualityUrl.isEmpty) { _showError("Selected quality has no valid URL."); return; }
-    setState(() { _isLoading = true; _hasError = false; _selectedApiQualityIndex = newQualityIndex; _playerKey = UniqueKey(); });
+    if (specificQualityUrl == null || specificQualityUrl.isEmpty) {
+      _showError("Selected quality has no valid URL.");
+      return;
+    }
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+      _selectedApiQualityIndex = newQualityIndex;
+      _playerKey = UniqueKey();
+    });
     await Future.delayed(const Duration(milliseconds: 50));
     if (!mounted) return;
-    await _initializePlayerInternal(_currentStreamUrl!, specificQualityUrl: specificQualityUrl, startAt: startAt);
+    await _initializePlayerInternal(_currentStreamUrl!,
+        specificQualityUrl: specificQualityUrl, startAt: startAt);
   }
 
   void _startHideControlsTimer() {
     _hideControlsTimer?.cancel();
-    _hideControlsTimer = Timer(const Duration(seconds: 4), () => _hideControls(animate: true));
+    _hideControlsTimer =
+        Timer(const Duration(seconds: 4), () => _hideControls(animate: true));
   }
 
   void _hideControls({required bool animate}) {
     if (!mounted || !_isControlsVisible) return;
-    if (animate) _animationController.reverse();
-    else _animationController.value = 0.0;
+    if (animate)
+      _animationController.reverse();
+    else
+      _animationController.value = 0.0;
     _setControlsVisibility(false);
   }
 
   void _toggleControlsVisibility() {
-    if (_isControlsVisible) _hideControls(animate: true);
-    else _showControls();
+    if (_isControlsVisible)
+      _hideControls(animate: true);
+    else
+      _showControls();
   }
 
   void _showControls() {
     if (!mounted || _isControlsVisible) return;
-      _animationController.forward();
+    _animationController.forward();
     _setControlsVisibility(true);
     _startHideControlsTimer();
   }
@@ -434,8 +615,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   String _formatDuration(Duration? duration) {
     if (duration == null) return "00:00";
     String twoDigits(int n) => n.toString().padLeft(2, '0');
-    if (duration.inHours > 0) return "${twoDigits(duration.inHours)}:${twoDigits(duration.inMinutes.remainder(60))}:${twoDigits(duration.inSeconds.remainder(60))}";
-    else return "${twoDigits(duration.inMinutes.remainder(60))}:${twoDigits(duration.inSeconds.remainder(60))}";
+    if (duration.inHours > 0)
+      return "${twoDigits(duration.inHours)}:${twoDigits(duration.inMinutes.remainder(60))}:${twoDigits(duration.inSeconds.remainder(60))}";
+    else
+      return "${twoDigits(duration.inMinutes.remainder(60))}:${twoDigits(duration.inSeconds.remainder(60))}";
   }
 
   Widget _buildErrorWidget(String message) {
@@ -445,11 +628,22 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         children: [
           const Icon(Icons.error_outline, color: Colors.white70, size: 48),
           const SizedBox(height: 16),
-          Text(message, style: const TextStyle(color: Colors.white70), textAlign: TextAlign.center),
+          Text(message,
+              style: const TextStyle(color: Colors.white70),
+              textAlign: TextAlign.center),
           const SizedBox(height: 16),
           ElevatedButton(
-            onPressed: () { if (mounted && _currentStreamUrl != null) { setState(() { _hasError = false; _isLoading = true; }); _initializePlayerInternal(_currentStreamUrl!); } },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.white70, foregroundColor: Colors.black),
+            onPressed: () {
+              if (mounted && _currentStreamUrl != null) {
+                setState(() {
+                  _hasError = false;
+                  _isLoading = true;
+                });
+                _initializePlayerInternal(_currentStreamUrl!);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white70, foregroundColor: Colors.black),
             child: const Text("Retry"),
           ),
         ],
@@ -462,22 +656,39 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     if (_validStreamLinks.isEmpty) return const SizedBox.shrink();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), borderRadius: BorderRadius.circular(25)),
+      decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.6),
+          borderRadius: BorderRadius.circular(25)),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: _validStreamLinks.asMap().entries.map<Widget>((entry) {
-            final index = entry.key; final streamName = entry.value['name']!.toString(); final isActive = index == _selectedStreamIndex;
+            final index = entry.key;
+            final streamName = entry.value['name']!.toString();
+            final isActive = index == _selectedStreamIndex;
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6),
               child: InkWell(
                 onTap: isActive ? null : () => _changeStream(index),
                 borderRadius: BorderRadius.circular(20),
-                  child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                  decoration: BoxDecoration(color: isActive ? widget.progressBarColor : Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(20), border: isActive ? Border.all(color: Colors.white, width: 2) : null),
-                  child: Text(streamName, style: TextStyle(color: isActive ? Colors.white : Colors.white70, fontWeight: isActive ? FontWeight.bold : FontWeight.normal, fontSize: 14)),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                  decoration: BoxDecoration(
+                      color: isActive
+                          ? widget.progressBarColor
+                          : Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
+                      border: isActive
+                          ? Border.all(color: Colors.white, width: 2)
+                          : null),
+                  child: Text(streamName,
+                      style: TextStyle(
+                          color: isActive ? Colors.white : Colors.white70,
+                          fontWeight:
+                              isActive ? FontWeight.bold : FontWeight.normal,
+                          fontSize: 14)),
                 ),
               ),
             );
@@ -490,53 +701,94 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   void _showQualitySelectionDialog(BuildContext context) {
     if (!_isCurrentStreamApi || _fetchedApiQualities.isEmpty) return;
     showModalBottomSheet(
-      context: context, backgroundColor: Colors.transparent, isScrollControlled: true,
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (BuildContext context) {
         return BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-            decoration: BoxDecoration(color: Colors.black.withOpacity(0.4), borderRadius: const BorderRadius.only(topLeft: Radius.circular(20.0), topRight: Radius.circular(20.0))),
-        child: Column(
-              mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-                const Padding(padding: EdgeInsets.only(bottom: 16.0), child: Text('اختر الجودة', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold))),
+            decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.4),
+                borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(20.0),
+                    topRight: Radius.circular(20.0))),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Padding(
+                    padding: EdgeInsets.only(bottom: 16.0),
+                    child: Text('اختر الجودة',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold))),
                 Flexible(
                   child: ListView(
                     shrinkWrap: true,
                     children: _fetchedApiQualities.asMap().entries.map((entry) {
-                      final qualityKey = entry.key; final qualityName = entry.value['name']?.toString() ?? 'Unknown'; final bool isSelected = qualityKey == _selectedApiQualityIndex;
+                      final qualityKey = entry.key;
+                      final qualityName =
+                          entry.value['name']?.toString() ?? 'Unknown';
+                      final bool isSelected =
+                          qualityKey == _selectedApiQualityIndex;
                       return ListTile(
-                        title: Text(qualityName, style: TextStyle(color: isSelected ? widget.progressBarColor : Colors.white, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-                        trailing: isSelected ? Icon(Icons.check, color: widget.progressBarColor) : null,
-                        onTap: () { Navigator.of(context).pop(); if (!isSelected) _changeApiQuality(qualityKey); },
+                        title: Text(qualityName,
+                            style: TextStyle(
+                                color: isSelected
+                                    ? widget.progressBarColor
+                                    : Colors.white,
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal)),
+                        trailing: isSelected
+                            ? Icon(Icons.check, color: widget.progressBarColor)
+                            : null,
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          if (!isSelected) _changeApiQuality(qualityKey);
+                        },
                       );
                     }).toList(),
                   ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
-    );
+          ),
+        );
       },
     );
   }
 
   void _showError(String message) {
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), duration: const Duration(seconds: 5)));
+    if (mounted)
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(message), duration: const Duration(seconds: 5)));
   }
 
   void _handleDoubleTap(TapDownDetails details) {
-    if (!mounted || (_videoPlayerController?.value.duration ?? Duration.zero) <= Duration.zero) return;
+    if (!mounted ||
+        (_videoPlayerController?.value.duration ?? Duration.zero) <=
+            Duration.zero) return;
     final screenWidth = MediaQuery.of(context).size.width;
     final tapPosition = details.localPosition.dx;
     final currentPosition = _videoPlayerController!.value.position;
     final totalDuration = _videoPlayerController!.value.duration;
     const seekDuration = Duration(seconds: 10);
     Duration newPosition;
-    if (tapPosition < screenWidth / 3) newPosition = (currentPosition - seekDuration).clamp(Duration.zero, totalDuration);
-    else if (tapPosition > screenWidth * 2 / 3) newPosition = (currentPosition + seekDuration).clamp(Duration.zero, totalDuration);
-    else { _toggleControlsVisibility(); return; }
+    if (tapPosition < screenWidth / 3)
+      newPosition =
+          (currentPosition - seekDuration).clamp(Duration.zero, totalDuration);
+    else if (tapPosition > screenWidth * 2 / 3)
+      newPosition =
+          (currentPosition + seekDuration).clamp(Duration.zero, totalDuration);
+    else {
+      _toggleControlsVisibility();
+      return;
+    }
     _chewieController?.seekTo(newPosition);
     _cancelAllTimers(); // MODIFIED: Cancel timers on interaction
     _showControls();
@@ -546,12 +798,28 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     _hideControlsTimer?.cancel();
     _bufferingRetryTimer?.cancel(); // MODIFIED: Cancel buffering timer
   }
-  
+
   // =======================================================================
   // ==================== UI / BUILD METHODS - MAJOR CHANGES ================
   // =======================================================================
 
   Widget _buildControls(BuildContext context) {
+    if (kIsWeb) {
+      // On Web, allow Vidstack to handle controls. Only show Stream Selector if available.
+      if (_validStreamLinks.isNotEmpty) {
+        // We wrap in IgnorePointer(ignoring: false) because the parent might be ignoring if controls are "hidden"
+        // But logic says _isControlsVisible dictates ignoring.
+        // For web, let's just show it always or handle visibility?
+        // Vidstack controls auto-hide.
+        return Positioned(
+            top: 10,
+            left: 0,
+            right: 0,
+            child: Center(child: _buildStreamSelector()));
+      }
+      return const SizedBox.shrink();
+    }
+
     // MODIFIED: This entire widget is now controlled by FadeTransition and IgnorePointer.
     // The logic to hide it during loading has been removed from here and is handled in the main build method stack.
     return FadeTransition(
@@ -559,32 +827,37 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       child: IgnorePointer(
         ignoring: !_isControlsVisible,
         child: Stack(
-              children: [
+          children: [
             // Top Stream Selector
             // MODIFIED: Show if there is at least one valid link.
+
             if (_validStreamLinks.isNotEmpty)
-                Positioned(
-                  top: MediaQuery.of(context).padding.top + 10,
-                  left: 0,
-                  right: 0,
-                  child: Center(child: _buildStreamSelector()),
-                ),
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 10,
+                left: 0,
+                right: 0,
+                child: Center(child: _buildStreamSelector()),
+              ),
 
             // Center play/pause button
-                Center(
+            Center(
               child: (_isLoading && !_hasError)
-                  ? const SizedBox.shrink() // Loading indicator is now at the root stack
-                  : (_videoPlayerController == null || !_videoPlayerController!.value.isInitialized
+                  ? const SizedBox
+                      .shrink() // Loading indicator is now at the root stack
+                  : (_videoPlayerController == null ||
+                          !_videoPlayerController!.value.isInitialized
                       ? const SizedBox.shrink()
                       : ValueListenableBuilder<VideoPlayerValue>(
                           valueListenable: _videoPlayerController!,
                           builder: (context, value, child) {
                             return GestureDetector(
                               onTap: () {
-                                if (value.isPlaying) _videoPlayerController!.pause();
-                                else _videoPlayerController!.play();
-                            _cancelAllTimers(); // MODIFIED: Cancel timers on interaction
-                            _startHideControlsTimer();
+                                if (value.isPlaying)
+                                  _videoPlayerController!.pause();
+                                else
+                                  _videoPlayerController!.play();
+                                _cancelAllTimers(); // MODIFIED: Cancel timers on interaction
+                                _startHideControlsTimer();
                               },
                               child: Container(
                                 padding: const EdgeInsets.all(12),
@@ -593,7 +866,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                                   shape: BoxShape.circle,
                                 ),
                                 child: Icon(
-                                  value.isPlaying ? Icons.pause : Icons.play_arrow,
+                                  value.isPlaying
+                                      ? Icons.pause
+                                      : Icons.play_arrow,
                                   color: Colors.white,
                                   size: 48,
                                 ),
@@ -604,15 +879,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
             ),
 
             // Bottom controls bar
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: _buildBottomControls(context),
-                ),
-              ],
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: _buildBottomControls(context),
             ),
-          ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -624,19 +899,28 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       builder: (context, child) {
         final isInitialized = controller?.value.isInitialized ?? false;
 
-        final position = isInitialized ? controller!.value.position : Duration.zero;
-        final duration = isInitialized ? controller!.value.duration : Duration.zero;
+        final position =
+            isInitialized ? controller!.value.position : Duration.zero;
+        final duration =
+            isInitialized ? controller!.value.duration : Duration.zero;
 
         // --- Buttons ---
         Widget qualityButton = const SizedBox.shrink();
         if (_isCurrentStreamApi && _fetchedApiQualities.length > 1) {
           String name = 'Auto';
-          if (_selectedApiQualityIndex >= 0 && _selectedApiQualityIndex < _fetchedApiQualities.length) {
-            name = _fetchedApiQualities[_selectedApiQualityIndex]['name']?.toString() ?? 'Auto';
+          if (_selectedApiQualityIndex >= 0 &&
+              _selectedApiQualityIndex < _fetchedApiQualities.length) {
+            name = _fetchedApiQualities[_selectedApiQualityIndex]['name']
+                    ?.toString() ??
+                'Auto';
           }
           qualityButton = TextButton(
-            onPressed: () { _showQualitySelectionDialog(context); _startHideControlsTimer(); },
-            child: Text(name, style: const TextStyle(color: Colors.white, fontSize: 14)),
+            onPressed: () {
+              _showQualitySelectionDialog(context);
+              _startHideControlsTimer();
+            },
+            child: Text(name,
+                style: const TextStyle(color: Colors.white, fontSize: 14)),
           );
         }
 
@@ -644,70 +928,109 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         if (defaultTargetPlatform == TargetPlatform.android) {
           pipButton = IconButton(
             icon: const Icon(Icons.picture_in_picture_alt, color: Colors.white),
-            onPressed: !isInitialized ? null : () async {
+            onPressed: !isInitialized
+                ? null
+                : () async {
                     if (!mounted) return;
                     try {
-                final asp = controller!.value.aspectRatio;
-                int n = 16, d = 9;
-                if (asp > 0 && asp.isFinite) { n = (asp * 100).round(); d = 100; }
-                await _androidPIP.enterPipMode(aspectRatio: [n, d]);
-              } catch (e) { if (mounted) _showError("Error: $e"); }
+                      final asp = controller!.value.aspectRatio;
+                      int n = 16, d = 9;
+                      if (asp > 0 && asp.isFinite) {
+                        n = (asp * 100).round();
+                        d = 100;
+                      }
+                      await _androidPIP.enterPipMode(aspectRatio: [n, d]);
+                    } catch (e) {
+                      if (mounted) _showError("Error: $e");
+                    }
                   },
           );
         }
 
         // --- Progress Bar Items ---
         final bool isLive = isInitialized && duration.inMilliseconds == 0;
-        final double durationMs = (isInitialized && !isLive && duration.inMilliseconds > 0) ? duration.inMilliseconds.toDouble() : 1.0;
-        final double positionMs = (isInitialized && !isLive) ? position.inMilliseconds.clamp(0.0, durationMs).toDouble() : 0.0;
+        final double durationMs =
+            (isInitialized && !isLive && duration.inMilliseconds > 0)
+                ? duration.inMilliseconds.toDouble()
+                : 1.0;
+        final double positionMs = (isInitialized && !isLive)
+            ? position.inMilliseconds.clamp(0.0, durationMs).toDouble()
+            : 0.0;
         double bufferedMs = 0.0;
         if (isInitialized && !isLive && controller!.value.buffered.isNotEmpty) {
-          bufferedMs = controller.value.buffered.last.end.inMilliseconds.clamp(0.0, durationMs).toDouble();
+          bufferedMs = controller.value.buffered.last.end.inMilliseconds
+              .clamp(0.0, durationMs)
+              .toDouble();
         }
 
         return Container(
           decoration: const BoxDecoration(
-            gradient: LinearGradient(colors: [Colors.transparent, Colors.black87], begin: Alignment.topCenter, end: Alignment.bottomCenter),
+            gradient: LinearGradient(
+                colors: [Colors.transparent, Colors.black87],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter),
           ),
-          padding: EdgeInsets.fromLTRB(16, 10, 16, MediaQuery.of(context).padding.bottom + 10),
-                child: Row(
-                  children: [
+          padding: EdgeInsets.fromLTRB(
+              16, 10, 16, MediaQuery.of(context).padding.bottom + 10),
+          child: Row(
+            children: [
               if (isLive) ...[
-                const Text('● LIVE', style: TextStyle(color: Colors.red, fontSize: 14, fontWeight: FontWeight.bold)),
+                const Text('● LIVE',
+                    style: TextStyle(
+                        color: Colors.red,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold)),
                 const Spacer(),
               ] else ...[
-                Text(_formatDuration(position), style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                  const SizedBox(width: 8),
-                      Expanded(
-                    child: SliderTheme(
-                      data: SliderTheme.of(context).copyWith(
-                      trackHeight: 2.0, thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
-                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 14.0),
-                      activeTrackColor: widget.progressBarColor, inactiveTrackColor: Colors.white30,
-                      thumbColor: Colors.white, overlayColor: widget.progressBarColor.withOpacity(0.3),
-                      ),
-                      child: Slider(
+                Text(_formatDuration(position),
+                    style:
+                        const TextStyle(color: Colors.white70, fontSize: 12)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 2.0,
+                      thumbShape:
+                          const RoundSliderThumbShape(enabledThumbRadius: 6.0),
+                      overlayShape:
+                          const RoundSliderOverlayShape(overlayRadius: 14.0),
+                      activeTrackColor: widget.progressBarColor,
+                      inactiveTrackColor: Colors.white30,
+                      thumbColor: Colors.white,
+                      overlayColor: widget.progressBarColor.withOpacity(0.3),
+                    ),
+                    child: Slider(
                       value: positionMs,
-                        min: 0.0,
+                      min: 0.0,
                       max: durationMs,
                       secondaryTrackValue: bufferedMs,
-                      onChanged: !isInitialized ? null : (value) => _chewieController?.seekTo(Duration(milliseconds: value.round())),
-                      onChangeStart: !isInitialized ? null : (_) => _cancelAllTimers(),
-                      onChangeEnd: !isInitialized ? null : (_) => _startHideControlsTimer(),
-                      ),
+                      onChanged: !isInitialized
+                          ? null
+                          : (value) => _chewieController
+                              ?.seekTo(Duration(milliseconds: value.round())),
+                      onChangeStart:
+                          !isInitialized ? null : (_) => _cancelAllTimers(),
+                      onChangeEnd: !isInitialized
+                          ? null
+                          : (_) => _startHideControlsTimer(),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                Text(_formatDuration(duration), style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                ],
-                  qualityButton,
-                  pipButton,
+                ),
+                const SizedBox(width: 8),
+                Text(_formatDuration(duration),
+                    style:
+                        const TextStyle(color: Colors.white70, fontSize: 12)),
+              ],
+              qualityButton,
+              pipButton,
               IconButton(
                 icon: const Icon(Icons.aspect_ratio, color: Colors.white),
                 onPressed: () {
                   if (!mounted) return;
                   setState(() {
-                    _currentVideoSize = VideoSize.values[(_currentVideoSize.index + 1) % VideoSize.values.length];
+                    _currentVideoSize = VideoSize.values[
+                        (_currentVideoSize.index + 1) %
+                            VideoSize.values.length];
                   });
                   _startHideControlsTimer();
                 },
@@ -720,6 +1043,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   }
 
   Widget _buildVideoPlayer() {
+    if (kIsWeb) {
+      if (_currentStreamUrl != null) {
+        return Center(
+          child: AspectRatio(
+            aspectRatio: 16 / 9,
+            child: VidstackPlayerWidget(url: _currentStreamUrl!),
+          ),
+        );
+      }
+      return Container(color: Colors.black);
+    }
+
     final chewie = _chewieController;
     if (chewie == null || !chewie.videoPlayerController.value.isInitialized) {
       return Container(color: Colors.black);
@@ -737,7 +1072,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       ),
     );
   }
-  
+
   double _getAspectRatioForSize(VideoSize size, double videoAspectRatio) {
     if (videoAspectRatio <= 0) return 16 / 9; // Fallback
     switch (size) {
@@ -772,9 +1107,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
             // Their actual visibility is handled internally by _isControlsVisible and the FadeTransition.
             _buildControls(context),
             if (_isLoading && !_hasError)
-              CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(widget.progressBarColor)),
-            if (_hasError)
-              _buildErrorWidget("حدث خطأ أثناء تشغيل الفيديو."),
+              CircularProgressIndicator(
+                  valueColor:
+                      AlwaysStoppedAnimation<Color>(widget.progressBarColor)),
+            if (_hasError) _buildErrorWidget("حدث خطأ أثناء تشغيل الفيديو."),
           ],
         ),
       ),

@@ -27,6 +27,10 @@ import 'package:hesen/theme_customization_screen.dart';
 import 'dart:io';
 import 'package:hesen/telegram_dialog.dart';
 import 'package:hesen/notification_page.dart';
+import 'package:hesen/services/promo_code_service.dart';
+import 'package:hesen/services/ad_service.dart';
+import 'package:hesen/utils/crypto_utils.dart';
+import 'package:hesen/player_utils/web_player_registry.dart'; // Added for web player registration
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -37,32 +41,36 @@ SharedPreferences? prefs;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-    await dotenv.load(fileName: './.env');
+  await dotenv.load(fileName: ".env");
 
-    try {
-      if (Firebase.apps.isEmpty) {
-        await Firebase.initializeApp(
-          options: DefaultFirebaseOptions.currentPlatform,
-        );
-      }
-    } on FirebaseException catch (e) {
+  try {
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    }
+  } on FirebaseException catch (e) {
     if (e.code == 'duplicate-app') {
       // Firebase app already initialized, safe to ignore
     } else {
-        rethrow;
-      }
+      rethrow;
     }
-    if (!kIsWeb) {
-      final firebaseApi = FirebaseApi();
-      await firebaseApi.initNotification();
-    }
-    tz.initializeTimeZones();
-    prefs = await SharedPreferences.getInstance();
+  }
+  if (!kIsWeb) {
+    final firebaseApi = FirebaseApi();
+    await firebaseApi.initNotification();
+  } else {
+    // Register custom web players (Vidstack)
+    registerVidstackPlayer();
+  }
+  tz.initializeTimeZones();
+  prefs = await SharedPreferences.getInstance();
 
-    if (!kIsWeb) {
-      await UnityAds.init(
-        gameId: '5840220',
-        testMode: false,
+  if (!kIsWeb) {
+    await UnityAds.init(
+      gameId: dotenv.env['UNITY_GAME_ID'] ??
+          '', // MODIFIED: Read plain Unity Game ID
+      testMode: false,
       onComplete: () {},
       onFailed: (error, message) {},
     );
@@ -72,9 +80,9 @@ Future<void> main() async {
     ChangeNotifierProvider(
       create: (context) => ThemeProvider(),
       child: const MyApp(),
-        ),
-      );
-    }
+    ),
+  );
+}
 
 // --- Top-level function for background processing ---
 Future<Map<String, dynamic>> _processFetchedData(List<dynamic> results) async {
@@ -232,9 +240,7 @@ Future<List<Map<String, dynamic>>> _processRefreshedChannelsData(
           final dateB = DateTime.parse(b['createdAt'].toString());
           return dateA.compareTo(dateB);
         } catch (e) {
-          return a['createdAt']
-              .toString()
-              .compareTo(b['createdAt'].toString());
+          return a['createdAt'].toString().compareTo(b['createdAt'].toString());
         }
       });
       newCategory['channels'] = sortedChannelsList;
@@ -306,96 +312,95 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-        final themeProvider = Provider.of<ThemeProvider>(context);
+    final themeProvider = Provider.of<ThemeProvider>(context);
 
-        return MaterialApp(
-          title: 'Hesen TV',
-          debugShowCheckedModeBanner: false,
-          themeMode: themeProvider.themeMode,
-          theme: ThemeData(
-            brightness: Brightness.light,
-            primaryColor: themeProvider.getPrimaryColor(false),
-            scaffoldBackgroundColor: themeProvider.getScaffoldBackgroundColor(
-              false,
-            ),
-            cardColor: themeProvider.getCardColor(false),
-            colorScheme: ColorScheme.light(
-              primary: themeProvider.getPrimaryColor(false),
-              secondary: themeProvider.getSecondaryColor(false),
-              surface: Colors.white,
-              background: themeProvider.getScaffoldBackgroundColor(false),
-              error: Colors.red,
-              onPrimary: Colors.white,
-              onSecondary: Colors.white,
-              onSurface: Colors.black,
-              onBackground: Colors.black,
-              onError: Colors.white,
-              brightness: Brightness.light,
-            ),
-            appBarTheme: AppBarTheme(
-              backgroundColor: themeProvider.getAppBarBackgroundColor(false),
-              foregroundColor: Colors.white,
-              iconTheme: const IconThemeData(color: Colors.white),
-              titleTextStyle: const TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            textTheme: const TextTheme(
-              bodyLarge: TextStyle(color: Colors.black),
-              bodyMedium: TextStyle(color: Colors.black),
-              bodySmall: TextStyle(color: Colors.black),
-            ),
+    return MaterialApp(
+      title: 'Hesen TV',
+      debugShowCheckedModeBanner: false,
+      themeMode: themeProvider.themeMode,
+      theme: ThemeData(
+        brightness: Brightness.light,
+        primaryColor: themeProvider.getPrimaryColor(false),
+        scaffoldBackgroundColor: themeProvider.getScaffoldBackgroundColor(
+          false,
+        ),
+        cardColor: themeProvider.getCardColor(false),
+        colorScheme: ColorScheme.light(
+          primary: themeProvider.getPrimaryColor(false),
+          secondary: themeProvider.getSecondaryColor(false),
+          surface: Colors.white,
+          background: themeProvider.getScaffoldBackgroundColor(false),
+          error: Colors.red,
+          onPrimary: Colors.white,
+          onSecondary: Colors.white,
+          onSurface: Colors.black,
+          onBackground: Colors.black,
+          onError: Colors.white,
+          brightness: Brightness.light,
+        ),
+        appBarTheme: AppBarTheme(
+          backgroundColor: themeProvider.getAppBarBackgroundColor(false),
+          foregroundColor: Colors.white,
+          iconTheme: const IconThemeData(color: Colors.white),
+          titleTextStyle: const TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
           ),
-          darkTheme: ThemeData(
-            brightness: Brightness.dark,
-            primaryColor: themeProvider.getPrimaryColor(true),
-            scaffoldBackgroundColor:
-                themeProvider.getScaffoldBackgroundColor(true),
-            cardColor: themeProvider.getCardColor(true),
-            colorScheme: ColorScheme.dark(
-              primary: themeProvider.getPrimaryColor(true),
-              secondary: themeProvider.getSecondaryColor(true),
-              surface: const Color(0xFF1C1C1C),
-              background: themeProvider.getScaffoldBackgroundColor(true),
-              error: Colors.red,
-              onPrimary: Colors.white,
-              onSecondary: Colors.white,
-              onSurface: Colors.white,
-              onBackground: Colors.white,
-              onError: Colors.white,
-              brightness: Brightness.dark,
-            ),
-            appBarTheme: AppBarTheme(
-              backgroundColor: themeProvider.getAppBarBackgroundColor(true),
-              foregroundColor: Colors.white,
-              iconTheme: const IconThemeData(color: Colors.white),
-              titleTextStyle: const TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            textTheme: const TextTheme(
-              bodyLarge: TextStyle(color: Colors.white),
-              bodyMedium: TextStyle(color: Colors.white),
-              bodySmall: TextStyle(color: Colors.white),
-            ),
+        ),
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(color: Colors.black),
+          bodyMedium: TextStyle(color: Colors.black),
+          bodySmall: TextStyle(color: Colors.black),
+        ),
+      ),
+      darkTheme: ThemeData(
+        brightness: Brightness.dark,
+        primaryColor: themeProvider.getPrimaryColor(true),
+        scaffoldBackgroundColor: themeProvider.getScaffoldBackgroundColor(true),
+        cardColor: themeProvider.getCardColor(true),
+        colorScheme: ColorScheme.dark(
+          primary: themeProvider.getPrimaryColor(true),
+          secondary: themeProvider.getSecondaryColor(true),
+          surface: const Color(0xFF1C1C1C),
+          background: themeProvider.getScaffoldBackgroundColor(true),
+          error: Colors.red,
+          onPrimary: Colors.white,
+          onSecondary: Colors.white,
+          onSurface: Colors.white,
+          onBackground: Colors.white,
+          onError: Colors.white,
+          brightness: Brightness.dark,
+        ),
+        appBarTheme: AppBarTheme(
+          backgroundColor: themeProvider.getAppBarBackgroundColor(true),
+          foregroundColor: Colors.white,
+          iconTheme: const IconThemeData(color: Colors.white),
+          titleTextStyle: const TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
           ),
-          initialRoute: '/home',
-          routes: {
-            '/home': (context) => HomePage(
-                  key: const ValueKey('home'),
-                  onThemeChanged: (isDarkMode) {
-                    themeProvider.setThemeMode(
-                      isDarkMode ? ThemeMode.dark : ThemeMode.light,
-                    );
-                  },
-                ),
-            '/Notification_screen': (context) => const NotificationPage(),
-          },
-          navigatorKey: navigatorKey,
+        ),
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(color: Colors.white),
+          bodyMedium: TextStyle(color: Colors.white),
+          bodySmall: TextStyle(color: Colors.white),
+        ),
+      ),
+      initialRoute: '/home',
+      routes: {
+        '/home': (context) => HomePage(
+              key: const ValueKey('home'),
+              onThemeChanged: (isDarkMode) {
+                themeProvider.setThemeMode(
+                  isDarkMode ? ThemeMode.dark : ThemeMode.light,
+                );
+              },
+            ),
+        '/Notification_screen': (context) => const NotificationPage(),
+      },
+      navigatorKey: navigatorKey,
     );
   }
 }
@@ -447,6 +452,105 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<Map<String, dynamic>> _getAdStatus() async {
+    final expiryDate = await AdService.getAdFreeExpiry();
+    final hasUsedCode = await AdService.hasEverUsedPromoCode();
+    return {'expiry': expiryDate, 'hasUsed': hasUsedCode};
+  }
+
+  Future<void> _showPromoCodeDialog() async {
+    final promoController = TextEditingController();
+    bool isProcessing = false;
+
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('إدخال كود مانع الإعلانات',
+                  textAlign: TextAlign.center),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: promoController,
+                      autofocus: true,
+                      decoration: const InputDecoration(
+                        hintText: 'PROMO-CODE',
+                        border: OutlineInputBorder(),
+                      ),
+                      enabled: !isProcessing,
+                    ),
+                    if (isProcessing)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 16.0),
+                        child: CircularProgressIndicator(),
+                      ),
+                  ],
+                ),
+              ),
+              actions: <Widget>[
+                TextButton(
+                  child: const Text('إلغاء'),
+                  onPressed:
+                      isProcessing ? null : () => Navigator.of(context).pop(),
+                ),
+                TextButton(
+                  child: const Text('تفعيل'),
+                  onPressed: isProcessing
+                      ? null
+                      : () async {
+                          if (promoController.text.isEmpty) return;
+
+                          setDialogState(() {
+                            isProcessing = true;
+                          });
+
+                          String result;
+                          try {
+                            final promoService = PromoCodeService();
+                            result = await promoService
+                                .redeemCode(promoController.text);
+                          } catch (e) {
+                            result =
+                                'Error: فشلت العملية. الرجاء التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.';
+                            debugPrint('Error redeeming code: $e');
+                          }
+
+                          if (!mounted) return;
+
+                          Navigator.of(context).pop(); // Close the promo dialog
+
+                          // Show result in a new dialog
+                          showDialog(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: Text(result.startsWith('Success')
+                                  ? 'نجاح'
+                                  : 'خطأ'),
+                              content: Text(result
+                                  .replaceAll('Success: ', '')
+                                  .replaceAll('Error: ', '')),
+                              actions: [
+                                TextButton(
+                                  child: const Text('حسناً'),
+                                  onPressed: () => Navigator.of(context).pop(),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _initNotifications() async {
@@ -525,8 +629,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     setState(() {
                       _userName = nameController.text;
                     });
-                    _sendDeviceInfoToServer(
-                        name: _userName!, token: _fcmToken);
+                    _sendDeviceInfoToServer(name: _userName!, token: _fcmToken);
                     Navigator.of(context).pop();
                   }
                 }
@@ -741,8 +844,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   int compareVersions(String version1, String version2) {
     List<String> v1Parts = version1.split('.');
     List<String> v2Parts = version2.split('.');
-    int len =
-        v1Parts.length > v2Parts.length ? v1Parts.length : v2Parts.length;
+    int len = v1Parts.length > v2Parts.length ? v1Parts.length : v2Parts.length;
     for (int i = 0; i < len; i++) {
       int v1 = i < v1Parts.length ? int.tryParse(v1Parts[i]) ?? 0 : 0;
       int v2 = i < v2Parts.length ? int.tryParse(v2Parts[i]) ?? 0 : 0;
@@ -763,7 +865,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         final data = json.decode(response.body);
         final latestVersion = data['version'];
         final updateUrl = data['update_url'];
-        const currentVersion = '3.0.0';
+        const currentVersion = '4.0.0';
 
         if (latestVersion != null &&
             updateUrl != null &&
@@ -915,6 +1017,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     List<Map<String, dynamic>> streamLinks,
     String sourceSection,
   ) async {
+    // WEB SPECIFIC: Skip all ad logic on web
+    if (kIsWeb) {
+      _navigateToVideoPlayer(context, initialUrl, streamLinks);
+      return;
+    }
+
+    // Check if the user has an active ad-free session
+    final bool adFree = await AdService.isAdFree();
+    if (adFree) {
+      print("Ad-free period is active. Skipping ad.");
+      _navigateToVideoPlayer(context, initialUrl, streamLinks);
+      return;
+    }
+
     if (_isAdShowing) {
       print("Ad is already in progress. Ignoring new request.");
       return;
@@ -926,7 +1042,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       final url = link['url']?.toString();
 
       // Basic validation: must have a URL and a non-empty name
-      if (name == null || name.trim().isEmpty || url == null || url.isEmpty || name.trim().toLowerCase() == 'stream') {
+      if (name == null ||
+          name.trim().isEmpty ||
+          url == null ||
+          url.isEmpty ||
+          name.trim().toLowerCase() == 'stream') {
         return false;
       }
 
@@ -950,7 +1070,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           // Not valid JSON, so it's a regular name. Let it pass.
         }
       }
-      
+
       return true; // The link is valid
     }).toList();
 
@@ -1045,69 +1165,75 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     });
 
     try {
-      UnityAds.load(
-        placementId: placementId,
-        onComplete: (loadedPlacementId) async {
-          if (adLoadFinished) return;
-          adLoadFinished = true;
-          loadTimer?.cancel();
+      if (!kIsWeb) {
+        UnityAds.load(
+          placementId: placementId,
+          onComplete: (loadedPlacementId) async {
+            if (adLoadFinished) return;
+            adLoadFinished = true;
+            loadTimer?.cancel();
 
-          if (navigationDone) {
-            showAdOverlay(loadedPlacementId);
-          } else {
-            BuildContext effectiveContext = capturedNavigatorContext ?? context;
-            if (Navigator.canPop(effectiveContext)) {
-              Navigator.pop(effectiveContext);
-            }
+            if (navigationDone) {
+              showAdOverlay(loadedPlacementId);
+            } else {
+              BuildContext effectiveContext =
+                  capturedNavigatorContext ?? context;
+              if (Navigator.canPop(effectiveContext)) {
+                Navigator.pop(effectiveContext);
+              }
 
-            DateTime? adStartTime;
+              DateTime? adStartTime;
 
-            await UnityAds.showVideoAd(
-              placementId: loadedPlacementId,
-              onComplete: (completedPlacementId) {
-                _resetAdLock();
-                dismissAndNavigate();
-              },
-              onFailed: (failedPlacementId, error, message) {
-                _resetAdLock();
-                dismissAndNavigate();
-              },
-              onStart: (startPlacementId) {
-                adStartTime = DateTime.now();
-              },
-              onClick: (clickPlacementId) => {},
-              onSkipped: (skippedPlacementId) {
-                _resetAdLock();
-                print("Pre-Nav Ad $skippedPlacementId Skipped.");
-
-                final adWatchDuration = adStartTime != null
-                    ? DateTime.now().difference(adStartTime!)
-                    : Duration.zero;
-
-                if (adWatchDuration.inSeconds < 6) {
-                  print(
-                      "Skipped early (likely back press). Cancelling navigation.");
-                  cancelAdAndDismiss();
-                } else {
-                  print("Skipped after threshold. Navigating to player.");
+              await UnityAds.showVideoAd(
+                placementId: loadedPlacementId,
+                onComplete: (completedPlacementId) {
+                  _resetAdLock();
                   dismissAndNavigate();
-                }
-              },
-            );
-          }
-        },
-        onFailed: (failedPlacementId, error, message) {
-          if (adLoadFinished) return;
-          adLoadFinished = true;
-          loadTimer?.cancel();
+                },
+                onFailed: (failedPlacementId, error, message) {
+                  _resetAdLock();
+                  dismissAndNavigate();
+                },
+                onStart: (startPlacementId) {
+                  adStartTime = DateTime.now();
+                },
+                onClick: (clickPlacementId) => {},
+                onSkipped: (skippedPlacementId) {
+                  _resetAdLock();
+                  print("Pre-Nav Ad $skippedPlacementId Skipped.");
 
-          _resetAdLock();
+                  final adWatchDuration = adStartTime != null
+                      ? DateTime.now().difference(adStartTime!)
+                      : Duration.zero;
 
-          if (!navigationDone) {
-            dismissAndNavigate();
-          }
-        },
-      );
+                  if (adWatchDuration.inSeconds < 6) {
+                    print(
+                        "Skipped early (likely back press). Cancelling navigation.");
+                    cancelAdAndDismiss();
+                  } else {
+                    print("Skipped after threshold. Navigating to player.");
+                    dismissAndNavigate();
+                  }
+                },
+              );
+            }
+          },
+          onFailed: (failedPlacementId, error, message) {
+            if (adLoadFinished) return;
+            adLoadFinished = true;
+            loadTimer?.cancel();
+
+            _resetAdLock();
+
+            if (!navigationDone) {
+              dismissAndNavigate();
+            }
+          },
+        );
+      } else {
+        // Fallback for web if somehow reached here
+        _navigateToVideoPlayer(context, initialUrl, streamLinks);
+      }
     } catch (e) {
       loadTimer?.cancel();
       _resetAdLock();
@@ -1245,7 +1371,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       switch (index) {
         case 0:
           try {
-          final fetchedChannels = await ApiService.fetchChannelCategories();
+            final fetchedChannels = await ApiService.fetchChannelCategories();
             final processedChannels =
                 await compute(_processRefreshedChannelsData, fetchedChannels);
 
@@ -1322,11 +1448,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             }
           } catch (e) {
             debugPrint('Error refreshing matches: $e');
-          if (mounted) {
-            setState(() {
+            if (mounted) {
+              setState(() {
                 _matchesHasError = true;
                 matches = [];
-            });
+              });
             }
           }
           break;
@@ -1376,11 +1502,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
                           if (_userName != null)
-                          ListTile(
-                            leading: Icon(
+                            ListTile(
+                              leading: Icon(
                                 Icons.person,
-                              color: Theme.of(context).colorScheme.secondary,
-                            ),
+                                color: Theme.of(context).colorScheme.secondary,
+                              ),
                               title: Text(
                                 _userName!,
                                 style: TextStyle(
@@ -1400,6 +1526,85 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 _showEditNameDialog();
                               },
                             ),
+                          FutureBuilder<Map<String, dynamic>>(
+                            future: _getAdStatus(),
+                            builder: (context, snapshot) {
+                              Widget? subtitle;
+                              IconData leadingIcon = Icons.shield_outlined;
+                              Color iconColor =
+                                  Theme.of(context).colorScheme.secondary;
+                              bool hasEverUsed = false;
+
+                              if (snapshot.connectionState ==
+                                      ConnectionState.done &&
+                                  snapshot.hasData) {
+                                final DateTime? expiryDate =
+                                    snapshot.data?['expiry'];
+                                hasEverUsed =
+                                    snapshot.data?['hasUsed'] ?? false;
+
+                                if (expiryDate != null &&
+                                    expiryDate.isAfter(DateTime.now())) {
+                                  // State: Active
+                                  final remainingDays = expiryDate
+                                      .difference(DateTime.now())
+                                      .inDays;
+                                  leadingIcon = Icons.check_circle;
+                                  iconColor = Colors.green;
+                                  subtitle = Row(
+                                    children: [
+                                      Container(
+                                        width: 8,
+                                        height: 8,
+                                        decoration: const BoxDecoration(
+                                            color: Colors.green,
+                                            shape: BoxShape.circle),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'متبقي: ${remainingDays + 1} يوم',
+                                        style: TextStyle(
+                                            color: Theme.of(context)
+                                                .textTheme
+                                                .bodySmall
+                                                ?.color
+                                                ?.withOpacity(0.8),
+                                            fontSize: 12),
+                                      ),
+                                    ],
+                                  );
+                                } else if (hasEverUsed) {
+                                  // State: Expired but used before
+                                  leadingIcon = Icons.check_circle_outline;
+                                  iconColor = Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.color ??
+                                      Colors.grey;
+                                }
+                                // State: Never used -> defaults are already set
+                              }
+
+                              return ListTile(
+                                leading: Icon(leadingIcon, color: iconColor),
+                                title: Text(
+                                  'كود مانع الإعلانات',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(context)
+                                        .textTheme
+                                        .bodyLarge!
+                                        .color,
+                                  ),
+                                ),
+                                subtitle: subtitle,
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _showPromoCodeDialog();
+                                },
+                              );
+                            },
+                          ),
                           ListTile(
                             leading: Icon(Icons.color_lens,
                                 color: Theme.of(context).colorScheme.secondary),
@@ -1565,24 +1770,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                           ).createShader(Rect.fromLTWH(
                                               0.0, 0.0, 200.0, 70.0)))
                                         : null,
-                                    color: _isDarkMode
-                                        ? null
-                                        : Color(0xFFF8F8F8),
+                                    color:
+                                        _isDarkMode ? null : Color(0xFFF8F8F8),
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                               ],
                             ),
                           )
-                        : const Text(
-              '7eSen TV',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 22,
-                color: Colors.white,
-              ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                        : const SizedBox.shrink(),
                   ),
                 ),
               ],

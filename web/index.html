@@ -1,4 +1,7 @@
-<!DOCTYPE html><html><head>
+<!DOCTYPE html>
+<html>
+
+<head>
   <base href="$FLUTTER_BASE_HREF">
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
@@ -29,7 +32,8 @@
       left: 0;
       right: 0;
       bottom: 0;
-      background: linear-gradient(to bottom right, #673ab7, #4a148c); /* Modern gradient */
+      background: linear-gradient(to bottom right, #673ab7, #4a148c);
+      /* Modern gradient */
       z-index: 9999;
       flex-direction: column;
       align-items: center;
@@ -37,38 +41,55 @@
       color: white;
       text-align: center;
       padding: 20px;
-      font-family: 'Roboto', sans-serif; /* Add a modern font */
+      font-family: 'Roboto', sans-serif;
+      /* Add a modern font */
     }
+
     .install-button {
       background: white;
-      color: #4a148c; /* Darker purple for button text */
+      color: #4a148c;
+      /* Darker purple for button text */
       border: none;
       padding: 15px 30px;
-      border-radius: 8px; /* Slightly more rounded corners */
+      border-radius: 8px;
+      /* Slightly more rounded corners */
       font-size: 18px;
       margin: 20px;
       cursor: pointer;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow */
-      transition: all 0.3s ease; /* Smooth transition for hover */
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      /* Subtle shadow */
+      transition: all 0.3s ease;
+      /* Smooth transition for hover */
     }
+
     .install-button:hover {
-      transform: translateY(-2px); /* Lift button on hover */
+      transform: translateY(-2px);
+      /* Lift button on hover */
       box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
     }
+
     .logo {
-      width: 120px; /* Slightly smaller logo */
+      width: 120px;
+      /* Slightly smaller logo */
       height: 120px;
-      margin-bottom: 25px; /* More space below logo */
-      border-radius: 20%; /* Slightly rounded corners for logo */
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Stronger shadow for logo */
+      margin-bottom: 25px;
+      /* More space below logo */
+      border-radius: 20%;
+      /* Slightly rounded corners for logo */
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      /* Stronger shadow for logo */
     }
-    h2.pwa-message { /* New class for the message */
+
+    h2.pwa-message {
+      /* New class for the message */
       font-size: 24px;
       margin-bottom: 15px;
       color: #ffffff;
       font-weight: 500;
     }
-    p.pwa-submessage { /* New class for the sub-message */
+
+    p.pwa-submessage {
+      /* New class for the sub-message */
       font-size: 16px;
       margin-bottom: 30px;
       color: #e0e0e0;
@@ -79,7 +100,12 @@
   <script src="flutter.js" defer=""></script>
   <link href="https://vjs.zencdn.net/7.20.3/video-js.css" rel="stylesheet">
   <script src="https://vjs.zencdn.net/7.20.3/video.min.js"></script>
-  
+
+  <!-- Vidstack Player -->
+  <link rel="stylesheet" href="https://cdn.vidstack.io/player/theme.css" />
+  <link rel="stylesheet" href="https://cdn.vidstack.io/player/video.css" />
+  <script src="https://cdn.vidstack.io/player" type="module"></script>
+
   <meta name="mobile-web-app-capable" content="yes">
   <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport">
   <style id="splash-screen-style">
@@ -91,7 +117,7 @@
       margin: 0;
       min-height: 100%;
       background-color: #000000;
-          background-size: 100% 100%;
+      background-size: 100% 100%;
     }
 
     .center {
@@ -104,19 +130,22 @@
     }
 
     .contain {
-      display:block;
-      width:100%; height:100%;
+      display: block;
+      width: 100%;
+      height: 100%;
       object-fit: contain;
     }
 
     .stretch {
-      display:block;
-      width:100%; height:100%;
+      display: block;
+      width: 100%;
+      height: 100%;
     }
 
     .cover {
-      display:block;
-      width:100%; height:100%;
+      display: block;
+      width: 100%;
+      height: 100%;
       object-fit: cover;
     }
 
@@ -148,13 +177,18 @@
     }
   </script>
 </head>
+
 <body>
   <picture id="splash">
-      <source srcset="splash/img/light-1x.png 1x, splash/img/light-2x.png 2x, splash/img/light-3x.png 3x, splash/img/light-4x.png 4x" media="(prefers-color-scheme: light)">
-      <source srcset="splash/img/dark-1x.png 1x, splash/img/dark-2x.png 2x, splash/img/dark-3x.png 3x, splash/img/dark-4x.png 4x" media="(prefers-color-scheme: dark)">
-      <img class="center" aria-hidden="true" src="splash/img/light-1x.png" alt="">
+    <source
+      srcset="splash/img/light-1x.png 1x, splash/img/light-2x.png 2x, splash/img/light-3x.png 3x, splash/img/light-4x.png 4x"
+      media="(prefers-color-scheme: light)">
+    <source
+      srcset="splash/img/dark-1x.png 1x, splash/img/dark-2x.png 2x, splash/img/dark-3x.png 3x, splash/img/dark-4x.png 4x"
+      media="(prefers-color-scheme: dark)">
+    <img class="center" aria-hidden="true" src="splash/img/light-1x.png" alt="">
   </picture>
-  
+
   <div id="pwa-install-prompt">
     <img src="icons/Icon-192.png" alt="App Logo" class="logo">
     <h2 class="pwa-message">تثبيت التطبيق على جهازك</h2>
@@ -165,13 +199,13 @@
   <div id="app-content">
     <!-- Flutter app content will be here -->
     <script>
-      window.addEventListener('load', function(ev) {
+      window.addEventListener('load', function (ev) {
         _flutter.loader.loadEntrypoint({
           serviceWorker: {
             serviceWorkerVersion: serviceWorkerVersion,
           },
-          onEntrypointLoaded: function(engineInitializer) {
-            engineInitializer.initializeEngine().then(function(appRunner) {
+          onEntrypointLoaded: function (engineInitializer) {
+            engineInitializer.initializeEngine().then(function (appRunner) {
               appRunner.runApp();
             });
           }
@@ -181,4 +215,6 @@
   </div>
 
 
-</body></html>
+</body>
+
+</html>

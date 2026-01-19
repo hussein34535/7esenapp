@@ -3,13 +3,14 @@ description: "A new Flutter project."
 
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 4.0.0+1
 environment:
   sdk: '>=3.3.3 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
+  encrypt: ^5.0.3
   flutter_local_notifications: ^19.3.0
   firebase_messaging: ^16.0.0
   firebase_analytics: ^12.0.0
@@ -21,7 +22,7 @@ dependencies:
   permission_handler: ^12.0.0+1
   url_launcher: ^6.2.5
   font_awesome_flutter: ^10.9.1
-  cached_network_image: ^3.2.3
+  cached_network_image: ^3.3.1
   wakelock_plus: ^1.2.8
   curved_navigation_bar: ^1.0.6
   day_night_switch: ^1.0.4
@@ -38,9 +39,6 @@ dependencies:
   flutter_inappwebview: ^6.0.0 # Added for improved WebView functionality
   html_unescape: ^2.0.0 # Added for HTML entity decoding
   youtube_explode_dart: ^2.5.2
-  media_kit: ^1.1.10
-  media_kit_video: ^1.2.4
-  media_kit_libs_video: ^1.0.4
 
 
   

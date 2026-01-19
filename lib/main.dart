@@ -511,6 +511,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _dataFuture = _initData();
     _initNotifications();
     checkForUpdate().then((_) => _checkAndAskForName());
+
+    // FAILSAFE: Ensure splash is removed once Home initializes
+    if (kIsWeb) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        removeWebSplash();
+      });
+    }
   }
 
   @override

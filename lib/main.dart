@@ -41,58 +41,85 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 
 SharedPreferences? prefs;
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await dotenv.load(fileName: ".env");
-  } catch (e) {
-    debugPrint(
-        "Warning: .env file not found. Using defaults/environment variables.");
-  }
+// ... imports ...
 
-  try {
-    if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
+Future<void> main() async {
+  runZonedGuarded<Future<void>>(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    FlutterError.onError = (FlutterErrorDetails details) {
+      FlutterError.presentError(details);
+      _displayError(details.exception, details.stack);
+    };
+
+    try {
+      await dotenv.load(fileName: ".env");
+    } catch (e) {
+      debugPrint("Warning: .env file not found.");
+    }
+
+    try {
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
+      }
+    } on FirebaseException catch (e) {
+      // Ignore duplicate app
+    } catch (e) {
+      _displayError("Firebase Init Error: $e", null);
+      return;
+    }
+
+    runApp(
+      ChangeNotifierProvider(
+        create: (context) => ThemeProvider(),
+        child: const MyApp(),
+      ),
+    );
+
+    if (!kIsWeb) {
+      final firebaseApi = FirebaseApi();
+      firebaseApi.initNotification();
+      await UnityAds.init(
+        gameId: dotenv.env['UNITY_GAME_ID'] ?? '',
+        testMode: false,
+        onComplete: () {},
+        onFailed: (error, message) {},
       );
-    }
-  } on FirebaseException catch (e) {
-    if (e.code == 'duplicate-app') {
-      // Firebase app already initialized, safe to ignore
     } else {
-      rethrow;
+      registerVidstackPlayer();
+      // FORCE REMOVE WEB SPLASH SCREEN
+      removeWebSplash();
     }
+  }, (error, stack) {
+    debugPrint("CAUGHT ERROR: $error");
+    _displayError(error, stack);
+  });
+}
+
+// Fallback error UI
+void _displayError(dynamic error, StackTrace? stack) {
+  if (kIsWeb) {
+    // Attempt to log to console explicitly for web
+    print("CRITICAL WRAPPER ERROR: $error\n$stack");
   }
   runApp(
-    ChangeNotifierProvider(
-      create: (context) => ThemeProvider(),
-      child: const MyApp(),
+    MaterialApp(
+      home: Scaffold(
+        backgroundColor: Colors.red,
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Center(
+            child: Text(
+              "CRITICAL ERROR:\n$error\n\nSTACK:\n$stack",
+              style: const TextStyle(color: Colors.white, fontSize: 16),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      ),
     ),
   );
-
-  // Initialize notifications AFTER the app starts to prevent freezing on splash screen
-  if (!kIsWeb) {
-    final firebaseApi = FirebaseApi();
-    // Don't await here to avoid blocking the main thread/UI
-    firebaseApi.initNotification();
-  } else {
-    // Register custom web players (Vidstack)
-    registerVidstackPlayer();
-  }
-
-  if (!kIsWeb) {
-    await UnityAds.init(
-      gameId: dotenv.env['UNITY_GAME_ID'] ?? '',
-      testMode: false,
-      onComplete: () {},
-      onFailed: (error, message) {},
-    );
-  }
-
-  // FORCE REMOVE WEB SPLASH SCREEN
-  if (kIsWeb) {
-    removeWebSplash();
-  }
 }
 
 // --- Top-level function for background processing ---

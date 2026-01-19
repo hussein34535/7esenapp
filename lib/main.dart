@@ -9,6 +9,7 @@ import 'dart:convert';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:permission_handler/permission_handler.dart';
+// Removed unused imports
 import 'package:hesen/services/api_service.dart';
 import 'package:hesen/models/match_model.dart';
 import 'package:uuid/uuid.dart';
@@ -20,7 +21,6 @@ import 'dart:async';
 import 'package:hesen/privacy_policy_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:timezone/data/latest.dart' as tz;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:unity_ads_plugin/unity_ads_plugin.dart';
 import 'package:flutter/foundation.dart';
@@ -31,7 +31,6 @@ import 'package:hesen/telegram_dialog.dart';
 import 'package:hesen/notification_page.dart';
 import 'package:hesen/services/promo_code_service.dart';
 import 'package:hesen/services/ad_service.dart';
-import 'package:hesen/utils/crypto_utils.dart';
 import 'package:hesen/player_utils/web_player_registry.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -1545,412 +1544,389 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final appBarHeight = AppBar().preferredSize.height;
 
     return Scaffold(
-      backgroundColor: Colors.black, // Outer background for PC/Web
-      body: Center(
-        child: Container(
-          constraints:
-              const BoxConstraints(maxWidth: 500), // Simulate Mobile Width
-          child: Scaffold(
-            appBar: PreferredSize(
-              preferredSize: Size.fromHeight(appBarHeight),
-              child: AnimatedContainer(
-                duration: Duration(milliseconds: 300),
-                decoration: BoxDecoration(
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      spreadRadius: 1,
-                      blurRadius: 3,
-                      offset: Offset(0, 1),
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(appBarHeight),
+        child: AnimatedContainer(
+          duration: Duration(milliseconds: 300),
+          decoration: BoxDecoration(
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                spreadRadius: 1,
+                blurRadius: 3,
+                offset: Offset(0, 1),
+              ),
+            ],
+            color: Theme.of(context).appBarTheme.backgroundColor,
+          ),
+          child: AppBar(
+            elevation: 0,
+            leading: IconButton(
+              icon: Icon(Icons.menu_rounded, color: Colors.white, size: 28),
+              onPressed: () {
+                showModalBottomSheet(
+                  context: context,
+                  backgroundColor: Theme.of(context).cardColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(16),
                     ),
-                  ],
-                  color: Theme.of(context).appBarTheme.backgroundColor,
-                ),
-                child: AppBar(
-                  elevation: 0,
-                  leading: IconButton(
-                    icon:
-                        Icon(Icons.menu_rounded, color: Colors.white, size: 28),
-                    onPressed: () {
-                      showModalBottomSheet(
-                        context: context,
-                        backgroundColor: Theme.of(context).cardColor,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.vertical(
-                            top: Radius.circular(16),
-                          ),
-                        ),
-                        builder: (BuildContext context) {
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 16.0),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: <Widget>[
-                                if (_userName != null)
-                                  ListTile(
-                                    leading: Icon(
-                                      Icons.person,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .secondary,
-                                    ),
-                                    title: Text(
-                                      _userName!,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: Theme.of(
-                                          context,
-                                        ).textTheme.bodyLarge!.color,
+                  ),
+                  builder: (BuildContext context) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          if (_userName != null)
+                            ListTile(
+                              leading: Icon(
+                                Icons.person,
+                                color: Theme.of(context).colorScheme.secondary,
+                              ),
+                              title: Text(
+                                _userName!,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Theme.of(
+                                    context,
+                                  ).textTheme.bodyLarge!.color,
+                                ),
+                              ),
+                              trailing: Icon(Icons.edit,
+                                  color: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.color),
+                              onTap: () {
+                                Navigator.pop(context);
+                                _showEditNameDialog();
+                              },
+                            ),
+                          FutureBuilder<Map<String, dynamic>>(
+                            future: _getAdStatus(),
+                            builder: (context, snapshot) {
+                              Widget? subtitle;
+                              IconData leadingIcon = Icons.shield_outlined;
+                              Color iconColor =
+                                  Theme.of(context).colorScheme.secondary;
+                              bool hasEverUsed = false;
+
+                              if (snapshot.connectionState ==
+                                      ConnectionState.done &&
+                                  snapshot.hasData) {
+                                final DateTime? expiryDate =
+                                    snapshot.data?['expiry'];
+                                hasEverUsed =
+                                    snapshot.data?['hasUsed'] ?? false;
+
+                                if (expiryDate != null &&
+                                    expiryDate.isAfter(DateTime.now())) {
+                                  // State: Active
+                                  final remainingDays = expiryDate
+                                      .difference(DateTime.now())
+                                      .inDays;
+                                  leadingIcon = Icons.check_circle;
+                                  iconColor = Colors.green;
+                                  subtitle = Row(
+                                    children: [
+                                      Container(
+                                        width: 8,
+                                        height: 8,
+                                        decoration: const BoxDecoration(
+                                            color: Colors.green,
+                                            shape: BoxShape.circle),
                                       ),
-                                    ),
-                                    trailing: Icon(Icons.edit,
-                                        color: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall
-                                            ?.color),
-                                    onTap: () {
-                                      Navigator.pop(context);
-                                      _showEditNameDialog();
-                                    },
-                                  ),
-                                FutureBuilder<Map<String, dynamic>>(
-                                  future: _getAdStatus(),
-                                  builder: (context, snapshot) {
-                                    Widget? subtitle;
-                                    IconData leadingIcon =
-                                        Icons.shield_outlined;
-                                    Color iconColor =
-                                        Theme.of(context).colorScheme.secondary;
-                                    bool hasEverUsed = false;
-
-                                    if (snapshot.connectionState ==
-                                            ConnectionState.done &&
-                                        snapshot.hasData) {
-                                      final DateTime? expiryDate =
-                                          snapshot.data?['expiry'];
-                                      hasEverUsed =
-                                          snapshot.data?['hasUsed'] ?? false;
-
-                                      if (expiryDate != null &&
-                                          expiryDate.isAfter(DateTime.now())) {
-                                        // State: Active
-                                        final remainingDays = expiryDate
-                                            .difference(DateTime.now())
-                                            .inDays;
-                                        leadingIcon = Icons.check_circle;
-                                        iconColor = Colors.green;
-                                        subtitle = Row(
-                                          children: [
-                                            Container(
-                                              width: 8,
-                                              height: 8,
-                                              decoration: const BoxDecoration(
-                                                  color: Colors.green,
-                                                  shape: BoxShape.circle),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Text(
-                                              'متبقي: ${remainingDays + 1} يوم',
-                                              style: TextStyle(
-                                                  color: Theme.of(context)
-                                                      .textTheme
-                                                      .bodySmall
-                                                      ?.color
-                                                      ?.withOpacity(0.8),
-                                                  fontSize: 12),
-                                            ),
-                                          ],
-                                        );
-                                      } else if (hasEverUsed) {
-                                        // State: Expired but used before
-                                        leadingIcon =
-                                            Icons.check_circle_outline;
-                                        iconColor = Theme.of(context)
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'متبقي: ${remainingDays + 1} يوم',
+                                        style: TextStyle(
+                                            color: Theme.of(context)
                                                 .textTheme
                                                 .bodySmall
-                                                ?.color ??
-                                            Colors.grey;
-                                      }
-                                      // State: Never used -> defaults are already set
-                                    }
-
-                                    return ListTile(
-                                      leading:
-                                          Icon(leadingIcon, color: iconColor),
-                                      title: Text(
-                                        'كود مانع الإعلانات',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: Theme.of(context)
-                                              .textTheme
-                                              .bodyLarge!
-                                              .color,
-                                        ),
-                                      ),
-                                      subtitle: subtitle,
-                                      onTap: () {
-                                        Navigator.pop(context);
-                                        _showPromoCodeDialog();
-                                      },
-                                    );
-                                  },
-                                ),
-                                ListTile(
-                                  leading: Icon(Icons.color_lens,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .secondary),
-                                  title: Text(
-                                    'تخصيص الألوان',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Theme.of(
-                                        context,
-                                      ).textTheme.bodyLarge!.color,
-                                    ),
-                                  ),
-                                  onTap: () {
-                                    Navigator.pop(context);
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const ThemeCustomizationScreen(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                ListTile(
-                                  leading: Icon(
-                                    FontAwesomeIcons.telegram,
-                                    color:
-                                        Theme.of(context).colorScheme.secondary,
-                                  ),
-                                  title: Text(
-                                    'Telegram',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Theme.of(
-                                        context,
-                                      ).textTheme.bodyLarge!.color,
-                                    ),
-                                  ),
-                                  onTap: () async {
-                                    Navigator.pop(context);
-                                    final Uri telegramUri = Uri.parse(
-                                      'https://t.me/tv_7esen',
-                                    );
-                                    try {
-                                      if (await canLaunchUrl(telegramUri)) {
-                                        await launchUrl(
-                                          telegramUri,
-                                          mode: LaunchMode.externalApplication,
-                                        );
-                                      } else {
-                                        if (mounted) {
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                'لا يمكن فتح رابط التحديث.',
-                                              ),
-                                            ),
-                                          );
-                                        }
-                                      }
-                                    } catch (e) {
-                                      if (mounted) {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'حدث خطأ عند فتح الرابط.',
-                                            ),
-                                          ),
-                                        );
-                                      }
-                                    }
-                                  },
-                                ),
-                                ListTile(
-                                  leading: Icon(
-                                    Icons.search,
-                                    color:
-                                        Theme.of(context).colorScheme.secondary,
-                                  ),
-                                  title: Text(
-                                    'البحث',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Theme.of(
-                                        context,
-                                      ).textTheme.bodyLarge!.color,
-                                    ),
-                                  ),
-                                  onTap: () {
-                                    Navigator.pop(context);
-                                    setState(() {
-                                      _isSearchBarVisible = true;
-                                    });
-                                  },
-                                ),
-                                ListTile(
-                                  leading: Icon(
-                                    Icons.privacy_tip_rounded,
-                                    color:
-                                        Theme.of(context).colorScheme.secondary,
-                                  ),
-                                  title: Text(
-                                    'سياسة الخصوصية',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Theme.of(
-                                        context,
-                                      ).textTheme.bodyLarge!.color,
-                                    ),
-                                  ),
-                                  onTap: () {
-                                    Navigator.pop(context);
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            PrivacyPolicyPage(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
-                  title: Row(
-                    children: [
-                      Expanded(
-                        child: Directionality(
-                          textDirection: TextDirection.rtl,
-                          child: _userName != null
-                              ? RichText(
-                                  textAlign: Directionality.of(context) ==
-                                          TextDirection.rtl
-                                      ? TextAlign.right
-                                      : TextAlign.left,
-                                  text: TextSpan(
-                                    style: const TextStyle(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                    children: [
-                                      const TextSpan(text: 'أهلاً بك '),
-                                      TextSpan(
-                                        text: _userName,
-                                        style: TextStyle(
-                                          fontSize: 22,
-                                          fontWeight: FontWeight.bold,
-                                          foreground: _isDarkMode
-                                              ? (Paint()
-                                                ..shader = LinearGradient(
-                                                  colors: <Color>[
-                                                    Colors.blue.shade800,
-                                                    Colors.deepPurple.shade700,
-                                                    Colors.blue.shade500,
-                                                  ],
-                                                  // --- >> START OF FIX << ---
-                                                  begin: Alignment.centerLeft,
-                                                  end: Alignment.centerRight,
-                                                  // --- >> END OF FIX << ---
-                                                ).createShader(Rect.fromLTWH(
-                                                    0.0, 0.0, 200.0, 70.0)))
-                                              : null,
-                                          color: _isDarkMode
-                                              ? null
-                                              : Color(0xFFF8F8F8),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
+                                                ?.color
+                                                ?.withOpacity(0.8),
+                                            fontSize: 12),
                                       ),
                                     ],
+                                  );
+                                } else if (hasEverUsed) {
+                                  // State: Expired but used before
+                                  leadingIcon = Icons.check_circle_outline;
+                                  iconColor = Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.color ??
+                                      Colors.grey;
+                                }
+                                // State: Never used -> defaults are already set
+                              }
+
+                              return ListTile(
+                                leading: Icon(leadingIcon, color: iconColor),
+                                title: Text(
+                                  'كود مانع الإعلانات',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(context)
+                                        .textTheme
+                                        .bodyLarge!
+                                        .color,
                                   ),
-                                )
-                              : const SizedBox.shrink(),
-                        ),
+                                ),
+                                subtitle: subtitle,
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _showPromoCodeDialog();
+                                },
+                              );
+                            },
+                          ),
+                          ListTile(
+                            leading: Icon(Icons.color_lens,
+                                color: Theme.of(context).colorScheme.secondary),
+                            title: Text(
+                              'تخصيص الألوان',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(
+                                  context,
+                                ).textTheme.bodyLarge!.color,
+                              ),
+                            ),
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const ThemeCustomizationScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                          ListTile(
+                            leading: Icon(
+                              FontAwesomeIcons.telegram,
+                              color: Theme.of(context).colorScheme.secondary,
+                            ),
+                            title: Text(
+                              'Telegram',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(
+                                  context,
+                                ).textTheme.bodyLarge!.color,
+                              ),
+                            ),
+                            onTap: () async {
+                              Navigator.pop(context);
+                              final Uri telegramUri = Uri.parse(
+                                'https://t.me/tv_7esen',
+                              );
+                              try {
+                                if (await canLaunchUrl(telegramUri)) {
+                                  await launchUrl(
+                                    telegramUri,
+                                    mode: LaunchMode.externalApplication,
+                                  );
+                                } else {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(
+                                      context,
+                                    ).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'لا يمكن فتح رابط التحديث.',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                }
+                              } catch (e) {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'حدث خطأ عند فتح الرابط.',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                          ),
+                          ListTile(
+                            leading: Icon(
+                              Icons.search,
+                              color: Theme.of(context).colorScheme.secondary,
+                            ),
+                            title: Text(
+                              'البحث',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(
+                                  context,
+                                ).textTheme.bodyLarge!.color,
+                              ),
+                            ),
+                            onTap: () {
+                              Navigator.pop(context);
+                              setState(() {
+                                _isSearchBarVisible = true;
+                              });
+                            },
+                          ),
+                          ListTile(
+                            leading: Icon(
+                              Icons.privacy_tip_rounded,
+                              color: Theme.of(context).colorScheme.secondary,
+                            ),
+                            title: Text(
+                              'سياسة الخصوصية',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(
+                                  context,
+                                ).textTheme.bodyLarge!.color,
+                              ),
+                            ),
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => PrivacyPolicyPage(),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  actions: _buildAppBarActions(),
-                ),
-              ),
+                    );
+                  },
+                );
+              },
             ),
-            body: _isSearchBarVisible
-                ? _buildSearchBar()
-                : FutureBuilder<void>(
-                    future: _dataFuture,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return Center(child: CircularProgressIndicator());
-                      } else if (_hasError) {
-                        return _buildGeneralErrorWidget();
-                      } else {
-                        return RefreshIndicator(
-                          color: Theme.of(context).colorScheme.secondary,
-                          backgroundColor: Theme.of(context).cardColor,
-                          onRefresh: () => _refreshSection(_selectedIndex),
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 10.0),
-                            child: IndexedStack(
-                              index: _selectedIndex,
+            title: Row(
+              children: [
+                Expanded(
+                  child: Directionality(
+                    textDirection: TextDirection.rtl,
+                    child: _userName != null
+                        ? RichText(
+                            textAlign:
+                                Directionality.of(context) == TextDirection.rtl
+                                    ? TextAlign.right
+                                    : TextAlign.left,
+                            text: TextSpan(
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
                               children: [
-                                _buildSectionContent(0), // Channels
-                                _buildSectionContent(1), // News
-                                _buildSectionContent(2), // Goals
-                                _buildSectionContent(3), // Matches
+                                const TextSpan(text: 'أهلاً بك '),
+                                TextSpan(
+                                  text: _userName,
+                                  style: TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    foreground: _isDarkMode
+                                        ? (Paint()
+                                          ..shader = LinearGradient(
+                                            colors: <Color>[
+                                              Colors.blue.shade800,
+                                              Colors.deepPurple.shade700,
+                                              Colors.blue.shade500,
+                                            ],
+                                            // --- >> START OF FIX << ---
+                                            begin: Alignment.centerLeft,
+                                            end: Alignment.centerRight,
+                                            // --- >> END OF FIX << ---
+                                          ).createShader(Rect.fromLTWH(
+                                              0.0, 0.0, 200.0, 70.0)))
+                                        : null,
+                                    color:
+                                        _isDarkMode ? null : Color(0xFFF8F8F8),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
                               ],
                             ),
-                          ),
-                        );
-                      }
-                    },
+                          )
+                        : const SizedBox.shrink(),
                   ),
-            bottomNavigationBar: CurvedNavigationBar(
-              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-              color: _isDarkMode ? Colors.black : Color(0xFF7C52D8),
-              buttonBackgroundColor: Theme.of(context).cardColor,
-              animationDuration: const Duration(milliseconds: 300),
-              items: [
-                Icon(Icons.tv, size: 30, color: Colors.white),
-                Image.asset(
-                  'assets/replay.png',
-                  width: 30,
-                  height: 30,
-                  color: Colors.white,
-                ),
-                Image.asset(
-                  'assets/goal.png',
-                  width: 30,
-                  height: 30,
-                  color: Colors.white,
-                ),
-                Image.asset(
-                  'assets/table.png',
-                  width: 30,
-                  height: 30,
-                  color: Colors.white,
                 ),
               ],
-              index: _selectedIndex,
-              onTap: (index) {
-                setState(() {
-                  _selectedIndex = index;
-                });
-              },
-              height: 60,
             ),
+            actions: _buildAppBarActions(),
           ),
         ),
+      ),
+      body: _isSearchBarVisible
+          ? _buildSearchBar()
+          : FutureBuilder<void>(
+              future: _dataFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(child: CircularProgressIndicator());
+                } else if (_hasError) {
+                  return _buildGeneralErrorWidget();
+                } else {
+                  return RefreshIndicator(
+                    color: Theme.of(context).colorScheme.secondary,
+                    backgroundColor: Theme.of(context).cardColor,
+                    onRefresh: () => _refreshSection(_selectedIndex),
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 10.0),
+                      child: IndexedStack(
+                        index: _selectedIndex,
+                        children: [
+                          _buildSectionContent(0), // Channels
+                          _buildSectionContent(1), // News
+                          _buildSectionContent(2), // Goals
+                          _buildSectionContent(3), // Matches
+                        ],
+                      ),
+                    ),
+                  );
+                }
+              },
+            ),
+      bottomNavigationBar: CurvedNavigationBar(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        color: _isDarkMode ? Colors.black : Color(0xFF7C52D8),
+        buttonBackgroundColor: Theme.of(context).cardColor,
+        animationDuration: const Duration(milliseconds: 300),
+        items: [
+          Icon(Icons.tv, size: 30, color: Colors.white),
+          Image.asset(
+            'assets/replay.png',
+            width: 30,
+            height: 30,
+            color: Colors.white,
+          ),
+          Image.asset(
+            'assets/goal.png',
+            width: 30,
+            height: 30,
+            color: Colors.white,
+          ),
+          Image.asset(
+            'assets/table.png',
+            width: 30,
+            height: 30,
+            color: Colors.white,
+          ),
+        ],
+        index: _selectedIndex,
+        onTap: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
+        height: 60,
       ),
     );
   }

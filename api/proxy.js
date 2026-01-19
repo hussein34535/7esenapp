@@ -16,8 +16,9 @@ module.exports = (req, res) => {
     }
 
     // Ensure target is a valid URL
+    // Ensure target is a valid URL
     if (!target.startsWith('http')) {
-        target = `https://st9.onrender.com${target.startsWith('/') ? '' : '/'}${target}`;
+        return res.status(400).json({ error: 'Invalid URL. Must be absolute http/https.' });
     }
 
     // 2. Handle HEAD requests via upstream GET (headers only)
@@ -69,6 +70,8 @@ module.exports = (req, res) => {
         onProxyReq: (proxyReq) => {
             // Force uncompressed response so we can easily parse m3u8 text
             proxyReq.setHeader('Accept-Encoding', 'identity');
+            // Spoof User-Agent to avoid blocking
+            proxyReq.setHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
         },
         onProxyRes: (proxyRes, req, res) => {
             // Set CORS

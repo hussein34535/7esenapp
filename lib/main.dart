@@ -10,6 +10,8 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:google_fonts/google_fonts.dart'; // Re-added for fallback
+import 'package:hesen/screens/pwa_install_screen.dart'; // PWA Install Screen
+import 'package:hesen/utils/pwa/pwa_helper.dart'; // PWA Helper
 import 'package:hesen/services/api_service.dart';
 import 'package:hesen/models/match_model.dart';
 import 'package:uuid/uuid.dart';
@@ -465,8 +467,9 @@ class _MyAppState extends State<MyApp> {
           ),
         ),
       ),
-      initialRoute: '/home',
+      initialRoute: isPwaStandalone() ? '/home' : '/pwa_install',
       routes: {
+        '/pwa_install': (context) => const PwaInstallScreen(),
         '/home': (context) => HomePage(
               key: const ValueKey('home'),
               onThemeChanged: (isDarkMode) {

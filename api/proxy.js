@@ -41,7 +41,18 @@ module.exports = (req, res) => {
             }, (proxyRes) => {
                 // Copy headers from upstream response
                 Object.keys(proxyRes.headers).forEach(key => {
-                    res.setHeader(key, proxyRes.headers[key]);
+                    if (key.toLowerCase() === 'location') {
+                        let originalLocation = proxyRes.headers[key];
+                        // Rewrite redirect location to keep it within the proxy
+                        if (originalLocation.startsWith('http')) {
+                            const encodedLocation = encodeURIComponent(originalLocation);
+                            res.setHeader(key, `/api/proxy?url=${encodedLocation}`);
+                        } else {
+                            res.setHeader(key, originalLocation);
+                        }
+                    } else {
+                        res.setHeader(key, proxyRes.headers[key]);
+                    }
                 });
 
                 // Ensure CORS headers are set (overwriting upstream if necessary)

@@ -89,13 +89,9 @@ Future<void> main() async {
     }
 
     runApp(
-      LogConsole(
-        // WRAP WITH CONSOLE OVERLAY for debugging
-        show: kIsWeb,
-        child: ChangeNotifierProvider(
-          create: (context) => ThemeProvider(),
-          child: const MyApp(),
-        ),
+      ChangeNotifierProvider(
+        create: (context) => ThemeProvider(),
+        child: const MyApp(),
       ),
     );
 
@@ -389,6 +385,10 @@ class _MyAppState extends State<MyApp> {
     final themeProvider = Provider.of<ThemeProvider>(context);
 
     return MaterialApp(
+      builder: (context, child) => LogConsole(
+        show: kIsWeb,
+        child: child ?? const SizedBox(),
+      ),
       title: 'Hesen TV',
       debugShowCheckedModeBanner: false,
       themeMode: themeProvider.themeMode,

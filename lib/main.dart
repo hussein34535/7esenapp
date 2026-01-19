@@ -32,8 +32,7 @@ import 'package:hesen/notification_page.dart';
 import 'package:hesen/services/promo_code_service.dart';
 import 'package:hesen/services/ad_service.dart';
 import 'package:hesen/utils/crypto_utils.dart';
-import 'package:hesen/player_utils/web_player_registry.dart';
-import 'package:hesen/debug_console.dart'; // Added for on-screen debugging
+// LogConsole import removed for cleanup
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -48,43 +47,41 @@ Future<void> main() async {
   runZonedGuarded<Future<void>>(() async {
     WidgetsFlutterBinding.ensureInitialized();
 
-    // REDIRECT LOGS TO CONSOLE OVERLAY
+    // REDIRECT LOGS TO CONSOLE OVERLAY REMOVED
     FlutterError.onError = (FlutterErrorDetails details) {
       FlutterError.presentError(details);
       // Only display critical UI error if it's NOT a Firebase init error that we can ignore
       if (details.exception.toString().contains("Firebase") ||
           details.exception.toString().contains("Null check")) {
-        LogConsole.log("Ignored Firebase/Null Warning: ${details.exception}");
+        debugPrint("Ignored Firebase/Null Warning: ${details.exception}");
       } else {
-        LogConsole.log("FLUTTER ERROR: ${details.exception}");
+        debugPrint("FLUTTER ERROR: ${details.exception}");
         _displayError(details.exception, details.stack);
       }
     };
 
-    // Override print to capture logs
-    void log(String msg) => LogConsole.log(msg);
-    debugPrint = (String? message, {int? wrapWidth}) {
-      if (message != null) LogConsole.log(message);
-    };
+    // Override print removed
+    // void log(String msg) => LogConsole.log(msg);
+    // debugPrint = ... removed
 
     try {
-      LogConsole.log("Loading .env...");
+      debugPrint("Loading .env...");
       await dotenv.load(fileName: ".env");
     } catch (e) {
-      LogConsole.log(".env warning (safely ignored).");
+      debugPrint(".env warning (safely ignored).");
     }
 
     // FIREBASE INIT - FAIL SAFE
     try {
       if (Firebase.apps.isEmpty) {
-        LogConsole.log("Initializing Firebase...");
+        debugPrint("Initializing Firebase...");
         await Firebase.initializeApp(
           options: DefaultFirebaseOptions.currentPlatform,
         );
-        LogConsole.log("Firebase initialized.");
+        debugPrint("Firebase initialized.");
       }
     } catch (e) {
-      LogConsole.log("FIREBASE INIT FAILED (IGNORING): $e");
+      debugPrint("FIREBASE INIT FAILED (IGNORING): $e");
       // CONTINUING EXECUTION...
     }
 
@@ -113,14 +110,14 @@ Future<void> main() async {
       try {
         registerVidstackPlayer();
       } catch (e) {
-        LogConsole.log("Vidstack Reg Error: $e");
+        debugPrint("Vidstack Reg Error: $e");
       }
 
-      LogConsole.log("Removing Web Splash...");
+      debugPrint("Removing Web Splash...");
       removeWebSplash();
     }
   }, (error, stack) {
-    LogConsole.log("ZONED ERROR: $error");
+    debugPrint("ZONED ERROR: $error");
     // Only show red screen for non-firebase errors
     if (!error.toString().contains("Firebase") &&
         !error.toString().contains("Null check")) {

@@ -6,8 +6,11 @@ module.exports = (req, res) => {
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS, POST, PUT, DELETE, HEAD');
     res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Authorization, Origin, Accept');
 
-    // Handle Preflight Request
-    if (req.method === 'OPTIONS') {
+    // Handle Preflight Request (OPTIONS) and Probe Request (HEAD)
+    if (req.method === 'OPTIONS' || req.method === 'HEAD') {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS, POST, PUT, DELETE, HEAD');
+        res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Authorization, Origin, Accept');
         res.status(200).end();
         return;
     }

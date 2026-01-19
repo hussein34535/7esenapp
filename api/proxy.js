@@ -6,8 +6,8 @@ module.exports = (req, res) => {
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS, POST, PUT, DELETE, HEAD');
     res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Authorization, Origin, Accept');
 
-    // Handle Preflight Request (OPTIONS) and Probe Request (HEAD)
-    if (req.method === 'OPTIONS' || req.method === 'HEAD') {
+    // Handle Preflight Request (OPTIONS) -> Direct 200
+    if (req.method === 'OPTIONS') {
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS, POST, PUT, DELETE, HEAD');
         res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Authorization, Origin, Accept');
@@ -16,15 +16,61 @@ module.exports = (req, res) => {
     }
 
     let target = req.query.url;
-
     if (!target) {
         return res.status(400).json({ error: 'Missing "url" query parameter' });
     }
 
     // Ensure target is a valid URL
     if (!target.startsWith('http')) {
-        // If it's just a path, assume the original API base
         target = `https://st9.onrender.com${target.startsWith('/') ? '' : '/'}${target}`;
+    }
+
+    // Handle HEAD requests by performing a GET request to upstream (but only consuming headers)
+    if (req.method === 'HEAD') {
+        try {
+            const parsedUrl = new URL(target);
+            const lib = parsedUrl.protocol === 'https:' ? require('https') : require('http');
+
+            const proxyReq = lib.request(target, {
+                method: 'GET', // Use GET instead of HEAD to avoid 405
+                headers: {
+                    'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0',
+                    'Accept': '*/*',
+                    // Forward other relevant headers?
+                }
+            }, (proxyRes) => {
+                // Copy headers from upstream response
+                Object.keys(proxyRes.headers).forEach(key => {
+                    res.setHeader(key, proxyRes.headers[key]);
+                });
+
+                // Ensure CORS headers are set (overwriting upstream if necessary)
+                res.setHeader('Access-Control-Allow-Origin', '*');
+                res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS, POST, PUT, DELETE, HEAD');
+                res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Authorization, Origin, Accept');
+
+                // Return upstream status code
+                res.status(proxyRes.statusCode);
+
+                // End response without body
+                res.end();
+
+                // Destroy upstream request to stop downloading body
+                proxyRes.destroy();
+            });
+
+            proxyReq.on('error', (err) => {
+                console.error('Proxy HEAD Error:', err);
+                res.status(502).end();
+            });
+
+            proxyReq.end();
+            return;
+        } catch (e) {
+            console.error('Proxy HEAD Exception:', e);
+            res.status(500).end();
+            return;
+        }
     }
 
     // Create the proxy middleware

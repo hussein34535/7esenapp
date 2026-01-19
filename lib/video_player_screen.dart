@@ -1045,11 +1045,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   Widget _buildVideoPlayer() {
     if (kIsWeb) {
       if (_currentStreamUrl != null) {
-        if (_currentStreamUrl != null) {
-          return SizedBox.expand(
-            child: VidstackPlayerWidget(url: _currentStreamUrl!),
-          );
-        }
+        return SizedBox.expand(
+          child: VidstackPlayerWidget(url: _currentStreamUrl!),
+        );
       }
       return Container(color: Colors.black);
     }

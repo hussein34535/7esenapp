@@ -64,20 +64,30 @@ Future<void> main() async {
     // void log(String msg) => LogConsole.log(msg);
     // debugPrint = ... removed
 
-    try {
-      debugPrint("Loading .env...");
-      await dotenv.load(fileName: ".env");
-    } catch (e) {
-      debugPrint(".env warning (safely ignored).");
-    }
-
-    // 1. RUN APP IMMEDIATELY (Don't wait for Firebase)
+    // 0. START APP IMMEDIATELY - PRIORITY 1
     runApp(
       ChangeNotifierProvider(
         create: (context) => ThemeProvider(),
         child: const MyApp(),
       ),
     );
+
+    // 1. Remove Web Splash Immediately - PRIORITY 2
+    if (kIsWeb) {
+      removeWebSplash();
+      try {
+        registerVidstackPlayer();
+      } catch (e) {
+        debugPrint("Vidstack Reg Error: $e");
+      }
+    }
+
+    // 2. Load Config & Firebase in Background
+    try {
+      await dotenv.load(fileName: ".env");
+    } catch (e) {
+      debugPrint(".env warning (safely ignored).");
+    }
 
     // 2. Remove Web Splash Immediately (Flutter is taking over)
     if (kIsWeb) {

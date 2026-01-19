@@ -35,6 +35,7 @@ class _LogConsoleState extends State<LogConsole> {
     if (!widget.show) return widget.child;
 
     return Stack(
+      fit: StackFit.expand, // Ensure child fills the screen
       children: [
         widget.child,
         Positioned(

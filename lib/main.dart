@@ -1,4 +1,23 @@
-import 'package:flutter/material.dart';
+import 'package:hesen/web_utils.dart' if (dart.library.io) 'package:hesen/web_utils_stub.dart';
+
+// ... (existing imports)
+
+// Inside main() ...
+  if (!kIsWeb) {
+    await UnityAds.init(
+      gameId: dotenv.env['UNITY_GAME_ID'] ??
+          '', // MODIFIED: Read plain Unity Game ID
+      testMode: false,
+      onComplete: () {},
+      onFailed: (error, message) {},
+    );
+  }
+
+  // FORCE REMOVE WEB SPLASH SCREEN
+  if (kIsWeb) {
+    removeWebSplash();
+  }
+}
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:hesen/firebase_api.dart';

@@ -19,7 +19,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
 function installPWA() {
     if (!deferredPrompt) return;
-    
+
     deferredPrompt.prompt();
     deferredPrompt.userChoice.then((choiceResult) => {
         if (choiceResult.outcome === 'accepted') {

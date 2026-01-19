@@ -1,23 +1,6 @@
-import 'package:hesen/web_utils.dart' if (dart.library.io) 'package:hesen/web_utils_stub.dart';
-
-// ... (existing imports)
-
-// Inside main() ...
-  if (!kIsWeb) {
-    await UnityAds.init(
-      gameId: dotenv.env['UNITY_GAME_ID'] ??
-          '', // MODIFIED: Read plain Unity Game ID
-      testMode: false,
-      onComplete: () {},
-      onFailed: (error, message) {},
-    );
-  }
-
-  // FORCE REMOVE WEB SPLASH SCREEN
-  if (kIsWeb) {
-    removeWebSplash();
-  }
-}
+import 'package:flutter/material.dart';
+import 'package:hesen/web_utils.dart'
+    if (dart.library.io) 'package:hesen/web_utils_stub.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:hesen/firebase_api.dart';
@@ -49,7 +32,7 @@ import 'package:hesen/notification_page.dart';
 import 'package:hesen/services/promo_code_service.dart';
 import 'package:hesen/services/ad_service.dart';
 import 'package:hesen/utils/crypto_utils.dart';
-import 'package:hesen/player_utils/web_player_registry.dart'; // Added for web player registration
+import 'package:hesen/player_utils/web_player_registry.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -88,24 +71,27 @@ Future<void> main() async {
   );
 
   // Initialize notifications AFTER the app starts to prevent freezing on splash screen
-  // Initialize notifications AFTER the app starts to prevent freezing on splash screen
   if (!kIsWeb) {
     final firebaseApi = FirebaseApi();
     // Don't await here to avoid blocking the main thread/UI
     firebaseApi.initNotification();
   } else {
-    // Register custom web players (Vidstack) - RESTORED
+    // Register custom web players (Vidstack)
     registerVidstackPlayer();
   }
 
   if (!kIsWeb) {
     await UnityAds.init(
-      gameId: dotenv.env['UNITY_GAME_ID'] ??
-          '', // MODIFIED: Read plain Unity Game ID
+      gameId: dotenv.env['UNITY_GAME_ID'] ?? '',
       testMode: false,
       onComplete: () {},
       onFailed: (error, message) {},
     );
+  }
+
+  // FORCE REMOVE WEB SPLASH SCREEN
+  if (kIsWeb) {
+    removeWebSplash();
   }
 }
 

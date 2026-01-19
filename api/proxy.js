@@ -38,6 +38,18 @@ module.exports = (req, res) => {
             proxyRes.headers['Access-Control-Allow-Origin'] = '*';
             proxyRes.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS, POST, PUT, DELETE';
             proxyRes.headers['Access-Control-Allow-Headers'] = 'X-Requested-With, Content-Type, Authorization, Origin, Accept';
+
+            // Handle Redirects (3xx) -> Rewrite Location header to keep using proxy
+            if (proxyRes.headers['location']) {
+                let originalLocation = proxyRes.headers['location'];
+
+                // If the redirect location is absolute, wrap it in our proxy
+                if (originalLocation.startsWith('http')) {
+                    const encodedLocation = encodeURIComponent(originalLocation);
+                    // Rewrite Location to point back to our proxy
+                    proxyRes.headers['location'] = `/api/proxy?url=${encodedLocation}`;
+                }
+            }
         },
     });
 

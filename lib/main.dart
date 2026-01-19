@@ -71,20 +71,7 @@ Future<void> main() async {
       debugPrint(".env warning (safely ignored).");
     }
 
-    // FIREBASE INIT - FAIL SAFE
-    try {
-      if (Firebase.apps.isEmpty) {
-        debugPrint("Initializing Firebase...");
-        await Firebase.initializeApp(
-          options: DefaultFirebaseOptions.currentPlatform,
-        );
-        debugPrint("Firebase initialized.");
-      }
-    } catch (e) {
-      debugPrint("FIREBASE INIT FAILED (IGNORING): $e");
-      // CONTINUING EXECUTION...
-    }
-
+    // 1. RUN APP IMMEDIATELY (Don't wait for Firebase)
     runApp(
       ChangeNotifierProvider(
         create: (context) => ThemeProvider(),
@@ -92,33 +79,44 @@ Future<void> main() async {
       ),
     );
 
-    if (!kIsWeb) {
-      try {
-        final firebaseApi = FirebaseApi();
-        firebaseApi.initNotification();
-        UnityAds.init(
-          gameId: dotenv.env['UNITY_GAME_ID'] ?? '',
-          testMode: false,
-          onComplete: () {},
-          onFailed: (error, message) {},
-        );
-      } catch (e) {
-        debugPrint("Services init error: $e");
-      }
-    } else {
+    // 2. Remove Web Splash Immediately (Flutter is taking over)
+    if (kIsWeb) {
+      debugPrint("Removing Web Splash...");
+      removeWebSplash(); // This removes the HTML loader
+
       debugPrint("Registering Vidstack Player...");
       try {
         registerVidstackPlayer();
       } catch (e) {
         debugPrint("Vidstack Reg Error: $e");
       }
-
-      debugPrint("Removing Web Splash...");
-      removeWebSplash();
     }
+
+    // 3. Initialize Firebase & Services in Background
+    Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    ).then((_) {
+      debugPrint("Firebase initialized.");
+      // Initialize other services that depend on Firebase
+      if (!kIsWeb) {
+        try {
+          final firebaseApi = FirebaseApi();
+          firebaseApi.initNotification();
+          UnityAds.init(
+            gameId: dotenv.env['UNITY_GAME_ID'] ?? '',
+            testMode: false,
+            onComplete: () {},
+            onFailed: (error, message) {},
+          );
+        } catch (e) {
+          debugPrint("Services init error: $e");
+        }
+      }
+    }).catchError((e) {
+      debugPrint("FIREBASE INIT FAILED (IGNORING): $e");
+    });
   }, (error, stack) {
     debugPrint("ZONED ERROR: $error");
-    // Only show red screen for non-firebase errors
     if (!error.toString().contains("Firebase") &&
         !error.toString().contains("Null check")) {
       _displayError(error, stack);

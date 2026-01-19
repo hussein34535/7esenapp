@@ -266,6 +266,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   Future<void> _initializePlayerInternal(String sourceUrl,
       {String? specificQualityUrl, Duration? startAt}) async {
     if (!mounted) return;
+
+    // Enable WakeLock to keep screen on during playback (Mobile & Web)
+    WakelockPlus.enable();
+
     debugPrint(
         '[HESEN PLAYER] Initializing player with sourceUrl: $sourceUrl and specificQualityUrl: $specificQualityUrl');
     await _releaseControllers();

@@ -24,7 +24,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         if (element != null) {
           element.innerHtml = '';
           final style = html.StyleElement();
-          // Customize Spinner - WHITE Color, but let it hide via default behavior
+          // Customize Spinner & Menu Position
           style.innerText = """
             .vds-player { 
               width: 100%; 
@@ -33,6 +33,16 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             }
             media-spinner {
               --video-spinner-color: #ffffff;
+            }
+            /* Move settings/menu to bottom right */
+            media-menu {
+              top: auto !important;
+              bottom: 80px !important; /* Above the control bar */
+              right: 10px !important;
+            }
+            /* Ensure controls are at the bottom */
+            media-controls {
+              opacity: 1;
             }
           """;
           element.append(style);

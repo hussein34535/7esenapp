@@ -1553,6 +1553,33 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    // LOADING STATE: Match HTML Splash (Full Screen, Black, Centered Logo)
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: Colors.black, // Match HTML splash bg
+        body: Center(
+          child: Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF7C52D8).withOpacity(0.5),
+                  blurRadius: 20,
+                  spreadRadius: 0,
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Image.asset('assets/icon/icon.png'),
+            ),
+          ),
+        ),
+      );
+    }
+
     final appBarHeight = AppBar().preferredSize.height;
 
     return Scaffold(

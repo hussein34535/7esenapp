@@ -73,6 +73,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           """;
           element.append(style);
 
+          // Build Layout
           final mediaPlayer = html.Element.tag('media-player');
           mediaPlayer.className = 'vds-player';
 
@@ -85,10 +86,51 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           mediaPlayer.setAttribute('load', 'eager');
           mediaPlayer.setAttribute('aspect-ratio', '16/9');
 
-          // Providers & Layouts
+          // Providers
           mediaPlayer.append(html.Element.tag('media-provider'));
-          mediaPlayer.append(html.Element.tag('media-video-layout'));
+
+          // Layout with Shadow DOM Injection
+          final layout = html.Element.tag('media-video-layout');
+          mediaPlayer.append(layout);
           element.append(mediaPlayer);
+
+          // INJECT STYLES INTO SHADOW DOM (Fix for Vidstack Encapsulation)
+          // We wait briefly for the component to initialize and create its shadow root.
+          Future.delayed(const Duration(milliseconds: 500), () {
+            try {
+              // Access shadowRoot via dynamic dispatch or JS interop
+              final shadowRoot = (layout as dynamic).shadowRoot;
+              if (shadowRoot != null) {
+                final shadowStyle = html.StyleElement();
+                shadowStyle.innerText = """
+                  /* FORCE ALL TOP CONTROLS TO BOTTOM RIGHT (Inside Shadow DOM) */
+                  media-controls-group[data-position^="top"] {
+                    display: flex !important;
+                    position: absolute !important;
+                    top: auto !important;
+                    bottom: 80px !important; /* Safe distance above timeline */
+                    right: 20px !important;
+                    left: auto !important;
+                    flex-direction: row-reverse !important;
+                    z-index: 99 !important;
+                    pointer-events: auto !important;
+                  }
+                  
+                  /* Ensure buttons are visible */
+                  media-menu-button, media-mute-button, media-fullscreen-button {
+                    display: block !important;
+                    visibility: visible !important;
+                  }
+                """;
+                shadowRoot.append(shadowStyle);
+                print("Vidstack Shadow DOM styles injected successfully.");
+              } else {
+                print("Vidstack Shadow DOM not found.");
+              }
+            } catch (e) {
+              print("Error injecting Vidstack styles: \$e");
+            }
+          });
         }
       },
     );

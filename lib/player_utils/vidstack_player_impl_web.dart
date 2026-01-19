@@ -105,6 +105,8 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
 
           // Set autoplay, controls, etc.
           mediaPlayer.setAttribute('autoplay', 'true');
+          mediaPlayer.setAttribute(
+              'playsinline', 'true'); // Required for iOS inline playback
           // mediaPlayer.setAttribute('controls', 'true'); // REMOVED: conflicting with custom layout
           mediaPlayer.setAttribute('load', 'eager');
           mediaPlayer.setAttribute(

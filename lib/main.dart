@@ -33,6 +33,7 @@ import 'package:hesen/services/promo_code_service.dart';
 import 'package:hesen/services/ad_service.dart';
 import 'package:hesen/utils/crypto_utils.dart';
 import 'package:hesen/player_utils/web_player_registry.dart';
+import 'package:hesen/debug_console.dart'; // Added for on-screen debugging
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -46,63 +47,89 @@ SharedPreferences? prefs;
 Future<void> main() async {
   runZonedGuarded<Future<void>>(() async {
     WidgetsFlutterBinding.ensureInitialized();
+
+    // REDIRECT LOGS TO CONSOLE OVERLAY
     FlutterError.onError = (FlutterErrorDetails details) {
       FlutterError.presentError(details);
-      _displayError(details.exception, details.stack);
+      // Only display critical UI error if it's NOT a Firebase init error that we can ignore
+      if (details.exception.toString().contains("Firebase") ||
+          details.exception.toString().contains("Null check")) {
+        LogConsole.log("Ignored Firebase/Null Warning: ${details.exception}");
+      } else {
+        LogConsole.log("FLUTTER ERROR: ${details.exception}");
+        _displayError(details.exception, details.stack);
+      }
+    };
+
+    // Override print to capture logs
+    void log(String msg) => LogConsole.log(msg);
+    debugPrint = (String? message, {int? wrapWidth}) {
+      if (message != null) LogConsole.log(message);
     };
 
     try {
+      LogConsole.log("Loading .env...");
       await dotenv.load(fileName: ".env");
     } catch (e) {
-      debugPrint("Warning: .env file not found.");
+      LogConsole.log(".env warning (safely ignored).");
     }
 
+    // FIREBASE INIT - FAIL SAFE
     try {
       if (Firebase.apps.isEmpty) {
-        // Debugging: Print options to console/log
-        if (kIsWeb) {
-          final opts = DefaultFirebaseOptions.currentPlatform;
-          print(
-              "FIREBASE OPTS: apiKey=${opts.apiKey}, appId=${opts.appId}, projId=${opts.projectId}");
-        }
-
+        LogConsole.log("Initializing Firebase...");
         await Firebase.initializeApp(
           options: DefaultFirebaseOptions.currentPlatform,
         );
+        LogConsole.log("Firebase initialized.");
       }
-    } on FirebaseException catch (e) {
-      // Ignore duplicate app
-    } catch (e, stack) {
-      // Capture stack trace
-      print("FIREBASE INIT ERROR: $e\n$stack");
-      _displayError("Firebase Init Error: $e", stack);
-      return;
+    } catch (e) {
+      LogConsole.log("FIREBASE INIT FAILED (IGNORING): $e");
+      // CONTINUING EXECUTION...
     }
 
     runApp(
-      ChangeNotifierProvider(
-        create: (context) => ThemeProvider(),
-        child: const MyApp(),
+      LogConsole(
+        // WRAP WITH CONSOLE OVERLAY for debugging
+        show: kIsWeb,
+        child: ChangeNotifierProvider(
+          create: (context) => ThemeProvider(),
+          child: const MyApp(),
+        ),
       ),
     );
 
     if (!kIsWeb) {
-      final firebaseApi = FirebaseApi();
-      firebaseApi.initNotification();
-      await UnityAds.init(
-        gameId: dotenv.env['UNITY_GAME_ID'] ?? '',
-        testMode: false,
-        onComplete: () {},
-        onFailed: (error, message) {},
-      );
+      try {
+        final firebaseApi = FirebaseApi();
+        firebaseApi.initNotification();
+        UnityAds.init(
+          gameId: dotenv.env['UNITY_GAME_ID'] ?? '',
+          testMode: false,
+          onComplete: () {},
+          onFailed: (error, message) {},
+        );
+      } catch (e) {
+        debugPrint("Services init error: $e");
+      }
     } else {
-      registerVidstackPlayer();
-      // FORCE REMOVE WEB SPLASH SCREEN
+      LogConsole.log("Registering Vidstack Player...");
+      try {
+        registerVidstackPlayer();
+      } catch (e) {
+        LogConsole.log("Vidstack Reg Error: $e");
+      }
+
+      LogConsole.log("Removing Web Splash...");
       removeWebSplash();
     }
   }, (error, stack) {
-    debugPrint("CAUGHT ERROR: $error");
-    _displayError(error, stack);
+    LogConsole.log("ZONED ERROR: $error");
+    // Only show red screen for non-firebase errors
+    if (!error.toString().contains("Firebase") &&
+        !error.toString().contains("Null check")) {
+      _displayError(error, stack);
+    }
   });
 }
 

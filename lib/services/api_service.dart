@@ -8,8 +8,14 @@ class ApiService {
 
   static Future<List> fetchChannelCategories() async {
     final url =
-        '$baseUrl/channel-categories?populate[channels][sort][0]=createdAt:asc&sort=createdAt:asc';
-    final response = await http.get(Uri.parse(WebProxyService.proxiedUrl(url)));
+        '$baseUrl/channel-categories?populate[channels][sort][0]=createdAt:asc&sort=createdAt:asc'; // Removed &timestamp=${DateTime.now().millisecondsSinceEpoch} as headers are better
+    final response = await http.get(
+      Uri.parse(WebProxyService.proxiedUrl(url)),
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'Pragma': 'no-cache',
+      },
+    );
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -22,7 +28,13 @@ class ApiService {
 
   static Future<List> fetchNews() async {
     final url = '$baseUrl/news?populate=*';
-    final response = await http.get(Uri.parse(WebProxyService.proxiedUrl(url)));
+    final response = await http.get(
+      Uri.parse(WebProxyService.proxiedUrl(url)),
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'Pragma': 'no-cache',
+      },
+    );
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -34,7 +46,13 @@ class ApiService {
 
   static Future<List<Match>> fetchMatches() async {
     final url = '$baseUrl/matches?populate=*';
-    final response = await http.get(Uri.parse(WebProxyService.proxiedUrl(url)));
+    final response = await http.get(
+      Uri.parse(WebProxyService.proxiedUrl(url)),
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'Pragma': 'no-cache',
+      },
+    );
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -51,7 +69,13 @@ class ApiService {
 
   static Future<List<dynamic>> fetchGoals() async {
     final url = 'https://st9.onrender.com/api/goals?populate=*';
-    final response = await http.get(Uri.parse(WebProxyService.proxiedUrl(url)));
+    final response = await http.get(
+      Uri.parse(WebProxyService.proxiedUrl(url)),
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'Pragma': 'no-cache',
+      },
+    );
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);

@@ -37,29 +37,30 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
               --video-spinner-color: #ffffff;
             }
             
-            /* Hide the default top-right group container to prevent ghosts */
+            /* Move the entire top-right group (Volume, Settings) to Bottom Right */
             media-controls-group[data-position="top right"] {
-              display: none !important;
+              display: flex !important; /* Ensure it is visible */
+              position: absolute !important;
+              top: auto !important;
+              bottom: 60px !important; /* Above bottom bar */
+              right: 10px !important;
+              flex-direction: row-reverse !important; /* Keep logical order */
+              z-index: 90 !important;
+              pointer-events: auto !important;
             }
 
-            /* Forcefully position the buttons at Bottom Right */
-            media-menu-button {
-              position: absolute !important;
-              bottom: 60px !important; /* Above bottom bar */
-              right: 20px !important;
-              top: auto !important;
-              left: auto !important;
-              z-index: 99 !important;
+            /* Ensure buttons inside are visible and clickable */
+            media-menu-button, media-mute-button {
+              display: block !important;
+              visibility: visible !important;
+              pointer-events: auto !important;
             }
-            
-            media-mute-button {
-              position: absolute !important;
-              bottom: 60px !important;
-              right: 60px !important; /* Next to settings */
-              top: auto !important;
-              left: auto !important;
-              z-index: 99 !important;
+
+            /* Hide ONLY the top gradient spacer, not the controls */
+            .vds-controls-spacer { 
+              display: none !important; 
             }
+
 
             /* Ensure main controls don't hide them */
             media-controls {

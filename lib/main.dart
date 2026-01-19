@@ -430,7 +430,6 @@ class _MyAppState extends State<MyApp> {
         ),
       ),
       darkTheme: ThemeData(
-        fontFamily: 'Cairo', // Local Asset Font
         brightness: Brightness.dark,
         primaryColor: themeProvider.getPrimaryColor(true),
         scaffoldBackgroundColor: themeProvider.getScaffoldBackgroundColor(true),
@@ -458,10 +457,12 @@ class _MyAppState extends State<MyApp> {
             fontWeight: FontWeight.bold,
           ),
         ),
-        textTheme: const TextTheme(
-          bodyLarge: TextStyle(color: Colors.white),
-          bodyMedium: TextStyle(color: Colors.white),
-          bodySmall: TextStyle(color: Colors.white),
+        textTheme: GoogleFonts.cairoTextTheme(
+          const TextTheme(
+            bodyLarge: TextStyle(color: Colors.white),
+            bodyMedium: TextStyle(color: Colors.white),
+            bodySmall: TextStyle(color: Colors.white),
+          ),
         ),
       ),
       initialRoute: '/home',

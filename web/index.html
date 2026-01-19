@@ -9,7 +9,7 @@
 
   <!-- iOS meta tags & icons -->
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Hesen TV">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
@@ -28,6 +28,12 @@
     body,
     html {
       font-family: 'Cairo', 'Roboto', sans-serif !important;
+      /* Native App Feel Tricks */
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+      overscroll-behavior-y: none;
     }
   </style>
 
@@ -55,6 +61,9 @@
       margin: 0;
       overflow: hidden;
       /* Prevent scrollbars during splash */
+      user-select: none;
+      /* Redundant but safe */
+      -webkit-tap-highlight-color: transparent;
     }
 
     /* Splash Screen Styles */

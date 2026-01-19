@@ -31,5 +31,31 @@
             "type": "image/png",
             "purpose": "maskable"
         }
-    ]
+    ],
+    "categories": [
+        "entertainment",
+        "sports",
+        "video"
+    ],
+    "display_override": [
+        "window-controls-overlay",
+        "standalone"
+    ],
+    "shortcuts": [
+        {
+            "name": "Live TV",
+            "short_name": "Live",
+            "description": "Watch Live TV Channels",
+            "url": "/home",
+            "icons": [
+                {
+                    "src": "icons/Icon-192.png",
+                    "sizes": "192x192"
+                }
+            ]
+        }
+    ],
+    "launch_handler": {
+        "client_mode": "navigate-existing"
+    }
 }

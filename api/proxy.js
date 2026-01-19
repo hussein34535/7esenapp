@@ -1,12 +1,7 @@
 const { createProxyMiddleware } = require('http-proxy-middleware');
 
 module.exports = (req, res) => {
-    // Handling CORS for all requests
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS, POST, PUT, DELETE, HEAD');
-    res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Authorization, Origin, Accept');
-
-    // Handle Preflight Request (OPTIONS) -> Direct 200
+    // 1. Handle Preflight (OPTIONS)
     if (req.method === 'OPTIONS') {
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS, POST, PUT, DELETE, HEAD');
@@ -25,92 +20,120 @@ module.exports = (req, res) => {
         target = `https://st9.onrender.com${target.startsWith('/') ? '' : '/'}${target}`;
     }
 
-    // Handle HEAD requests by performing a GET request to upstream (but only consuming headers)
+    // 2. Handle HEAD requests via upstream GET (headers only)
     if (req.method === 'HEAD') {
         try {
             const parsedUrl = new URL(target);
             const lib = parsedUrl.protocol === 'https:' ? require('https') : require('http');
-
             const proxyReq = lib.request(target, {
-                method: 'GET', // Use GET instead of HEAD to avoid 405
+                method: 'GET',
                 headers: {
                     'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0',
                     'Accept': '*/*',
-                    // Forward other relevant headers?
+                    'Accept-Encoding': 'identity' // Prevent compression so we read headers clearly if needed
                 }
             }, (proxyRes) => {
-                // Copy headers from upstream response
+                // Copy headers
                 Object.keys(proxyRes.headers).forEach(key => {
                     if (key.toLowerCase() === 'location') {
-                        let originalLocation = proxyRes.headers[key];
-                        // Rewrite redirect location to keep it within the proxy
-                        if (originalLocation.startsWith('http')) {
-                            const encodedLocation = encodeURIComponent(originalLocation);
-                            res.setHeader(key, `/api/proxy?url=${encodedLocation}`);
+                        let loc = proxyRes.headers[key];
+                        if (loc.startsWith('http')) {
+                            res.setHeader(key, `/api/proxy?url=${encodeURIComponent(loc)}`);
                         } else {
-                            res.setHeader(key, originalLocation);
+                            res.setHeader(key, loc);
                         }
                     } else {
                         res.setHeader(key, proxyRes.headers[key]);
                     }
                 });
-
-                // Ensure CORS headers are set (overwriting upstream if necessary)
                 res.setHeader('Access-Control-Allow-Origin', '*');
-                res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS, POST, PUT, DELETE, HEAD');
-                res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Authorization, Origin, Accept');
-
-                // Return upstream status code
                 res.status(proxyRes.statusCode);
-
-                // End response without body
                 res.end();
-
-                // Destroy upstream request to stop downloading body
                 proxyRes.destroy();
             });
-
-            proxyReq.on('error', (err) => {
-                console.error('Proxy HEAD Error:', err);
-                res.status(502).end();
-            });
-
+            proxyReq.on('error', (e) => res.status(502).end());
             proxyReq.end();
             return;
         } catch (e) {
-            console.error('Proxy HEAD Exception:', e);
-            res.status(500).end();
-            return;
+            return res.status(500).end();
         }
     }
 
-    // Create the proxy middleware
+    // 3. Create Proxy for GET/POST/etc
     const proxy = createProxyMiddleware({
         target: target,
         changeOrigin: true,
-        pathRewrite: (path, req) => {
-            // We are proxying the 'url' param, so the target IS the url.
-            return '';
+        selfHandleResponse: true, // We will manually handle response to rewrite m3u8
+        pathRewrite: () => '',
+        router: () => target,
+        onProxyReq: (proxyReq) => {
+            // Force uncompressed response so we can easily parse m3u8 text
+            proxyReq.setHeader('Accept-Encoding', 'identity');
         },
-        router: () => target, // Force router to use the calculated target
         onProxyRes: (proxyRes, req, res) => {
-            // Add CORS headers to the response from the target as well
-            proxyRes.headers['Access-Control-Allow-Origin'] = '*';
-            proxyRes.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS, POST, PUT, DELETE, HEAD';
-            proxyRes.headers['Access-Control-Allow-Headers'] = 'X-Requested-With, Content-Type, Authorization, Origin, Accept';
+            // Set CORS
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS, POST, PUT, DELETE, HEAD');
+            res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Authorization, Origin, Accept');
 
-            // Handle Redirects (3xx) -> Rewrite Location header to keep using proxy
-            if (proxyRes.headers['location']) {
-                let originalLocation = proxyRes.headers['location'];
-
-                // If the redirect location is absolute, wrap it in our proxy
-                if (originalLocation.startsWith('http')) {
-                    const encodedLocation = encodeURIComponent(originalLocation);
-                    // Rewrite Location to point back to our proxy
-                    proxyRes.headers['location'] = `/api/proxy?url=${encodedLocation}`;
+            // Copy Upstream Headers (handling redirects)
+            Object.keys(proxyRes.headers).forEach(key => {
+                if (key.toLowerCase() === 'location') {
+                    let loc = proxyRes.headers[key];
+                    if (loc.startsWith('http')) {
+                        res.setHeader(key, `/api/proxy?url=${encodeURIComponent(loc)}`);
+                    } else {
+                        res.setHeader(key, loc);
+                    }
+                } else if (key.toLowerCase() === 'content-encoding' || key.toLowerCase() === 'content-length') {
+                    // Skip these, we might change body size/encoding
+                } else {
+                    res.setHeader(key, proxyRes.headers[key]);
                 }
+            });
+
+            // Check if it is an M3U8 Playlist
+            const contentType = proxyRes.headers['content-type'] || '';
+            const isM3u8 = contentType.includes('application/vnd.apple.mpegurl') ||
+                contentType.includes('application/x-mpegurl') ||
+                contentType.includes('text/plain'); // Sometimes served as text
+
+            // Set Status
+            res.statusCode = proxyRes.statusCode;
+
+            if (isM3u8 && proxyRes.statusCode >= 200 && proxyRes.statusCode < 300) {
+                // Buffer the response
+                let bodyChunks = [];
+                proxyRes.on('data', chunk => bodyChunks.push(chunk));
+                proxyRes.on('end', () => {
+                    let body = Buffer.concat(bodyChunks).toString('utf8');
+
+                    // REWRITE LOGIC: Replace http://... with /api/proxy?url=
+                    // Regex to find absolute http/https URLs in the m3u8 content
+                    // We match (http|https)://[^\s\n]+
+                    // But we must be careful not to double-proxy or break things. 
+                    // Actually, we mostly care about 'http' causing mixed content.
+
+                    // A robust regex for URI in m3u8 lines (lines not starting with #, or inside #EXT-X-KEY:URI="...")
+                    // Simplest Global valid replacement: replace all absolute http:// URLs
+
+                    const replacedBody = body.replace(/(https?:\/\/[^\s"'\n]+)/g, (match) => {
+                        return `/api/proxy?url=${encodeURIComponent(match)}`;
+                    });
+
+                    res.setHeader('Content-Length', Buffer.byteLength(replacedBody));
+                    res.end(replacedBody);
+                });
+            } else {
+                // Pipe directly for non-m3u8 (video chunks, images, etc.)
+                // We must pipe data because we set selfHandleResponse: true
+                proxyRes.pipe(res);
             }
         },
+        onError: (err, req, res) => {
+            console.error('Proxy Error:', err);
+            res.status(500).end();
+        }
     });
 
     return proxy(req, res);

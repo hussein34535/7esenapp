@@ -79,99 +79,78 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
     // Here we need to pass parameters or handle setup.
     // To keep it simple: We will use a unique key to force recreation of the view when URL changes,
     // and rely on the factory (which we'll update to be smarter) OR
-    // we define the factory here dynamically? No, factory must be registered globally usually.
-    return OrientationBuilder(
-      builder: (context, orientation) {
-        // If we are in portrait mode, we rotate the content 90 degrees (quarterTurns: 1)
-        // so it looks like landscape. The user simply turns their phone.
-        final bool isPortrait = orientation == Orientation.portrait;
+    // we define the factory here dynamically? No, factory must
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          // 1. The Web Player
+          HtmlElementView(
+            key: ValueKey(widget.url),
+            viewType: 'vidstack-player',
+            onPlatformViewCreated: (int viewId) {
+              final containerId = 'vidstack-container-$viewId';
+              final element = vidstackViews[viewId];
 
-        return Scaffold(
-          backgroundColor: Colors.black,
-          body: isPortrait
-              ? RotatedBox(
-                  quarterTurns: 1,
-                  child: _buildPlayerStack(context),
-                )
-              : _buildPlayerStack(context),
-        );
-      },
-    );
-  }
+              if (element != null) {
+                element.innerHtml = '';
+                final style = html.StyleElement();
+                // Customize Spinner - WHITE Color
+                style.innerText = """
+                  .vds-player {
+                    width: 100%;
+                    height: 100%;
+                    background-color: black;
+                  }
+                  /* Improve spinner visibility */
+                  media-spinner {
+                    --video-spinner-color: #ffffff;
+                    opacity: 1 !important;
+                  }
+                """;
+                element.append(style);
 
-  Widget _buildPlayerStack(BuildContext context) {
-    return Stack(
-      children: [
-        // 1. The Web Player
-        HtmlElementView(
-          key: ValueKey(widget.url),
-          viewType: 'vidstack-player',
-          onPlatformViewCreated: (int viewId) {
-            final containerId = 'vidstack-container-$viewId';
-            final element = vidstackViews[viewId];
+                final mediaPlayer = html.Element.tag('media-player');
+                mediaPlayer.className = 'vds-player';
 
-            if (element != null) {
-              element.innerHtml = '';
-              final style = html.StyleElement();
-              // Hide Fullscreen button, Force width/height, Customize Spinner
-              style.innerText = """
-                .vds-player { 
-                  width: 100vw; 
-                  height: 100vh; 
-                  background-color: black; 
-                  overflow: hidden;
-                }
-                /* Hide default fullscreen button to prevent iOS native player */
-                media-fullscreen-button { display: none !important; }
-                /* Improve spinner visibility - WHITE Color */
-                media-spinner {
-                  --video-spinner-color: #ffffff;
-                  opacity: 1 !important;
-                }
-              """;
-              element.append(style);
+                // Proxy & Config
+                final proxiedUrl = WebProxyService.proxiedUrl(widget.url);
+                mediaPlayer.setAttribute('src', proxiedUrl);
+                mediaPlayer.setAttribute('autoplay', 'true');
+                mediaPlayer.setAttribute('muted', 'true');
+                mediaPlayer.setAttribute('playsinline', 'true');
+                mediaPlayer.setAttribute('load', 'eager');
+                mediaPlayer.setAttribute('aspect-ratio', '16/9');
 
-              final mediaPlayer = html.Element.tag('media-player');
-              mediaPlayer.className = 'vds-player';
+                // Providers & Layouts
+                mediaPlayer.append(html.Element.tag('media-provider'));
+                mediaPlayer.append(html.Element.tag('media-video-layout'));
+                element.append(mediaPlayer);
+              }
+            },
+          ),
 
-              // Proxy & Config
-              final proxiedUrl = WebProxyService.proxiedUrl(widget.url);
-              mediaPlayer.setAttribute('src', proxiedUrl);
-              mediaPlayer.setAttribute('autoplay', 'true');
-              mediaPlayer.setAttribute(
-                  'muted', 'true'); // Auto-play often requires muted
-              mediaPlayer.setAttribute('playsinline', 'true'); // Stay inline!
-              mediaPlayer.setAttribute('load', 'eager');
-              mediaPlayer.setAttribute('aspect-ratio', '16/9');
-
-              // Providers & Layouts
-              mediaPlayer.append(html.Element.tag('media-provider'));
-              mediaPlayer.append(html.Element.tag('media-video-layout'));
-              element.append(mediaPlayer);
-            }
-          },
-        ),
-
-        // 2. Custom Back Button Overlay
-        Positioned(
-          top: 20,
-          left: 20,
-          child: SafeArea(
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.5),
-                shape: BoxShape.circle,
-              ),
-              child: IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
+          // 2. Custom Back Button Overlay
+          Positioned(
+            top: 20,
+            left: 20,
+            child: SafeArea(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.5),
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

@@ -37,28 +37,38 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
               --video-spinner-color: #ffffff;
             }
             
-            /* Move the entire top-right group (Volume, Settings) to Bottom Right */
-            media-controls-group[data-position="top right"] {
-              display: flex !important; /* Ensure it is visible */
-              position: absolute !important;
-              top: auto !important;
-              bottom: 60px !important; /* Above bottom bar */
-              right: 10px !important;
-              flex-direction: row-reverse !important; /* Keep logical order */
-              z-index: 90 !important;
-              pointer-events: auto !important;
+            /* DESKTOP ONLY: Move top-right group to Bottom Right */
+            @media (min-width: 768px) {
+              media-controls-group[data-position="top right"] {
+                display: flex !important;
+                position: absolute !important;
+                top: auto !important;
+                bottom: 60px !important;
+                right: 10px !important;
+                flex-direction: row-reverse !important;
+                z-index: 90 !important;
+                pointer-events: auto !important;
+              }
+              .vds-controls-spacer { 
+                display: none !important; 
+              }
             }
 
+            /* MOBILE ONLY: Keep them at top but ensure visibility */
+            @media (max-width: 767px) {
+               media-controls-group[data-position="top right"] {
+                top: 10px !important;
+                right: 10px !important;
+                bottom: auto !important;
+                z-index: 95 !important;
+              }
+            }
+            
             /* Ensure buttons inside are visible and clickable */
             media-menu-button, media-mute-button {
               display: block !important;
               visibility: visible !important;
               pointer-events: auto !important;
-            }
-
-            /* Hide ONLY the top gradient spacer, not the controls */
-            .vds-controls-spacer { 
-              display: none !important; 
             }
 
 

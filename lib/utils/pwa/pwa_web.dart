@@ -4,14 +4,15 @@ import 'package:flutter/foundation.dart';
 bool isPwaStandalone() {
   if (!kIsWeb) return true;
   // Check if running in standalone mode (PWA)
+  // Check if running in standalone mode (PWA)
   try {
-    return js.context
-                .callMethod('matchMedia', ['(display-mode: standalone)'])
-                .toString()
-                .contains('matches: true') ==
-            true ||
-        js.context['navigator']['standalone'] == true; // iOS
+    final mq = js.context.callMethod('matchMedia', ['(display-mode: standalone)']);
+    final bool isStandalone = mq['matches'] == true;
+    final bool isIosStandalone = js.context['navigator']['standalone'] == true;
+    return isStandalone || isIosStandalone;
   } catch (e) {
+    return false;
+  }
     return false;
   }
 }

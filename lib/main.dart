@@ -65,7 +65,12 @@ Future<void> main() async {
     // void log(String msg) => LogConsole.log(msg);
     // debugPrint = ... removed
 
-    // 0. START APP IMMEDIATELY - PRIORITY 1
+    // 0. LOAD FONTS FIRST - Prevents "Squares" glitch
+    await GoogleFonts.pendingFonts([
+      GoogleFonts.cairo(),
+    ]);
+
+    // 1. START APP - PRIORITY 1
     runApp(
       ChangeNotifierProvider(
         create: (context) => ThemeProvider(),

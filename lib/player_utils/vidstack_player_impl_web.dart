@@ -37,31 +37,20 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
               --video-spinner-color: #ffffff;
             }
             
-            /* DESKTOP ONLY: Move top-right group to Bottom Right */
-            @media (min-width: 768px) {
-              media-controls-group[data-position="top right"] {
-                display: flex !important;
-                position: absolute !important;
-                top: auto !important;
-                bottom: 60px !important;
-                right: 10px !important;
-                flex-direction: row-reverse !important;
-                z-index: 90 !important;
-                pointer-events: auto !important;
-              }
-              .vds-controls-spacer { 
-                display: none !important; 
-              }
+            /* FORCE BOTTOM RIGHT PLACEMENT [ALL SCREENS] to avoid Top UI & Seek Bar */
+            media-controls-group[data-position="top right"] {
+              display: flex !important;
+              position: absolute !important;
+              top: auto !important;
+              bottom: 80px !important; /* Safe distance above timeline */
+              right: 20px !important;
+              flex-direction: row-reverse !important;
+              z-index: 99 !important;
+              pointer-events: auto !important;
             }
 
-            /* MOBILE ONLY: Keep them at top but ensure visibility */
-            @media (max-width: 767px) {
-               media-controls-group[data-position="top right"] {
-                top: 10px !important;
-                right: 10px !important;
-                bottom: auto !important;
-                z-index: 95 !important;
-              }
+            .vds-controls-spacer { 
+              display: none !important; 
             }
             
             /* Ensure buttons inside are visible and clickable */

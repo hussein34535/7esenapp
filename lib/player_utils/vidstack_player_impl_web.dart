@@ -1,5 +1,6 @@
 import 'dart:html' as html;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Import for SystemChrome
 import 'dart:ui_web' as ui_web;
 import 'package:hesen/player_utils/video_player_web.dart'; // Import the registry
 import 'package:hesen/services/web_proxy_service.dart';
@@ -21,6 +22,11 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
   void initState() {
     super.initState();
     _currentUrl = widget.url;
+    // Force Landscape for viewing experience
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
   }
 
   @override
@@ -46,6 +52,16 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
 
     // Actually, creating a new UniqueKey for HtmlElementView forces a partial reload which might be safest for switching streams cleanly in web.
     setState(() {});
+  }
+
+  @override
+  void dispose() {
+    // Reset to portrait or system default when player is closed
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+    super.dispose();
   }
 
   @override
@@ -106,9 +122,12 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           // Set autoplay, controls, etc.
           mediaPlayer.setAttribute('autoplay', 'true');
           mediaPlayer.setAttribute(
+              'muted', 'true'); // Required for autoplay on most browsers
+          mediaPlayer.setAttribute(
               'playsinline', 'true'); // Required for iOS inline playback
           // mediaPlayer.setAttribute('controls', 'true'); // REMOVED: conflicting with custom layout
-          mediaPlayer.setAttribute('load', 'eager');
+          mediaPlayer.setAttribute(
+              'load', 'eager'); // Start loading immediately
           mediaPlayer.setAttribute(
               'aspect-ratio', '16/9'); // Default aspect ratio
 

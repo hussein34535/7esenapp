@@ -80,78 +80,98 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
     // To keep it simple: We will use a unique key to force recreation of the view when URL changes,
     // and rely on the factory (which we'll update to be smarter) OR
     // we define the factory here dynamically? No, factory must be registered globally usually.
+    return OrientationBuilder(
+      builder: (context, orientation) {
+        // If we are in portrait mode, we rotate the content 90 degrees (quarterTurns: 1)
+        // so it looks like landscape. The user simply turns their phone.
+        final bool isPortrait = orientation == Orientation.portrait;
 
-    // BETTER APPROACH:
-    // Define a custom factory that accepts params? No, standard PlatformView API is limited.
-    //
-    // We register the factory ONCE.
-    // Inside the factory, we return a Div.
-    // We use a simplified approach: The factory creates a Div with a known ID scheme based on `viewId`.
-    // BUT we don't know the `viewId` in `build`.
-    //
-    // SO: We will use a dedicated customized element or just straightforward JS interop.
-
-    // Let's try this:
-    // 1. `HtmlElementView`
-    // 2. `onPlatformViewCreated`: (id) => _setupPlayer(id)
-
-    return HtmlElementView(
-      key: ValueKey(widget.url), // Force rebuild when URL changes
-      viewType: 'vidstack-player',
-      onPlatformViewCreated: (int viewId) {
-        final containerId = 'vidstack-container-$viewId';
-        print(
-            '[VIDSTACK] onPlatformViewCreated - viewId: $viewId, looking for container: $containerId');
-
-        // Access the element directly from our registry
-        final element = vidstackViews[viewId];
-
-        if (element != null) {
-          print('[VIDSTACK] Container found. Initializing player...');
-          element.innerHtml = ''; // Clear previous
-
-          final mediaPlayer = html.Element.tag('media-player');
-          mediaPlayer.className = 'vds-player';
-
-          print('[VIDSTACK] Source URL: ${widget.url}');
-          // Wrap with proxy to handle CORS/Redirects on Web
-          // Debug: Direct (requires disabled security). Release: Vercel Proxy.
-          final proxiedUrl = WebProxyService.proxiedUrl(widget.url);
-          mediaPlayer.setAttribute('src', proxiedUrl);
-
-          // Set autoplay, controls, etc.
-          mediaPlayer.setAttribute('autoplay', 'true');
-          mediaPlayer.setAttribute(
-              'muted', 'true'); // Required for autoplay on most browsers
-          mediaPlayer.setAttribute(
-              'playsinline', 'true'); // Required for iOS inline playback
-          // mediaPlayer.setAttribute('controls', 'true'); // REMOVED: conflicting with custom layout
-          mediaPlayer.setAttribute(
-              'load', 'eager'); // Start loading immediately
-          mediaPlayer.setAttribute(
-              'aspect-ratio', '16/9'); // Default aspect ratio
-
-          // Add Media Provider
-          final mediaProvider = html.Element.tag('media-provider');
-          mediaPlayer.append(mediaProvider);
-
-          // Add Default Layout (Controls)
-          final defaultLayout = html.Element.tag('media-video-layout');
-          // No need for detailed slotting if using default layout component
-          // The CDN script imports default layouts usually.
-          // Checking Vidstack docs: <media-video-layout> is correct for default layout in recent versions if using the right bundle.
-          // If we used the "player" bundle in index.html, it includes defaults.
-
-          // Actually, <media-video-layout> might need slots.
-          // Newest Vidstack uses <media-audio-layout> or <media-video-layout>.
-          mediaPlayer.append(defaultLayout);
-
-          element.append(mediaPlayer);
-          print('[VIDSTACK] Player initialized and appended.');
-        } else {
-          print('[VIDSTACK] ERROR: Container $containerId NOT FOUND.');
-        }
+        return Scaffold(
+          backgroundColor: Colors.black,
+          body: isPortrait
+              ? RotatedBox(
+                  quarterTurns: 1,
+                  child: _buildPlayerStack(context),
+                )
+              : _buildPlayerStack(context),
+        );
       },
+    );
+  }
+
+  Widget _buildPlayerStack(BuildContext context) {
+    return Stack(
+      children: [
+        // 1. The Web Player
+        HtmlElementView(
+          key: ValueKey(widget.url),
+          viewType: 'vidstack-player',
+          onPlatformViewCreated: (int viewId) {
+            final containerId = 'vidstack-container-$viewId';
+            final element = vidstackViews[viewId];
+
+            if (element != null) {
+              element.innerHtml = '';
+              final style = html.StyleElement();
+              // Hide Fullscreen button, Force width/height, Customize Spinner
+              style.innerText = """
+                .vds-player { 
+                  width: 100vw; 
+                  height: 100vh; 
+                  background-color: black; 
+                  overflow: hidden;
+                }
+                /* Hide default fullscreen button to prevent iOS native player */
+                media-fullscreen-button { display: none !important; }
+                /* Improve spinner visibility - WHITE Color */
+                media-spinner {
+                  --video-spinner-color: #ffffff;
+                  opacity: 1 !important;
+                }
+              """;
+              element.append(style);
+
+              final mediaPlayer = html.Element.tag('media-player');
+              mediaPlayer.className = 'vds-player';
+
+              // Proxy & Config
+              final proxiedUrl = WebProxyService.proxiedUrl(widget.url);
+              mediaPlayer.setAttribute('src', proxiedUrl);
+              mediaPlayer.setAttribute('autoplay', 'true');
+              mediaPlayer.setAttribute(
+                  'muted', 'true'); // Auto-play often requires muted
+              mediaPlayer.setAttribute('playsinline', 'true'); // Stay inline!
+              mediaPlayer.setAttribute('load', 'eager');
+              mediaPlayer.setAttribute('aspect-ratio', '16/9');
+
+              // Providers & Layouts
+              mediaPlayer.append(html.Element.tag('media-provider'));
+              mediaPlayer.append(html.Element.tag('media-video-layout'));
+              element.append(mediaPlayer);
+            }
+          },
+        ),
+
+        // 2. Custom Back Button Overlay
+        Positioned(
+          top: 20,
+          left: 20,
+          child: SafeArea(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.5),
+                shape: BoxShape.circle,
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

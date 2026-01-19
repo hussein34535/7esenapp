@@ -26,25 +26,48 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           final style = html.StyleElement();
           // Customize Spinner & Menu Position
           style.innerText = """
+            /* Force LTR to prevent RTL flipping issues */
             .vds-player { 
               width: 100%; 
               height: 100%; 
-              background-color: black; 
+              background-color: black;
+              direction: ltr !important; 
             }
             media-spinner {
               --video-spinner-color: #ffffff;
             }
-            /* Move top-right controls (Volume, Settings) to Bottom Right */
+            
+            /* Hide the default top-right group container to prevent ghosts */
             media-controls-group[data-position="top right"] {
+              display: none !important;
+            }
+
+            /* Forcefully position the buttons at Bottom Right */
+            media-menu-button {
+              position: absolute !important;
+              bottom: 60px !important; /* Above bottom bar */
+              right: 20px !important;
               top: auto !important;
-              bottom: 60px !important; /* Move down near the bottom bar */
-              right: 10px !important;
-              flex-direction: row-reverse !important; /* Keep order logical */
+              left: auto !important;
+              z-index: 99 !important;
             }
             
-            /* Hide the default top gradient if it obscures things */
-            .vds-controls-spacer { 
-              display: none !important; 
+            media-mute-button {
+              position: absolute !important;
+              bottom: 60px !important;
+              right: 60px !important; /* Next to settings */
+              top: auto !important;
+              left: auto !important;
+              z-index: 99 !important;
+            }
+
+            /* Ensure main controls don't hide them */
+            media-controls {
+              opacity: 1;
+              pointer-events: none; /* Let clicks pass through empty areas */
+            }
+            media-controls * {
+              pointer-events: auto; /* Re-enable for buttons */
             }
           """;
           element.append(style);

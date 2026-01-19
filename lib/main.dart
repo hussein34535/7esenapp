@@ -69,10 +69,14 @@ Future<void> main() async {
   );
 
   // Initialize notifications AFTER the app starts to prevent freezing on splash screen
+  // Initialize notifications AFTER the app starts to prevent freezing on splash screen
   if (!kIsWeb) {
     final firebaseApi = FirebaseApi();
     // Don't await here to avoid blocking the main thread/UI
     firebaseApi.initNotification();
+  } else {
+    // Register custom web players (Vidstack) - RESTORED
+    registerVidstackPlayer();
   }
 
   if (!kIsWeb) {
@@ -556,6 +560,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Future<void> _initNotifications() async {
+    // On Web (especially iOS), requesting token immediately can freeze the app or cause issues.
+    // It should be done via user interaction. Disabling auto-init for Web.
+    if (kIsWeb) return;
+
     final firebaseApi = FirebaseApi();
     _fcmToken = await firebaseApi.initNotification();
     if (_userName != null && _userName!.isNotEmpty) {

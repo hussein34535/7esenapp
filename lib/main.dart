@@ -32,7 +32,7 @@ import 'package:hesen/notification_page.dart';
 import 'package:hesen/services/promo_code_service.dart';
 import 'package:hesen/services/ad_service.dart';
 import 'package:hesen/utils/crypto_utils.dart';
-// LogConsole import removed for cleanup
+import 'package:hesen/player_utils/web_player_registry.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -106,7 +106,7 @@ Future<void> main() async {
         debugPrint("Services init error: $e");
       }
     } else {
-      LogConsole.log("Registering Vidstack Player...");
+      debugPrint("Registering Vidstack Player...");
       try {
         registerVidstackPlayer();
       } catch (e) {

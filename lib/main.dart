@@ -59,14 +59,23 @@ Future<void> main() async {
 
     try {
       if (Firebase.apps.isEmpty) {
+        // Debugging: Print options to console/log
+        if (kIsWeb) {
+          final opts = DefaultFirebaseOptions.currentPlatform;
+          print(
+              "FIREBASE OPTS: apiKey=${opts.apiKey}, appId=${opts.appId}, projId=${opts.projectId}");
+        }
+
         await Firebase.initializeApp(
           options: DefaultFirebaseOptions.currentPlatform,
         );
       }
     } on FirebaseException catch (e) {
       // Ignore duplicate app
-    } catch (e) {
-      _displayError("Firebase Init Error: $e", null);
+    } catch (e, stack) {
+      // Capture stack trace
+      print("FIREBASE INIT ERROR: $e\n$stack");
+      _displayError("Firebase Init Error: $e", stack);
       return;
     }
 

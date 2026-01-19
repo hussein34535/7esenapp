@@ -8,6 +8,7 @@
   <meta name="description" content="Watch Live TV and News">
 
   <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Hesen TV">
@@ -118,6 +119,34 @@
   <div id="app-content">
     <!-- Flutter app content will be here -->
     <script>
+      // PWA Install Prompt Logic
+      let deferredPrompt;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        // Prevent the mini-infobar from appearing on mobile
+        e.preventDefault();
+        // Stash the event so it can be triggered later.
+        deferredPrompt = e;
+        console.log('beforeinstallprompt fired');
+      });
+
+      window.triggerInstallPrompt = function () {
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          deferredPrompt.userChoice.then((choiceResult) => {
+            if (choiceResult.outcome === 'accepted') {
+              console.log('User accepted the A2HS prompt');
+            } else {
+              console.log('User dismissed the A2HS prompt');
+            }
+            deferredPrompt = null;
+          });
+        } else {
+          console.log('No deferred prompt available');
+          // Optional: Show manual instructions here if needed
+          alert('للتثبيت: اضغط على القائمة (Three Dots) واختر "Install App" أو "Add to Home Screen"');
+        }
+      };
+
       window.addEventListener('load', function (ev) {
         _flutter.loader.loadEntrypoint({
           serviceWorker: {

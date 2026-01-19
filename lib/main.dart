@@ -385,10 +385,6 @@ class _MyAppState extends State<MyApp> {
     final themeProvider = Provider.of<ThemeProvider>(context);
 
     return MaterialApp(
-      builder: (context, child) => LogConsole(
-        show: kIsWeb,
-        child: child ?? const SizedBox(),
-      ),
       title: 'Hesen TV',
       debugShowCheckedModeBanner: false,
       themeMode: themeProvider.themeMode,

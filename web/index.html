@@ -207,6 +207,13 @@
           onEntrypointLoaded: function (engineInitializer) {
             engineInitializer.initializeEngine().then(function (appRunner) {
               appRunner.runApp();
+              // Safety fallback: Remove splash screen after a short delay
+              // in case Flutter doesn't do it or hangs.
+              setTimeout(function () {
+                if (typeof removeSplashFromWeb === 'function') {
+                  removeSplashFromWeb();
+                }
+              }, 3000);
             });
           }
         });

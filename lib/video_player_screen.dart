@@ -1045,12 +1045,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   Widget _buildVideoPlayer() {
     if (kIsWeb) {
       if (_currentStreamUrl != null) {
-        return Center(
-          child: AspectRatio(
-            aspectRatio: 16 / 9,
+        if (_currentStreamUrl != null) {
+          return SizedBox.expand(
             child: VidstackPlayerWidget(url: _currentStreamUrl!),
-          ),
-        );
+          );
+        }
       }
       return Container(color: Colors.black);
     }

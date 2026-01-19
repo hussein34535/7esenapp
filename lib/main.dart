@@ -9,7 +9,7 @@ import 'dart:convert';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:permission_handler/permission_handler.dart';
-// Removed unused imports
+import 'package:google_fonts/google_fonts.dart'; // Re-added for fallback
 import 'package:hesen/services/api_service.dart';
 import 'package:hesen/models/match_model.dart';
 import 'package:uuid/uuid.dart';
@@ -392,7 +392,6 @@ class _MyAppState extends State<MyApp> {
       debugShowCheckedModeBanner: false,
       themeMode: themeProvider.themeMode,
       theme: ThemeData(
-        fontFamily: 'Cairo', // Local Asset Font
         brightness: Brightness.light,
         primaryColor: themeProvider.getPrimaryColor(false),
         scaffoldBackgroundColor: themeProvider.getScaffoldBackgroundColor(
@@ -422,10 +421,12 @@ class _MyAppState extends State<MyApp> {
             fontWeight: FontWeight.bold,
           ),
         ),
-        textTheme: const TextTheme(
-          bodyLarge: TextStyle(color: Colors.black),
-          bodyMedium: TextStyle(color: Colors.black),
-          bodySmall: TextStyle(color: Colors.black),
+        textTheme: GoogleFonts.cairoTextTheme(
+          const TextTheme(
+            bodyLarge: TextStyle(color: Colors.black),
+            bodyMedium: TextStyle(color: Colors.black),
+            bodySmall: TextStyle(color: Colors.black),
+          ),
         ),
       ),
       darkTheme: ThemeData(

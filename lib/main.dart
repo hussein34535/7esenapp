@@ -392,6 +392,7 @@ class _MyAppState extends State<MyApp> {
       debugShowCheckedModeBanner: false,
       themeMode: themeProvider.themeMode,
       theme: ThemeData(
+        fontFamily: 'Cairo', // Local Asset Font
         brightness: Brightness.light,
         primaryColor: themeProvider.getPrimaryColor(false),
         scaffoldBackgroundColor: themeProvider.getScaffoldBackgroundColor(
@@ -428,6 +429,7 @@ class _MyAppState extends State<MyApp> {
         ),
       ),
       darkTheme: ThemeData(
+        fontFamily: 'Cairo', // Local Asset Font
         brightness: Brightness.dark,
         primaryColor: themeProvider.getPrimaryColor(true),
         scaffoldBackgroundColor: themeProvider.getScaffoldBackgroundColor(true),

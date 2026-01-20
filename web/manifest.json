@@ -1,23 +1,44 @@
-```json
 {
-    "window-controls-overlay",
-    "standalone"
-],
-"shortcuts": [
-    {
-        "name": "Live TV",
-        "short_name": "Live",
-        "description": "Watch Live TV Channels",
-        "url": "/home",
-        "icons": [
-            {
-                "src": "icons/Icon-192.png",
-                "sizes": "192x192"
-            }
-        ]
-    }
-],
-"launch_handler": {
-    "client_mode": "navigate-existing"
-}
+    "name": "7esenTV",
+    "short_name": "7esenTV",
+    "description": "شاهد القنوات الرياضية والمباريات مباشرة مع جودة عالية",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#000000",
+    "theme_color": "#673AB7",
+    "orientation": "any",
+    "dir": "rtl",
+    "lang": "ar",
+    "scope": "/",
+    "icons": [
+        {
+            "src": "assets/icon/icon.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "assets/icon/icon.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "categories": [
+        "entertainment",
+        "sports",
+        "video"
+    ],
+    "shortcuts": [
+        {
+            "name": "القنوات المباشرة",
+            "url": "/?tab=channels",
+            "description": "شاهد القنوات مباشرة"
+        },
+        {
+            "name": "المباريات",
+            "url": "/?tab=matches",
+            "description": "شاهد المباريات الحية"
+        }
+    ]
 }

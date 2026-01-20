@@ -120,34 +120,41 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
                   final shadowStyle = html.StyleElement();
                   shadowStyle.id = 'vds-custom-style';
                   shadowStyle.innerText = """
-                      /* NUCLEAR OPTION: FORCE ALL CONTROLS TO BOTTOM */
+                      /* NUCLEAR CSS: FIX OVERLAPPING CONTROLS */
                       
-                      /* 1. Reset Top Groups (Left/Right) to Bottom */
+                      /* 1. Target ALL top groups (Left & Right) and move them DOWN */
                       media-controls-group[data-position^="top"] {
                         top: auto !important;
-                        bottom: 80px !important; /* Above timeline */
-                        right: 20px !important;
                         left: auto !important;
+                        bottom: 60px !important; /* Move to bottom area */
+                        right: 15px !important; /* Move to right side */
                         width: auto !important;
-                        flex-direction: row-reverse !important; /* Align buttons right */
                         
-                        /* Layout fixes */
+                        /* Layout fixes to make them look like a bottom toolbar */
                         display: flex !important;
+                        flex-direction: row !important; /* Keep horizontal */
                         align-items: center !important;
                         justify-content: flex-end !important;
                         z-index: 90 !important;
+                        pointer-events: auto !important;
                       }
 
-                      /* 2. Specific fix for overlapping buttons */
-                      media-tooltip {
-                        z-index: 99 !important;
+                      /* 2. SPECIFIC: If there are multiple top groups, stack them or merge them visualy */
+                      media-controls-group[data-position="top left"] {
+                        right: 80px !important; /* Shift left slightly to not overlap right group */
                       }
                       
-                      /* 3. Ensure they are visible */
-                      media-menu-button, media-mute-button, media-fullscreen-button {
-                        display: block !important;
-                        visibility: visible !important;
-                        pointer-events: auto !important;
+                      /* 3. Hide big center play button if it interferes, but usually it's fine */
+                      /* media-play-button[data-position="center"] { opacity: 0; } */
+
+                      /* 4. Ensure Tooltips are on top */
+                      media-tooltip {
+                        z-index: 100 !important;
+                      }
+
+                      /* 5. Ensure gestures don't block taps */
+                      .vds-controls-spacer {
+                         pointer-events: none !important;
                       }
                     """;
                   shadowRoot.append(shadowStyle);

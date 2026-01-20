@@ -1558,43 +1558,50 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     // WEB ONLY as requested
     if (kIsWeb && _isLoading) {
       return Scaffold(
-        backgroundColor: Colors.black, // Match HTML splash bg
-        body: Stack(
-          children: [
-            // 1. Logo Centered Exactly (Matches HTML)
-            Center(
-              child: Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF7C52D8).withOpacity(0.5),
-                      blurRadius: 20,
-                      spreadRadius: 0,
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: Image.asset('assets/icon/icon.png'),
-                ),
-              ),
-            ),
-            // 2. Loading Indicator (Below Logo)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: MediaQuery.of(context).size.height *
-                  0.35, // Approx below center
-              child: const Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF7C52D8)),
+        backgroundColor: Colors.black,
+        // Ensure the splash fills the ENTIRE screen, ignoring safe areas, to match HTML exactly
+        body: SizedBox.expand(
+          child: Stack(
+            alignment: Alignment.center,
+            fit: StackFit.expand,
+            children: [
+              // 1. Logo Centered Exactly (Matches HTML 1:1)
+              // Usage of Alignment.center within StackFit.expand ignores parent padding/safe areas better than Center() widget sometimes
+              Align(
+                alignment: Alignment.center,
+                child: Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF7C52D8).withValues(alpha: 0.5),
+                        blurRadius: 20,
+                        spreadRadius: 0,
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Image.asset('assets/icon/icon.png'),
+                  ),
                 ),
               ),
-            ),
-          ],
+              // 2. Loading Indicator (Below Logo)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: MediaQuery.of(context).size.height * 0.35,
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(Color(0xFF7C52D8)),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }

@@ -15,6 +15,7 @@ import 'player_utils/hesentv_handler.dart';
 import 'player_utils/okru_playlist_parser.dart';
 import 'player_utils/youtube_handler.dart';
 import 'player_utils/vidstack_player_widget.dart'; // Added for Vidstack Web Player
+import 'package:hesen/services/web_proxy_service.dart';
 
 const String _userAgent = 'VLC/3.0.18 LibVLC/3.0.18';
 
@@ -271,8 +272,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     // Enable WakeLock to keep screen on during playback (Mobile & Web)
     WakelockPlus.enable();
 
-    debugPrint(
-        '[HESEN PLAYER] Initializing player with sourceUrl: $sourceUrl and specificQualityUrl: $specificQualityUrl');
+    debugPrint('[HESEN PLAYER] Initializing player with sourceUrl: $sourceUrl');
     await _releaseControllers();
     await Future.delayed(const Duration(milliseconds: 250));
     if (!mounted) return;
@@ -286,26 +286,60 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
     try {
       if (kIsWeb) {
-        // WEB OPTIMIZATION: Bypass client-side parsing to avoid CORS issues
+        // ✅ WEB OPTIMIZATION: Minimal parsing + Proxy
         if (urlToProcess.contains('youtube.com') ||
             urlToProcess.contains('youtu.be')) {
-          // Vidstack handles YouTube natively
+          // Vidstack handles YouTube natively - NO PROXY NEEDED
+          debugPrint('[WEB] YouTube detected - using Vidstack directly');
           if (mounted) {
             setState(() {
-              _currentStreamUrl = urlToProcess;
+              _currentStreamUrl = urlToProcess; // ❌ لا تستخدم Proxy لـ YouTube
               _isLoading = false;
               _hasError = false;
             });
             _showControls();
           }
           return;
+        } else if (urlToProcess.contains('ok.ru/')) {
+          // Ok.ru - Extract ID then use direct embed (no API call needed on web)
+          String? videoId;
+          if (urlToProcess.contains('/video/')) {
+            videoId = urlToProcess.split('/video/').last.split('?').first;
+          } else if (urlToProcess.contains('/live/')) {
+            videoId = urlToProcess.split('/live/').last.split('?').first;
+          }
+
+          if (videoId != null && videoId.isNotEmpty) {
+            // ✅ استخدم رابط Embed مباشر (Vidstack يدعمه)
+            videoUrlToLoad = 'https://ok.ru/videoembed/$videoId';
+            debugPrint('[WEB] Ok.ru embed URL: $videoUrlToLoad');
+          } else {
+            // ✅ إذا فشل، استخدم الرابط الخام مع Proxy
+            videoUrlToLoad = WebProxyService.proxiedUrl(urlToProcess);
+          }
+        } else {
+          // ✅ لأي رابط آخر (M3U8, MP4, إلخ) استخدم Proxy
+          videoUrlToLoad = WebProxyService.proxiedUrl(urlToProcess);
+          debugPrint('[WEB] Using proxied URL: $videoUrlToLoad');
         }
-        // For other links (Ok.ru, etc.), skip extraction and use the URL directly (will be proxied)
-        videoUrlToLoad = urlToProcess;
-      } else if (urlToProcess.contains('youtube.com') ||
+
+        // Update state and show Vidstack player
+        if (mounted) {
+          setState(() {
+            _currentStreamUrl = videoUrlToLoad;
+            _isLoading = false;
+            _hasError = false;
+          });
+          _showControls();
+        }
+        return; // Skip native player initialization
+      }
+
+      // ========== MOBILE/DESKTOP LOGIC ==========
+      if (urlToProcess.contains('youtube.com') ||
           urlToProcess.contains('youtu.be')) {
         debugPrint(
-            '[HESEN PLAYER] URL identified as YouTube. Processing in background...');
+            '[MOBILE] URL identified as YouTube. Processing in background...');
         final streamDetails = await compute(handleYoutubeStream, urlToProcess);
         videoUrlToLoad = streamDetails.videoUrlToLoad;
         if (mounted)
@@ -361,32 +395,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         debugPrint(
             '[HESEN PLAYER] URL did not match any handler. Playing raw URL.');
         String urlToPlay = urlToProcess;
-        if (kIsWeb) {
-          debugPrint(
-              '[HESEN PLAYER] M3U8 link detected. Using Vidstack for Web.');
-        } else {
-          debugPrint(
-              '[HESEN PLAYER] M3U8 link detected. Skipping manual redirect resolution to let ExoPlayer handle it.');
-        }
-
+        // Logic for skipping manual redirect is already in native player handling
         videoUrlToLoad = urlToPlay;
       }
 
       if (videoUrlToLoad == null || videoUrlToLoad.isEmpty)
         throw Exception('videoUrlToLoad could not be determined.');
-
-      // WEB SPECIFIC HANDLING: Vidstack
-      if (kIsWeb) {
-        if (mounted) {
-          setState(() {
-            _currentStreamUrl = videoUrlToLoad; // Update with resolved URL
-            _isLoading = false;
-            _hasError = false;
-          });
-          _showControls(); // Ensure controls (back button etc) are shown
-        }
-        return; // Skip native player initialization
-      }
 
       VideoFormat? formatHint;
       if (videoUrlToLoad.startsWith('data:application/dash+xml'))
@@ -541,17 +555,21 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         newStreamIndex == _selectedStreamIndex ||
         newStreamIndex < 0 ||
         newStreamIndex >= _validStreamLinks.length) return;
+
     final Duration? startAt = _videoPlayerController?.value.position;
     if (!isAutoRetry) {
       _autoRetryAttempt = 0;
     }
     _cancelAllTimers();
+
     final newStreamData = _validStreamLinks[newStreamIndex];
     final newStreamUrl = newStreamData['url']?.toString();
+
     if (newStreamUrl == null || newStreamUrl.isEmpty) {
       _showError("Selected stream has no valid URL.");
       return;
     }
+
     setState(() {
       _isLoading = true;
       _hasError = false;
@@ -570,8 +588,44 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       _fetchedApiQualities = [];
       _selectedApiQualityIndex = -1;
     });
+
     await Future.delayed(const Duration(milliseconds: 50));
     if (!mounted) return;
+
+    // ✅ على الويب: تحديث الرابط مباشرة بدون إعادة تهيئة كاملة
+    if (kIsWeb) {
+      String urlToUse = newStreamUrl;
+
+      // Apply proxy if needed
+      if (!newStreamUrl.contains('youtube.com') &&
+          !newStreamUrl.contains('youtu.be')) {
+        if (newStreamUrl.contains('ok.ru/')) {
+          String? videoId;
+          if (newStreamUrl.contains('/video/')) {
+            videoId = newStreamUrl.split('/video/').last.split('?').first;
+          } else if (newStreamUrl.contains('/live/')) {
+            videoId = newStreamUrl.split('/live/').last.split('?').first;
+          }
+          if (videoId != null && videoId.isNotEmpty) {
+            urlToUse = 'https://ok.ru/videoembed/$videoId';
+          } else {
+            urlToUse = WebProxyService.proxiedUrl(newStreamUrl);
+          }
+        } else {
+          urlToUse = WebProxyService.proxiedUrl(newStreamUrl);
+        }
+      }
+
+      setState(() {
+        _currentStreamUrl = urlToUse;
+        _isLoading = false;
+        _hasError = false;
+      });
+      _showControls();
+      return;
+    }
+
+    // Mobile: Full initialization
     await _initializePlayerInternal(_currentStreamUrl!, startAt: startAt);
   }
 

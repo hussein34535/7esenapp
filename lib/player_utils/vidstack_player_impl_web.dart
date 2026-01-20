@@ -12,56 +12,82 @@ class VidstackPlayerImpl extends StatefulWidget {
 }
 
 class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
+  html.Element? _currentPlayer;
+  int? _currentViewId;
+
+  @override
+  void didUpdateWidget(VidstackPlayerImpl oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // ✅ إذا تغير الرابط، حدّث Player
+    if (oldWidget.url != widget.url) {
+      _updatePlayerSource();
+    }
+  }
+
+  void _updatePlayerSource() {
+    if (_currentPlayer != null && _currentViewId != null) {
+      print('[VIDSTACK] Updating source to: ${widget.url}');
+      _currentPlayer!.setAttribute('src', widget.url);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return HtmlElementView(
-      key: ValueKey(widget.url),
+      key: ValueKey(widget.url), // ✅ Force rebuild on URL change
       viewType: 'vidstack-player',
       onPlatformViewCreated: (int viewId) {
+        _currentViewId = viewId;
         final element = vidstackViews[viewId];
+        if (element == null) return;
 
-        if (element != null) {
-          // 1. Clean previous element
-          element.innerHtml = '';
+        // 1. تنظيف
+        element.innerHtml = '';
 
-          // 2. Add essential styles (mainly for LTR direction)
-          final style = html.StyleElement();
-          style.innerText = """
-            .vds-player { 
-              width: 100%; 
-              height: 100%; 
-              background-color: black;
-              direction: ltr !important; 
-            }
-          """;
-          element.append(style);
+        // 2. Styles
+        final style = html.StyleElement();
+        style.innerText = """
+          .vds-player { 
+            width: 100%; 
+            height: 100%; 
+            background: #000;
+            direction: ltr !important;
+            --media-brand: #7C52D8;
+            --media-focus: #5E3CB5;
+          }
+        """;
+        element.append(style);
 
-          // 3. Create Main Player
-          final mediaPlayer = html.Element.tag('media-player');
-          mediaPlayer.className = 'vds-player';
+        // 3. إنشاء Player
+        final player = html.Element.tag('media-player');
+        player.className = 'vds-player';
+        _currentPlayer = player; // ✅ حفظ المرجع
 
-          // Config & Attributes
-          final proxiedUrl = WebProxyService.proxiedUrl(widget.url);
-          mediaPlayer.setAttribute('src', proxiedUrl);
-          mediaPlayer.setAttribute('title', 'Live Stream');
-          mediaPlayer.setAttribute('autoplay', 'true');
-          mediaPlayer.setAttribute('load', 'eager');
-          mediaPlayer.setAttribute('aspect-ratio', '16/9');
+        // 4. تحديد المصدر
+        player.setAttribute('src', widget.url);
+        player.setAttribute('autoplay', 'true');
+        player.setAttribute('controls', 'true');
+        player.setAttribute('load', 'eager');
+        player.setAttribute('crossorigin', 'anonymous');
 
-          // 4. Add Media Provider
-          mediaPlayer.append(html.Element.tag('media-provider'));
+        // 5. Provider
+        final provider = html.Element.tag('media-provider');
+        player.append(provider);
 
-          // 5. Add Default Vidstack Layout (The Magic Line)
-          // This automatically handles controls, icons, settings, animations, and responsiveness.
-          final defaultLayout = html.Element.tag('media-video-layout');
-          // Optional: Add thumbnails if available
-          // defaultLayout.setAttribute('thumbnails', 'https://example.com/thumbnails.vtt');
+        // 6. Layout
+        final layout = html.Element.tag('media-video-layout');
+        player.append(layout);
 
-          mediaPlayer.append(defaultLayout);
+        // 7. Error Handling
+        player.addEventListener('error', (event) {
+          print('[VIDSTACK] Error: ${widget.url}');
+        });
 
-          // 6. Append Player to the View
-          element.append(mediaPlayer);
-        }
+        player.addEventListener('can-play', (event) {
+          print('[VIDSTACK] Ready to play: ${widget.url}');
+        });
+
+        element.append(player);
       },
     );
   }

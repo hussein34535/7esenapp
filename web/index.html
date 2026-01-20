@@ -48,103 +48,144 @@
   <!-- Vidstack Player -->
   <link rel="stylesheet" href="https://cdn.vidstack.io/player/theme.css" />
   <link rel="stylesheet" href="https://cdn.vidstack.io/player/video.css" />
-  <script src="https://cdn.vidstack.io/player" type="module"></script>
-
-  <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
-    name="viewport">
 
   <style>
     body {
-      background-color: #000000;
-      /* Prevent white screen flashes */
       margin: 0;
+      padding: 0;
+      background: #000;
+      font-family: 'Cairo', sans-serif;
       overflow: hidden;
-      /* Prevent scrollbars during splash */
-      user-select: none;
-      /* Redundant but safe */
-      -webkit-tap-highlight-color: transparent;
     }
 
-    /* Splash Screen Styles */
-    .splash-screen {
+    /* Custom Splash Screen */
+    #splash {
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background-color: #000000;
+      inset: 0;
       display: flex;
-      justify-content: center;
+      flex-direction: column;
       align-items: center;
-      z-index: 9998;
+      justify-content: center;
+      background: linear-gradient(135deg, #000 0%, #1a1a2e 100%);
+      z-index: 9999;
       transition: opacity 0.5s ease-out;
     }
 
-    .splash-logo {
+    #splash.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .logo-container {
       width: 120px;
       height: 120px;
       border-radius: 20px;
-      box-shadow: 0 0 20px rgba(124, 82, 216, 0.5);
-      /* Glow effect from app theme */
-      animation: pulse 2s infinite;
+      overflow: hidden;
+      box-shadow: 0 10px 40px rgba(124, 82, 216, 0.6);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .logo-container img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
     }
 
     @keyframes pulse {
-      0% {
-        transform: scale(1);
-        box-shadow: 0 0 0 0 rgba(124, 82, 216, 0.7);
-      }
 
-      70% {
-        transform: scale(1.05);
-        box-shadow: 0 0 0 10px rgba(124, 82, 216, 0);
-      }
-
+      0%,
       100% {
         transform: scale(1);
-        box-shadow: 0 0 0 0 rgba(124, 82, 216, 0);
       }
+
+      50% {
+        transform: scale(1.05);
+      }
+    }
+
+    .loader {
+      margin-top: 40px;
+      width: 50px;
+      height: 50px;
+      border: 4px solid rgba(255, 255, 255, 0.1);
+      border-top-color: #7C52D8;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* Hide Flutter Default Loading */
+    .loading {
+      display: none !important;
     }
   </style>
 </head>
 
 <body>
-  <!-- Splash Screen -->
-  <div id="splash-screen" class="splash-screen">
-    <img src="icons/Icon-192.png" alt="Logo" class="splash-logo">
+  <!-- Custom Splash Screen -->
+  <div id="splash">
+    <div class="logo-container">
+      <img src="assets/icon/icon.png" alt="7esenTV Logo">
+    </div>
+    <div class="loader"></div>
   </div>
 
-  <div id="app-content">
-    <!-- Flutter app content will be here -->
-    <script src="install_prompt.js" defer></script>
-    <script>
-      // Helper function for Dart to remove splash screen safely
-      window.removeSplashFromWeb = function () {
-        var splash = document.getElementById('splash-screen');
-        if (splash) {
-          splash.style.opacity = '0';
-          setTimeout(function () { splash.remove(); }, 500);
-        }
-      };
+  <!-- Flutter App Container -->
+  <div id="flutter-app"></div>
 
-      window.addEventListener('load', function (ev) {
-        _flutter.loader.loadEntrypoint({
-          serviceWorker: {
-            serviceWorkerVersion: serviceWorkerVersion,
-          },
-          onEntrypointLoaded: function (engineInitializer) {
-            engineInitializer.initializeEngine().then(function (appRunner) {
-              appRunner.runApp();
-              // Fallback removal if Dart doesn't call it immediately
-              // setTimeout(window.removeSplashFromWeb, 1500); 
-            });
-          }
-        });
+  <script>
+    // ✅ Remove Splash when Flutter is ready
+    window.removeSplashFromWeb = function () {
+      const splash = document.getElementById('splash');
+      if (splash) {
+        splash.classList.add('hidden');
+        setTimeout(() => splash.remove(), 500);
+      }
+    };
+
+    // ✅ Service Worker Registration
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js')
+          .then(reg => console.log('[SW] Registered:', reg.scope))
+          .catch(err => console.error('[SW] Failed:', err));
       });
-    </script>
-  </div>
+    }
 
+    // ✅ PWA Install Prompt
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      console.log('[PWA] Install prompt available');
+    });
 
+    window.triggerInstallPrompt = function () {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choice) => {
+          console.log('[PWA] User choice:', choice.outcome);
+          deferredPrompt = null;
+        });
+      } else {
+        console.log('[PWA] No install prompt available');
+      }
+    };
+
+    // ✅ Check if running as PWA
+    window.isPwaStandalone = function () {
+      return window.matchMedia('(display-mode: standalone)').matches ||
+        window.navigator.standalone === true;
+    };
+  </script>
+
+  <!-- ✅ Flutter Initialization -->
+  <script src="flutter_bootstrap.js" async></script>
 </body>
 
 </html>

@@ -11,7 +11,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:google_fonts/google_fonts.dart'; // Re-added for fallback
 import 'package:hesen/screens/pwa_install_screen.dart'; // PWA Install Screen
-import 'package:hesen/utils/pwa/pwa_helper.dart'; // PWA Helper
 import 'package:hesen/services/api_service.dart';
 import 'package:hesen/models/match_model.dart';
 import 'package:uuid/uuid.dart';
@@ -1326,7 +1325,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         _navigateToVideoPlayer(context, initialUrl, streamLinks);
       }
     } catch (e) {
-      loadTimer?.cancel();
+      loadTimer.cancel();
       _resetAdLock();
       if (!navigationDone) {
         dismissAndNavigate();
@@ -1617,7 +1616,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           decoration: BoxDecoration(
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withValues(alpha: 0.1),
                 spreadRadius: 1,
                 blurRadius: 3,
                 offset: Offset(0, 1),
@@ -1711,7 +1710,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                                 .textTheme
                                                 .bodySmall
                                                 ?.color
-                                                ?.withOpacity(0.8),
+                                                ?.withValues(alpha: 0.8),
                                             fontSize: 12),
                                       ),
                                     ],

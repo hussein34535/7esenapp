@@ -1,5 +1,4 @@
 import 'dart:html' as html;
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:hesen/player_utils/video_player_web.dart'; // Import the registry
 import 'package:hesen/services/web_proxy_service.dart';

@@ -3,11 +3,8 @@
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
-# Download Flutter SDK
-curl -o flutter_linux_3.22.2-stable.tar.xz https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.22.2-stable.tar.xz
-
-# Extract Flutter SDK
-tar -xf flutter_linux_3.22.2-stable.tar.xz
+# Clone Flutter SDK (Stable Channel)
+git clone https://github.com/flutter/flutter.git -b stable --depth 1
 
 # Add Flutter to PATH for the current session
 export PATH="$PATH:$(pwd)/flutter/bin"

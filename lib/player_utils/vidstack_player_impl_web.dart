@@ -47,8 +47,8 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
     super.dispose();
   }
 
-  // دالة مساعدة لتحميل المصدر بشكل صحيح
-  void _loadSource(String rawUrl) {
+  // دالة مساعدة لتحميل المصدر بشكل صحيح (async للتعامل مع 7esenlink)
+  Future<void> _loadSourceAsync(String rawUrl) async {
     if (_currentPlayer == null) return;
 
     String finalUrl = rawUrl;
@@ -59,22 +59,28 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
       finalUrl = '$finalUrl.m3u8';
     }
 
-    final proxiedUrl = WebProxyService.proxiedUrl(finalUrl);
+    // 🔴 استخدام الدالة الجديدة لجلب الرابط الأصلي من 7esenlink
+    final resolvedUrl = await WebProxyService.resolveStreamUrl(finalUrl);
 
-    print('[VIDSTACK] Loading Source: $proxiedUrl');
+    print('[VIDSTACK] Loading Source: $resolvedUrl');
 
-    _currentPlayer!.setAttribute('src', proxiedUrl);
-    _currentPlayer!.setAttribute('title', 'Live Stream'); // إعادة تعيين العنوان
+    _currentPlayer!.setAttribute('src', resolvedUrl);
+    _currentPlayer!.setAttribute('title', 'Live Stream');
 
     // تحديد النوع بدقة مهم جداً لـ HLS
-    if (finalUrl.contains('.m3u8')) {
+    if (resolvedUrl.contains('.m3u8') || resolvedUrl.contains('stream.php')) {
       _currentPlayer!.setAttribute('type', 'application/x-mpegurl');
-    } else if (finalUrl.contains('.mp4')) {
+    } else if (resolvedUrl.contains('.mp4')) {
       _currentPlayer!.setAttribute('type', 'video/mp4');
     } else {
       // إزالة النوع لتركه يتعرف تلقائياً
       _currentPlayer!.removeAttribute('type');
     }
+  }
+
+  // Wrapper للتوافق مع الكود القديم
+  void _loadSource(String rawUrl) {
+    _loadSourceAsync(rawUrl);
   }
 
   void _updateActiveButton(String currentUrl) {

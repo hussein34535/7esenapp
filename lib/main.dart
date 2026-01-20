@@ -472,7 +472,8 @@ class _MyAppState extends State<MyApp> {
           ),
         ),
       ),
-      initialRoute: isPwaStandalone() ? '/home' : '/pwa_install',
+      // initialRoute: isPwaStandalone() ? '/home' : '/pwa_install',
+      initialRoute: '/home', // BYPASS INSTALL SCREEN: Open as normal site
       routes: {
         '/pwa_install': (context) => const PwaInstallScreen(),
         '/home': (context) => HomePage(

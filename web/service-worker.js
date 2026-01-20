@@ -51,6 +51,11 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
+  // ❌ Ignore non-http/https requests (e.g. chrome-extension://)
+  if (!url.protocol.startsWith('http')) {
+    return;
+  }
+
   // ❌ لا تخزن روابط البث المباشر (M3U8, TS, API)
   if (
     url.pathname.includes('.m3u8') ||

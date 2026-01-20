@@ -97,6 +97,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       DeviceOrientation.landscapeRight,
     ]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    WakelockPlus.enable();
     _androidPIP = AndroidPIP(
       onPipEntered: () {
         if (!mounted) return;

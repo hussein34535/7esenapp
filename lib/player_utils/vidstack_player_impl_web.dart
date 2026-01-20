@@ -89,92 +89,77 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           // Providers
           mediaPlayer.append(html.Element.tag('media-provider'));
 
-          // GESTURES (Since we removed the default layout, we need to add these back)
-          // Toggle Play/Pause on Tap
-          final gesturePlay = html.Element.tag('media-gesture');
-          gesturePlay.setAttribute('event', 'pointerup');
-          gesturePlay.setAttribute('action', 'toggle:paused');
-          mediaPlayer.append(gesturePlay);
-
-          // Double Tap to Seek (+/- 10s)
-          final gestureSeekFwd = html.Element.tag('media-gesture');
-          gestureSeekFwd.setAttribute('event', 'dblpointerup');
-          gestureSeekFwd.setAttribute('action', 'seek:10');
-          mediaPlayer.append(gestureSeekFwd);
-
-          final gestureSeekRew = html.Element.tag('media-gesture');
-          gestureSeekRew.setAttribute('event', 'dblpointerup');
-          gestureSeekRew.setAttribute('action', 'seek:-10');
-          mediaPlayer.append(gestureSeekRew);
-
-          // CONTROLS LAYER (Custom Manual Build)
-          final controls = html.Element.tag('media-controls');
-          controls.style.position = 'absolute';
-          controls.style.top = '0';
-          controls.style.left = '0';
-          controls.style.width = '100%';
-          controls.style.height = '100%';
-          // Pointer events logic usually handled by CSS, but let's be safe:
-          // controls.style.pointerEvents = 'none'; // Individual buttons will re-enable it
-
-          // 1. BOTTOM CONTROLS GROUP (The only one we want!)
-          final bottomGroup = html.Element.tag('media-controls-group');
-          bottomGroup.className = 'vds-controls-group';
-          // Force layout
-          bottomGroup.style.display = 'flex';
-          bottomGroup.style.alignItems = 'center';
-          bottomGroup.style.width = '100%';
-          bottomGroup.style.position = 'absolute';
-          bottomGroup.style.bottom = '0'; // Pinned to bottom
-          bottomGroup.style.left = '0';
-          bottomGroup.style.padding = '20px';
-          bottomGroup.style.boxSizing = 'border-box';
-          // Gradient background for readability
-          bottomGroup.style.background =
-              'linear-gradient(to top, rgba(0,0,0,0.8), transparent)';
-          bottomGroup.style.pointerEvents = 'auto'; // Enable clicks
-          bottomGroup.style.zIndex = '999';
-
-          // ADD BUTTONS TO BOTTOM GROUP
-
-          // Play Button
-          bottomGroup.append(html.Element.tag('media-play-button'));
-
-          // Spacer just in case
-          final spacer = html.DivElement();
-          spacer.style.width = '10px';
-          bottomGroup.append(spacer);
-
-          // Time Slider (Seek Bar)
-          final timeSlider = html.Element.tag('media-time-slider');
-          timeSlider.style.flex = '1'; // Take remaining space
-          bottomGroup.append(timeSlider);
-
-          // Time Label
-          // bottomGroup.append(html.Element.tag('media-time')); // Optional, can be inside slider
-
-          // Mute Button (Volume)
-          bottomGroup.append(html.Element.tag('media-mute-button'));
-
-          // Settings Menu (The problem child!)
-          final settingsButton = html.Element.tag('media-menu-button');
-          settingsButton.setAttribute(
-              'placement', 'top end'); // Pop upwards to the right
-          settingsButton.setAttribute('tooltip', 'Settings');
-          bottomGroup.append(settingsButton);
-
-          // Fullscreen
-          bottomGroup.append(html.Element.tag('media-fullscreen-button'));
-
-          // Append Group to Controls
-          controls.append(bottomGroup);
-
-          // Append Controls to Player
-          mediaPlayer.append(controls);
-
+          // Layout (Standard Vidstack Layout - Ensures Icons & Gestures work)
+          final layout = html.Element.tag('media-video-layout');
+          mediaPlayer.append(layout);
           element.append(mediaPlayer);
 
-          // NO Shadow DOM Injection needed because we own the Light DOM now!
+          // INJECT STYLES INTO SHADOW DOM (Persistent Retry Mechanism)
+          // Vidstack loads asynchronously, so we poll for the shadowRoot to be ready.
+          // This moves the top controls to the bottom-right FORCEFULLY.
+          int retryCount = 0;
+          const maxRetries = 50; // Try for 5 seconds (50 * 100ms)
+
+          Timer.periodic(const Duration(milliseconds: 100), (timer) {
+            retryCount++;
+            if (retryCount > maxRetries) {
+              timer.cancel();
+              print("Vidstack Injection: Timed out.");
+              return;
+            }
+
+            try {
+              // Try to access shadowRoot
+              final shadowRoot = (layout as dynamic).shadowRoot;
+              if (shadowRoot != null) {
+                // Check if we already injected to avoid duplicates
+                final existingStyle =
+                    shadowRoot.querySelector('#vds-custom-style');
+                if (existingStyle == null) {
+                  final shadowStyle = html.StyleElement();
+                  shadowStyle.id = 'vds-custom-style';
+                  shadowStyle.innerText = """
+                      /* NUCLEAR OPTION: FORCE ALL CONTROLS TO BOTTOM */
+                      
+                      /* 1. Reset Top Groups (Left/Right) to Bottom */
+                      media-controls-group[data-position^="top"] {
+                        top: auto !important;
+                        bottom: 80px !important; /* Above timeline */
+                        right: 20px !important;
+                        left: auto !important;
+                        width: auto !important;
+                        flex-direction: row-reverse !important; /* Align buttons right */
+                        
+                        /* Layout fixes */
+                        display: flex !important;
+                        align-items: center !important;
+                        justify-content: flex-end !important;
+                        z-index: 90 !important;
+                      }
+
+                      /* 2. Specific fix for overlapping buttons */
+                      media-tooltip {
+                        z-index: 99 !important;
+                      }
+                      
+                      /* 3. Ensure they are visible */
+                      media-menu-button, media-mute-button, media-fullscreen-button {
+                        display: block !important;
+                        visibility: visible !important;
+                        pointer-events: auto !important;
+                      }
+                    """;
+                  shadowRoot.append(shadowStyle);
+                  print(
+                      "Vidstack Shadow DOM styles injected SUCCESSFULLY on attempt $retryCount.");
+                }
+                // Success - cancel timer
+                timer.cancel();
+              }
+            } catch (e) {
+              // Ignore errors while waiting for DOM
+            }
+          });
         }
       },
     );

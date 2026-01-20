@@ -976,7 +976,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       }
     } catch (e) {
       if (e is http.ClientException || e is SocketException) {
-        if (mounted) {
+        // Prevent SnackBar from appearing over the Splash Screen
+        if (mounted && !_isLoading) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
@@ -1554,28 +1555,46 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     // LOADING STATE: Match HTML Splash (Full Screen, Black, Centered Logo)
-    if (_isLoading) {
+    // WEB ONLY as requested
+    if (kIsWeb && _isLoading) {
       return Scaffold(
         backgroundColor: Colors.black, // Match HTML splash bg
-        body: Center(
-          child: Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF7C52D8).withOpacity(0.5),
-                  blurRadius: 20,
-                  spreadRadius: 0,
+        body: Stack(
+          children: [
+            // 1. Logo Centered Exactly (Matches HTML)
+            Center(
+              child: Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF7C52D8).withOpacity(0.5),
+                      blurRadius: 20,
+                      spreadRadius: 0,
+                    ),
+                  ],
                 ),
-              ],
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Image.asset('assets/icon/icon.png'),
+                ),
+              ),
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: Image.asset('assets/icon/icon.png'),
+            // 2. Loading Indicator (Below Logo)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: MediaQuery.of(context).size.height *
+                  0.35, // Approx below center
+              child: const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF7C52D8)),
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       );
     }

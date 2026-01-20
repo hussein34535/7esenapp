@@ -1,5 +1,6 @@
 import 'dart:html' as html;
 import 'dart:js' as js; // Needed for interop
+import 'dart:async'; // Needed for Timer
 import 'package:flutter/material.dart';
 import 'package:hesen/player_utils/video_player_web.dart'; // Import the registry
 import 'package:hesen/services/web_proxy_service.dart';

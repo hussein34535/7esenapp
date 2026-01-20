@@ -34,7 +34,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
   @override
   Widget build(BuildContext context) {
     return HtmlElementView(
-      key: const ValueKey('vidstack_player'), // ✅ Fixed Key to allow recycling
+      key: ValueKey(widget.url), // ✅ Force rebuild on URL change
       viewType: 'vidstack-player',
       onPlatformViewCreated: (int viewId) {
         _currentViewId = viewId;

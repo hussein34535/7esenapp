@@ -1,0 +1,17 @@
+# Ignore everything initially
+*
+!api/
+!package.json
+!vercel.json
+!android/app/build/web/
+
+# Explicitly ignore heavy folders just in case
+ios/
+windows/
+linux/
+macos/
+test/
+.git/
+.idea/
+.vscode/
+*.log

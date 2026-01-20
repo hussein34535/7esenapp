@@ -8,13 +8,12 @@ class ApiService {
 
   static Future<List> fetchChannelCategories() async {
     final url =
-        '$baseUrl/channel-categories?populate[channels][sort][0]=createdAt:asc&sort=createdAt:asc'; // Removed &timestamp=${DateTime.now().millisecondsSinceEpoch} as headers are better
+        '$baseUrl/channel-categories?populate[channels][sort][0]=createdAt:asc&sort=createdAt:asc';
+
+    // نستخدم proxiedUrl لتمرير الطلب عبر كلاود فلير
     final response = await http.get(
       Uri.parse(WebProxyService.proxiedUrl(url)),
-      headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate',
-        'Pragma': 'no-cache',
-      },
+      // ❌ حذفنا الـ headers لأنها تسبب مشاكل CORS
     );
 
     if (response.statusCode == 200) {
@@ -30,10 +29,6 @@ class ApiService {
     final url = '$baseUrl/news?populate=*';
     final response = await http.get(
       Uri.parse(WebProxyService.proxiedUrl(url)),
-      headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate',
-        'Pragma': 'no-cache',
-      },
     );
 
     if (response.statusCode == 200) {
@@ -48,10 +43,6 @@ class ApiService {
     final url = '$baseUrl/matches?populate=*';
     final response = await http.get(
       Uri.parse(WebProxyService.proxiedUrl(url)),
-      headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate',
-        'Pragma': 'no-cache',
-      },
     );
 
     if (response.statusCode == 200) {
@@ -71,10 +62,6 @@ class ApiService {
     final url = 'https://st9.onrender.com/api/goals?populate=*';
     final response = await http.get(
       Uri.parse(WebProxyService.proxiedUrl(url)),
-      headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate',
-        'Pragma': 'no-cache',
-      },
     );
 
     if (response.statusCode == 200) {

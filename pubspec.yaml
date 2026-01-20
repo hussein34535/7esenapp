@@ -66,6 +66,7 @@ flutter_launcher_icons:
 flutter:
   uses-material-design: true
   assets:
+    - .env
     - assets/sun.png
     - assets/moon.png
     - assets/no-image.png

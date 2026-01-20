@@ -285,7 +285,24 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     };
 
     try {
-      if (urlToProcess.contains('youtube.com') ||
+      if (kIsWeb) {
+        // WEB OPTIMIZATION: Bypass client-side parsing to avoid CORS issues
+        if (urlToProcess.contains('youtube.com') ||
+            urlToProcess.contains('youtu.be')) {
+          // Vidstack handles YouTube natively
+          if (mounted) {
+            setState(() {
+              _currentStreamUrl = urlToProcess;
+              _isLoading = false;
+              _hasError = false;
+            });
+            _showControls();
+          }
+          return;
+        }
+        // For other links (Ok.ru, etc.), skip extraction and use the URL directly (will be proxied)
+        videoUrlToLoad = urlToProcess;
+      } else if (urlToProcess.contains('youtube.com') ||
           urlToProcess.contains('youtu.be')) {
         debugPrint(
             '[HESEN PLAYER] URL identified as YouTube. Processing in background...');

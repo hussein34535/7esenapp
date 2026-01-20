@@ -100,10 +100,6 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             media-controls-group svg {
                vertical-align: middle;
             }
-            /* CUSTOM SLOT VISIBILITY removed as we use standard media-icon */
-            media-controls-group svg {
-               vertical-align: middle;
-            }
           """;
           element.append(style);
 
@@ -177,24 +173,39 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           bottomGroup.style.pointerEvents = 'auto'; // Re-enable clicks
           bottomGroup.style.zIndex = '100';
 
+          // HELPER: Create SVG Icon via DOM (Bypasses Sanitizer)
+          html.Element createSvgIcon(String pathData) {
+            final svg = html.document
+                .createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('viewBox', '0 0 24 24');
+            svg.setAttribute('fill', 'white');
+            svg.style.width = '28px';
+            svg.style.height = '28px';
+            final path = html.document
+                .createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', pathData);
+            svg.append(path);
+            return svg;
+          }
+
           // PLAY BUTTON
           final playButton = html.Element.tag('media-play-button');
+          final playSlot = html.DivElement();
+          playSlot.setAttribute('slot', 'play');
+          playSlot.append(createSvgIcon('M8 5v14l11-7z'));
 
-          final playIcon = html.Element.tag('media-icon');
-          playIcon.setAttribute('type', 'play');
-          playIcon.setAttribute('slot', 'play');
+          final pauseSlot = html.DivElement();
+          pauseSlot.setAttribute('slot', 'pause');
+          pauseSlot.append(createSvgIcon('M6 19h4V5H6v14zm8-14v14h4V5h-4z'));
 
-          final pauseIcon = html.Element.tag('media-icon');
-          pauseIcon.setAttribute('type', 'pause');
-          pauseIcon.setAttribute('slot', 'pause');
+          final replaySlot = html.DivElement();
+          replaySlot.setAttribute('slot', 'replay');
+          replaySlot.append(createSvgIcon(
+              'M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z'));
 
-          final replayIcon = html.Element.tag('media-icon');
-          replayIcon.setAttribute('type', 'replay');
-          replayIcon.setAttribute('slot', 'replay');
-
-          playButton.append(playIcon);
-          playButton.append(pauseIcon);
-          playButton.append(replayIcon);
+          playButton.append(playSlot);
+          playButton.append(pauseSlot);
+          playButton.append(replaySlot);
           bottomGroup.append(playButton);
 
           // SPACER
@@ -217,37 +228,40 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
 
           // MUTE BUTTON
           final muteButton = html.Element.tag('media-mute-button');
+          final volumeHighSlot = html.DivElement();
+          volumeHighSlot.setAttribute('slot', 'volume-high');
+          volumeHighSlot.append(createSvgIcon(
+              'M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z'));
 
-          final volumeHighIcon = html.Element.tag('media-icon');
-          volumeHighIcon.setAttribute('type', 'volume-high');
-          volumeHighIcon.setAttribute('slot', 'volume-high');
+          final volumeLowSlot = html.DivElement();
+          volumeLowSlot.setAttribute('slot', 'volume-low');
+          volumeLowSlot.append(createSvgIcon(
+              'M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z'));
 
-          final volumeLowIcon = html.Element.tag('media-icon');
-          volumeLowIcon.setAttribute('type', 'volume-low');
-          volumeLowIcon.setAttribute('slot', 'volume-low');
+          final volumeMuteSlot = html.DivElement();
+          volumeMuteSlot.setAttribute('slot', 'volume-mute');
+          volumeMuteSlot.append(createSvgIcon(
+              'M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z'));
 
-          final volumeMuteIcon = html.Element.tag('media-icon');
-          volumeMuteIcon.setAttribute('type', 'volume-mute');
-          volumeMuteIcon.setAttribute('slot', 'volume-mute');
-
-          muteButton.append(volumeHighIcon);
-          muteButton.append(volumeLowIcon);
-          muteButton.append(volumeMuteIcon);
+          muteButton.append(volumeHighSlot);
+          muteButton.append(volumeLowSlot);
+          muteButton.append(volumeMuteSlot);
           bottomGroup.append(muteButton);
 
           // FULLSCREEN BUTTON
           final fsButton = html.Element.tag('media-fullscreen-button');
+          final enterFsSlot = html.DivElement();
+          enterFsSlot.setAttribute('slot', 'enter');
+          enterFsSlot.append(createSvgIcon(
+              'M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z'));
 
-          final fsEnterIcon = html.Element.tag('media-icon');
-          fsEnterIcon.setAttribute('type', 'fullscreen');
-          fsEnterIcon.setAttribute('slot', 'enter');
+          final exitFsSlot = html.DivElement();
+          exitFsSlot.setAttribute('slot', 'exit');
+          exitFsSlot.append(createSvgIcon(
+              'M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z'));
 
-          final fsExitIcon = html.Element.tag('media-icon');
-          fsExitIcon.setAttribute('type', 'fullscreen-exit');
-          fsExitIcon.setAttribute('slot', 'exit');
-
-          fsButton.append(fsEnterIcon);
-          fsButton.append(fsExitIcon);
+          fsButton.append(enterFsSlot);
+          fsButton.append(exitFsSlot);
           bottomGroup.append(fsButton);
 
           // Append Controls

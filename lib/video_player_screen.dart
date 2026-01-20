@@ -1094,26 +1094,35 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: GestureDetector(
-        onTap: _toggleControlsVisibility,
-        onDoubleTapDown: _handleDoubleTap,
-        behavior: HitTestBehavior.opaque,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            _buildVideoPlayer(),
-            // MODIFIED: The custom controls are now always in the stack,
-            // allowing the GestureDetector to toggle their visibility at any time.
-            // Their actual visibility is handled internally by _isControlsVisible and the FadeTransition.
-            _buildControls(context),
-            if (_isLoading && !_hasError)
-              CircularProgressIndicator(
-                  valueColor:
-                      AlwaysStoppedAnimation<Color>(widget.progressBarColor)),
-            if (_hasError) _buildErrorWidget("حدث خطأ أثناء تشغيل الفيديو."),
-          ],
+    // WEB/PWA: Handle Back Button to Ensure Video Closes properly
+    return PopScope(
+      canPop: false, // Handle manually
+      onPopInvoked: (didPop) {
+        if (didPop) return;
+        // Logic: Just pop the navigator which will trigger dispose() and stop video
+        Navigator.of(context).pop();
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: GestureDetector(
+          onTap: _toggleControlsVisibility,
+          onDoubleTapDown: _handleDoubleTap,
+          behavior: HitTestBehavior.opaque,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              _buildVideoPlayer(),
+              // MODIFIED: The custom controls are now always in the stack,
+              // allowing the GestureDetector to toggle their visibility at any time.
+              // Their actual visibility is handled internally by _isControlsVisible and the FadeTransition.
+              _buildControls(context),
+              if (_isLoading && !_hasError)
+                CircularProgressIndicator(
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(widget.progressBarColor)),
+              if (_hasError) _buildErrorWidget("حدث خطأ أثناء تشغيل الفيديو."),
+            ],
+          ),
         ),
       ),
     );

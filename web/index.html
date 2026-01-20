@@ -116,51 +116,27 @@
 
   <div id="app-content">
     <!-- Flutter app content will be here -->
+    <script src="install_prompt.js" defer></script>
     <script>
-      // PWA Install Prompt Logic
-      let deferredPrompt;
-      window.addEventListener('beforeinstallprompt', (e) => {
-        // Prevent the mini-infobar from appearing on mobile
-        e.preventDefault();
-        // Stash the event so it can be triggered later.
-        deferredPrompt = e;
-        console.log('beforeinstallprompt fired');
-      });
-
-      window.triggerInstallPrompt = function () {
-        if (deferredPrompt) {
-          deferredPrompt.prompt();
-          deferredPrompt.userChoice.then((choiceResult) => {
-            if (choiceResult.outcome === 'accepted') {
-              console.log('User accepted the A2HS prompt');
-            } else {
-              console.log('User dismissed the A2HS prompt');
-            }
-            deferredPrompt = null;
-          });
-        } else {
-          console.log('No deferred prompt available');
-          // Optional: Show manual instructions here if needed
-          alert('للتثبيت: اضغط على القائمة (Three Dots) واختر "Install App" أو "Add to Home Screen"');
+      // Helper function for Dart to remove splash screen safely
+      window.removeSplashFromWeb = function () {
+        var splash = document.getElementById('splash-screen');
+        if (splash) {
+          splash.style.opacity = '0';
+          setTimeout(function () { splash.remove(); }, 500);
         }
       };
 
       window.addEventListener('load', function (ev) {
         _flutter.loader.loadEntrypoint({
           serviceWorker: {
-            serviceWorkerVersion: null,
+            serviceWorkerVersion: serviceWorkerVersion,
           },
           onEntrypointLoaded: function (engineInitializer) {
             engineInitializer.initializeEngine().then(function (appRunner) {
               appRunner.runApp();
-              // Remove splash screen after app starts running
-              setTimeout(function () {
-                var splash = document.getElementById('splash-screen');
-                if (splash) {
-                  splash.style.opacity = '0';
-                  setTimeout(function () { splash.remove(); }, 500);
-                }
-              }, 1000); // 1-second buffer for Flutter to render first frame
+              // Fallback removal if Dart doesn't call it immediately
+              // setTimeout(window.removeSplashFromWeb, 1500); 
             });
           }
         });

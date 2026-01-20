@@ -31868,7 +31868,7 @@ case 1:return A.u(q,r)}})
 return A.v($async$a6Z,r)},
 qi(a){var s="https://corsproxy.io/?"
 if(B.c.aU(a,"https://late-dream-51e2.hussona4635.workers.dev")||B.c.aU(a,s))return a
-if(B.c.n(a,"youtube.com")||B.c.n(a,"youtu.be")||B.c.n(a,"ok.ru/videoembed")||B.c.n(a,"7esenlink.vercel.app"))return a
+if(B.c.n(a,"youtube.com")||B.c.n(a,"youtu.be")||B.c.n(a,"ok.ru/videoembed"))return a
 if((B.c.n(a,":8080")||B.c.n(a,":80")||!B.c.n(a,"."))&&!B.c.hP(a,".m3u8"))a+=".m3u8"
 if(B.c.n(a,"onrender.com"))return"https://late-dream-51e2.hussona4635.workers.dev?url="+A.o5(2,a,B.U,!1)
 return s+A.o5(2,a,B.U,!1)},

@@ -6,7 +6,13 @@ import 'package:hesen/services/web_proxy_service.dart';
 
 class VidstackPlayerImpl extends StatefulWidget {
   final String url;
-  const VidstackPlayerImpl({required this.url, Key? key}) : super(key: key);
+  final List<Map<String, dynamic>> streamLinks; // 🆕 Accept stream links
+
+  const VidstackPlayerImpl({
+    required this.url,
+    this.streamLinks = const [], // Default to empty
+    Key? key,
+  }) : super(key: key);
 
   @override
   State<VidstackPlayerImpl> createState() => _VidstackPlayerImplState();
@@ -147,6 +153,42 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
               font-size: 16px;
               font-weight: bold;
               text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+              margin-left: 10px;
+              white-space: nowrap;
+            }
+
+            /* Container for Quality/Server Buttons */
+            .vds-links-container {
+              display: flex;
+              gap: 10px;
+              overflow-x: auto;
+              margin-right: auto; /* Push to the right (RTL logic might inverse this, but flex works) */
+              padding-left: 20px;
+              scrollbar-width: none; /* Hide scrollbar Firefox */
+            }
+            .vds-links-container::-webkit-scrollbar { 
+              display: none; /* Hide scrollbar Chrome/Safari */
+            }
+
+            .vds-link-btn {
+              background: rgba(124, 82, 216, 0.3); /* Brand Purple Transparent */
+              color: white;
+              border: 1px solid rgba(255, 255, 255, 0.2);
+              border-radius: 12px;
+              padding: 5px 12px;
+              font-family: 'Cairo', sans-serif;
+              font-size: 12px;
+              cursor: pointer;
+              white-space: nowrap;
+              transition: all 0.2s;
+            }
+            .vds-link-btn:hover {
+              background: rgba(124, 82, 216, 0.8);
+              transform: scale(1.05);
+            }
+            .vds-link-btn.active {
+              background: #7C52D8;
+              border-color: #fff;
             }
         """;
         element.append(style);
@@ -190,13 +232,57 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
               </svg>
             </button>
             <div class="vds-title">Live Stream</div>
+            <div class="vds-links-container"></div> <!-- Container for buttons -->
           ''';
 
         // Back Button Action
-        overlay.querySelector('.vds-back-btn')!.onClick.listen((_) {
-          // جرب الخروج من الفول سكرين
-          js.JsObject.fromBrowserObject(player).callMethod('exitFullscreen');
+        overlay.querySelector('.vds-back-btn')!.onClick.listen((_) async {
+          // 1. Exit Fullscreen
+          try {
+            js.JsObject.fromBrowserObject(player).callMethod('exitFullscreen');
+          } catch (e) {
+            print('[VIDSTACK] Error exiting fullscreen: $e');
+          }
+
+          // 2. Return to Menu (Pop)
+          await Future.delayed(const Duration(milliseconds: 100));
+          if (mounted) {
+            Navigator.of(context).maybePop();
+          }
         });
+
+        // 🆕 Dynamic Link Buttons Generation
+        final linksContainer = overlay.querySelector('.vds-links-container')!;
+
+        for (var link in widget.streamLinks) {
+          final name = link['name'] ?? 'Stream';
+          final url = link['url'];
+
+          if (url != null && url.isNotEmpty) {
+            final btn = html.ButtonElement()
+              ..className = 'vds-link-btn'
+              ..innerText = name;
+
+            // Highlight if it's the current URL
+            if (url == widget.url) {
+              btn.classes.add('active');
+            }
+
+            btn.onClick.listen((_) {
+              print('[VIDSTACK] Switching source to: $name');
+              final newProxiedUrl = WebProxyService.proxiedUrl(url);
+              player.setAttribute('src', newProxiedUrl);
+              player.setAttribute('autoplay', 'true'); // Ensure it plays
+
+              // Update Active State Visuals
+              linksContainer.children
+                  .forEach((c) => c.classes.remove('active'));
+              btn.classes.add('active');
+            });
+
+            linksContainer.append(btn);
+          }
+        }
 
         player.append(overlay);
         // --- 🆕 HTML OVERLAY END ---

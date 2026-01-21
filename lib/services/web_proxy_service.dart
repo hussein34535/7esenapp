@@ -25,10 +25,9 @@ class WebProxyService {
       return url;
     }
 
-    // ج) روابط 7esenlink - تذهب مباشرة (لديها streaming proxy)
-    if (url.contains('7esenlink.vercel.app')) {
-      return url; // الـ API يتعامل مع CORS
-    }
+    // ج) روابط 7esenlink - نسمح لها بالمرور عبر البروكسي (Stream Proxy)
+    // لأنها تقوم بعمل Redirect لروابط HTTP، ونحن نحتاج HTTPS على الويب.
+    // لذلك أزلنا شرط (return url) هنا ليتم معالجتها في الخطوة (هـ).
 
     // د) إصلاح روابط IPTV (إضافة .m3u8)
     if ((url.contains(':8080') || url.contains(':80') || !url.contains('.')) &&

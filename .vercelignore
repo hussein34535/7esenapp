@@ -1,23 +1,30 @@
-# Ignore everything initially
-*
-!api/
-!package.json
-!vercel.json
-!install_flutter.sh
-!lib/
-!web/
-!pubspec.yaml
-!pubspec.lock
-!assets/
-!analysis_options.yaml
+# Vercel Ignore File
+# We use a blacklist strategy (ignore specific files) to ensure source code (lib, web, etc.) is included.
 
-# Explicitly ignore heavy folders just in case
+# Build & Dependency Artifacts
+.dart_tool/
+build/
+.pub-cache/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+
+# Native Platforms (Not needed for Web deployment)
+android/
 ios/
 windows/
 linux/
 macos/
-test/
-.git/
+
+# IDE & Git
 .idea/
 .vscode/
+.git/
+*.iml
+.DS_Store
+
+# Logs
 *.log
+
+# Misc
+test/

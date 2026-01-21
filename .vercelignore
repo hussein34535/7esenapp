@@ -3,7 +3,13 @@
 !api/
 !package.json
 !vercel.json
-!android/app/build/web/
+!install_flutter.sh
+!lib/
+!web/
+!pubspec.yaml
+!pubspec.lock
+!assets/
+!analysis_options.yaml
 
 # Explicitly ignore heavy folders just in case
 ios/

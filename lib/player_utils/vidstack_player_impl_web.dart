@@ -381,9 +381,17 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         player.addEventListener('can-play', (event) {
           print('[VIDSTACK] Media Ready - Attempting Play');
           try {
-            js.JsObject.fromBrowserObject(player).callMethod('play');
+            final playPromise = js_util.callMethod(player, 'play', []);
+            if (playPromise != null) {
+              js_util.promiseToFuture(playPromise).then((_) {
+                print('[VIDSTACK] Playback started successfully');
+              }).catchError((e) {
+                // AbortError is common when switching sources quickly or auto-play logic interferes
+                print('[VIDSTACK] Play request handled: $e');
+              });
+            }
           } catch (e) {
-            print('Play error: \$e');
+            print('[VIDSTACK] Data connection to play failed: $e');
           }
         });
 

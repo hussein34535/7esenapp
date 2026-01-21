@@ -2,7 +2,7 @@
     "name": "hesen-proxy",
     "version": "1.0.0",
     "scripts": {
-        "build": "./install_flutter.sh && flutter build web --release --no-tree-shake-icons"
+        "build": "./install_flutter.sh && ./flutter/bin/flutter build web --release --no-tree-shake-icons"
     },
     "dependencies": {}
 }

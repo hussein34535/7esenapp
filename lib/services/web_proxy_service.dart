@@ -39,9 +39,8 @@ class WebProxyService {
       return '$_apiProxy?url=' + Uri.encodeComponent(url);
     }
 
-    // 2. Fallback: Use Private Next.js Proxy (7esenlink)
-    // Most reliable method. Bypasses Blocks & Fixes CORS.
-    // Ensure you deploy the Next.js updates!
-    return 'https://7esenlink.vercel.app/api/proxy?url=${Uri.encodeComponent(url)}';
+    // 2. Fallback: Use CorsProxy.io
+    // Better handling for video/binary content than CodeTabs.
+    return 'https://corsproxy.io/?${Uri.encodeComponent(url)}';
   }
 }

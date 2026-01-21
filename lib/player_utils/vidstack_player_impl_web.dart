@@ -120,12 +120,13 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             workingManifestContent = content;
 
             // تحديد القالب بدقة من القائمة الأصلية
-            if (i < WebProxyService.proxyTemplates.length) {
-              activeProxyTemplate = WebProxyService.proxyTemplates[i];
+            // ملاحظة: قمنا بإضافة الرابط المباشر في البداية (index 0)
+            // لذا القوالب تبدأ من (i - 1)
+            if (i > 0 && (i - 1) < WebProxyService.proxyTemplates.length) {
+              activeProxyTemplate = WebProxyService.proxyTemplates[i - 1];
             } else {
-              // Fallback
-              activeProxyTemplate =
-                  proxyUrl.split(Uri.encodeComponent(finalUrl))[0];
+              // إذا كان i=0 فهذا الرابط المباشر، لا يوجد قالب
+              activeProxyTemplate = '';
             }
             break;
           }

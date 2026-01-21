@@ -48,26 +48,159 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
   }
 
   // دالة مساعدة لتحميل المصدر بشكل صحيح
-  void _loadSource(String rawUrl) {
+  Future<void> _loadSource(String rawUrl) async {
     if (_currentPlayer == null) return;
 
     String finalUrl = rawUrl;
 
-    // منطق خاص لروابط IPTV لإضافة الامتداد إذا كان ناقصاً
-    if ((finalUrl.contains(':8080') || finalUrl.contains(':80')) &&
-        !finalUrl.contains('.m3u8')) {
-      finalUrl = '$finalUrl.m3u8';
+    // 1. إذا كان رابط 7esenlink، نطلب الرابط الحقيقي (JSON Mode)
+    // هذا يحل مشكلة الـ Redirect + CORS
+    if (finalUrl.contains('7esenlink.vercel.app')) {
+      try {
+        print('[VIDSTACK] Resolving 7esenlink URL: $finalUrl');
+        // نضيف ?json=true للرابط
+        final jsonUri = Uri.parse(finalUrl).replace(queryParameters: {
+          ...Uri.parse(finalUrl).queryParameters,
+          'json': 'true'
+        });
+
+        // نستخدم fetch من dart:html لأن http package قد تواجه مشاكل CORS أقل هنا
+        final response = await html.window.fetch(jsonUri.toString());
+        if (response != null) {
+          // response is actually a Future<Response> wrapper related
+          // Simplified fetch in Dart web can be tricky, fallback to HttpRequest if needed or just use standard logic
+          // Let's use standard HttpRequest which is simpler in Dart Web context
+          final request = await html.HttpRequest.request(jsonUri.toString());
+          final jsonResponse =
+              js.context['JSON'].callMethod('parse', [request.responseText]);
+          if (jsonResponse['url'] != null) {
+            finalUrl = jsonResponse['url'];
+            print('[VIDSTACK] Resolved URL: $finalUrl');
+          }
+        }
+      } catch (e) {
+        print('[VIDSTACK] Error resolving URL: $e');
+        // في حال الفشل، نكمل بالرابط الأصلي (سيفشل غالباً لكن نحاول)
+      }
     }
 
+    // 2. منطق خاص لروابط IPTV (تحويل MPEG-TS إلى HLS)
+    // النمط المعتاد: http://host:port/user/pass/id
+    // النمط المطلوب للويب: http://host:port/live/user/pass/id.m3u8
+    if (finalUrl.contains(':8080') ||
+        (finalUrl.contains(':80') && !finalUrl.contains('stream.php'))) {
+      Uri uri = Uri.parse(finalUrl);
+      List<String> segments = List.from(uri.pathSegments);
+
+      // إذا كان الرابط يحتوي على 3 أجزاء (user, pass, id) ولا يبدأ بـ live
+      if (segments.length == 3 && segments[0] != 'live') {
+        print('[VIDSTACK] Converting TS to HLS (Injecting /live/)');
+        segments.insert(0, 'live'); // إضافة live في البداية
+
+        // التأكد من الامتداد .m3u8
+        String lastSegment = segments.last;
+        if (!lastSegment.endsWith('.m3u8')) {
+          segments.last = '$lastSegment.m3u8';
+        }
+
+        finalUrl = uri.replace(pathSegments: segments).toString();
+      }
+      // حالة أخرى: إذا كان ينقصه الامتداد فقط
+      else if (!finalUrl.endsWith('.m3u8')) {
+        finalUrl = '$finalUrl.m3u8';
+      }
+    }
+
+    // 3. تغليف الرابط بالبروكسي (CodeTabs)
     final proxiedUrl = WebProxyService.proxiedUrl(finalUrl);
 
-    print('[VIDSTACK] Loading Source: $proxiedUrl');
+    print('[VIDSTACK] Loading Source (Proxied): $proxiedUrl');
 
-    _currentPlayer!.setAttribute('src', proxiedUrl);
+    String sourceToUse = proxiedUrl;
+
+    // ✅ اعتراض ملفات M3U8 لإعادة صياغة الروابط الداخلية (Segments)
+    // المشكلة: ملف M3U8 يحتوي على روابط مباشرة (.ts) لا تدعم CORS
+    // الحل: تحميل الملف نصياً، إضافة البروكسي قبل كل رابط داخلي، ثم تشغيله كـ Blob
+    if (finalUrl.contains('.m3u8') ||
+        finalUrl.contains('stream.php') ||
+        finalUrl.contains('/live/')) {
+      try {
+        print('[VIDSTACK] Intercepting Manifest for Rewriting...');
+        final content = await html.HttpRequest.getString(proxiedUrl);
+
+        // 1. استخراج الـ Base URL الصحيح (بدون اسم الملف)
+        // http://server.com/live/user/pass/132.m3u8 -> http://server.com/live/user/pass/
+        // نستخدم finalUrl (الرابط الأصلي) وليس البروكسي
+        final uri = Uri.parse(finalUrl);
+        final baseUrlString =
+            uri.toString().substring(0, uri.toString().lastIndexOf('/') + 1);
+        final baseUrl = Uri.parse(baseUrlString);
+
+        print('[VIDSTACK] Base URL for Relative Resolution: $baseUrlString');
+
+        final lines = content.split('\n');
+        final rewrittenLines = [];
+
+        for (var line in lines) {
+          line = line.trim();
+          if (line.isEmpty) {
+            rewrittenLines.add(line);
+            continue;
+          }
+
+          // تخطي الأسطر الوصفية (Metadata) ولكن معالجة المفاتيح (Keys)
+          if (line.startsWith('#')) {
+            if (line.startsWith('#EXT-X-KEY') && line.contains('URI="')) {
+              // معالجة مفتاح التشفير اذا كان نسبياً
+              line = line.replaceAllMapped(RegExp(r'URI="([^"]+)"'), (match) {
+                String keyUri = match.group(1)!;
+                if (!keyUri.startsWith('http')) {
+                  keyUri = baseUrl.resolve(keyUri).toString();
+                }
+                return 'URI="${WebProxyService.proxiedUrl(keyUri)}"';
+              });
+            }
+            rewrittenLines.add(line);
+            continue;
+          }
+
+          // هذا السطر هو رابط لملف (Segment)
+          String segmentUrl = line;
+
+          // أ) حل الرابط النسبي
+          if (!segmentUrl.startsWith('http')) {
+            segmentUrl = baseUrl.resolve(segmentUrl).toString();
+          }
+
+          // ب) تغليف الرابط بالبروكسي (CodeTabs)
+          if (!segmentUrl.contains('codetabs.com')) {
+            segmentUrl = WebProxyService.proxiedUrl(segmentUrl);
+          }
+
+          rewrittenLines.add(segmentUrl);
+        }
+
+        final rewrittenContent = rewrittenLines.join('\n');
+
+        final blob = html.Blob([rewrittenContent], 'application/x-mpegurl');
+        sourceToUse = html.Url.createObjectUrlFromBlob(blob);
+        print(
+            '[VIDSTACK] Manifest Rewritten & Created Blob (Relative URLs Fixed): $sourceToUse');
+      } catch (e) {
+        print('[VIDSTACK] Manifest Rewriting Failed: $e');
+        // Fallback: Use proxied URL directly
+        sourceToUse = proxiedUrl;
+      }
+    }
+
+    _currentPlayer!.setAttribute('src', sourceToUse);
     _currentPlayer!.setAttribute('title', 'Live Stream');
 
     // تحديد النوع بدقة مهم جداً لـ HLS
-    if (finalUrl.contains('.m3u8')) {
+    if (finalUrl.contains('.m3u8') ||
+        proxiedUrl.contains('.m3u8') ||
+        finalUrl.contains('stream.php') ||
+        finalUrl.contains('/live/')) {
       _currentPlayer!.setAttribute('type', 'application/x-mpegurl');
     } else if (finalUrl.contains('.mp4')) {
       _currentPlayer!.setAttribute('type', 'video/mp4');
@@ -210,8 +343,32 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         });
 
         // 2. معالجة الأخطاء
+        // 2. معالجة الأخطاء
         player.addEventListener('error', (event) {
           print('[VIDSTACK] Error Event Triggered');
+          try {
+            // استخدام js_util لاستخراج تفاصيل الخطأ العميق
+            final detail =
+                js.context['Object'].callMethod('getPrototypeOf', [event]);
+            // أو محاولة الوصول المباشر
+            final eventObj = js.JsObject.fromBrowserObject(event);
+            print('[VIDSTACK] Event Type: ${eventObj['type']}');
+
+            // محاولة الوصول لـ detail (مشتركة في CustomEvent)
+            if (eventObj.hasProperty('detail')) {
+              final detail = eventObj['detail'];
+              print('[VIDSTACK] Error Detail Object: $detail');
+              // تفاصيل HLS often inside detail
+              if (detail != null) {
+                final code = detail['code'];
+                final message = detail['message'];
+                print(
+                    '[VIDSTACK] HLS/Media Error: Code=$code, Message=$message');
+              }
+            }
+          } catch (e) {
+            print('[VIDSTACK] Error extraction failed: $e');
+          }
         });
 
         element.append(player);

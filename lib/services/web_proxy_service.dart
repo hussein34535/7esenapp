@@ -12,9 +12,7 @@ class WebProxyService {
     if (!kIsWeb) return url;
 
     // أ) منع التكرار
-    if (url.startsWith(_apiProxy) ||
-        url.startsWith(_streamProxy) ||
-        url.startsWith('https://7esenlink.vercel.app')) {
+    if (url.startsWith(_apiProxy) || url.startsWith(_streamProxy)) {
       return url;
     }
 
@@ -25,15 +23,14 @@ class WebProxyService {
       return url;
     }
 
-    // ج) روابط 7esenlink - نسمح لها بالمرور عبر البروكسي (Stream Proxy)
-    // لأنها تقوم بعمل Redirect لروابط HTTP، ونحن نحتاج HTTPS على الويب.
-    // لذلك أزلنا شرط (return url) هنا ليتم معالجتها في الخطوة (هـ).
-
-    // د) إصلاح روابط IPTV (إضافة .m3u8)
-    if ((url.contains(':8080') || url.contains(':80') || !url.contains('.')) &&
-        !url.endsWith('.m3u8')) {
-      url = '$url.m3u8';
+    // ج) روابط 7esenlink - نسمح لها بالمرور بدون بروكسي مبدئياً
+    // لأننا سنقوم بمعالجتها يدوياً في VidstackPlayerImpl لطلب JSON
+    if (url.contains('7esenlink.vercel.app')) {
+      return url;
     }
+
+    // د) تم نقل معالجة روابط IPTV إلى VidstackPlayerImpl
+    // لإضافة /live/ وتحويلها إلى HLS بشكل ذكي.
 
     // هـ) التوجيه الذكي
 
@@ -42,7 +39,9 @@ class WebProxyService {
       return '$_apiProxy?url=' + Uri.encodeComponent(url);
     }
 
-    // 2. Other streams -> CorsProxy fallback
-    return '$_streamProxy' + Uri.encodeComponent(url);
+    // 2. Fallback: Use Private Next.js Proxy (7esenlink)
+    // Most reliable method. Bypasses Blocks & Fixes CORS.
+    // Ensure you deploy the Next.js updates!
+    return 'https://7esenlink.vercel.app/api/proxy?url=${Uri.encodeComponent(url)}';
   }
 }

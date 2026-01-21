@@ -30,7 +30,22 @@ class WebProxyService {
     // سيتم استخدام الـ Worker أولاً لأنه في رأس القائمة
 
     final encoded = Uri.encodeComponent(url);
-    return _proxyTemplates.map((tpl) => '$tpl$encoded').toList();
+
+    // Custom Logic for specific IPTV streams that require a unique User-Agent
+    String workerSuffix = '';
+    if (url.contains('cyou.') ||
+        url.contains(':8080') ||
+        url.contains('fastes.sbs')) {
+      // Known IPTV User-Agent from logs
+      workerSuffix = '&ua=1768615609-1768604809';
+    }
+
+    return _proxyTemplates.map((tpl) {
+      if (tpl.contains('workers.dev')) {
+        return '$tpl$encoded$workerSuffix';
+      }
+      return '$tpl$encoded';
+    }).toList();
   }
 
   /// (Deprecated) Returns the first proxy

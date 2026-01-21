@@ -11,6 +11,9 @@ fi
 # Add Flutter to PATH for the current session
 export PATH="$PATH:$(pwd)/flutter/bin"
 
+# Generate dummy .env if missing (required for build assets)
+touch .env
+
 # Enable web support for Flutter
 flutter config --enable-web
 

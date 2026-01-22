@@ -336,32 +336,14 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
 
         // --- OVERLAY ---
         final overlay = html.DivElement()..className = 'vds-overlay-header';
-
-        // Add VLC Button to the HTML structure
         overlay.setInnerHtml(
-          '''
-          <button class="vds-back-btn"><span style="font-size:24px;">&#x276E;</span></button>
-          <div class="vds-links-container"></div>
-          <button class="vds-vlc-btn" style="
-            background: #FF5722; color: white; border: none; border-radius: 8px;
-            padding: 6px 12px; cursor: pointer; display: flex; align-items: center; gap: 5px;
-            font-weight: bold; margin-left: 10px;
-          ">
-            <span>Open in VLC</span>
-            <span style="font-size:16px;">🚀</span>
-          </button>
-          ''',
+          '''<button class="vds-back-btn"><span style="font-size:24px;">&#x276E;</span></button><div class="vds-links-container"></div>''',
           treeSanitizer: html.NodeTreeSanitizer.trusted,
         );
 
         // Back Button
         overlay.querySelector('.vds-back-btn')!.onClick.listen((_) {
           if (mounted) Navigator.of(context).maybePop();
-        });
-
-        // VLC Button Logic
-        overlay.querySelector('.vds-vlc-btn')!.onClick.listen((_) {
-          _openInVlc(widget.url);
         });
 
         // Links
@@ -387,10 +369,6 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             btn.onClick.listen((_) {
               _loadSource(urlStr);
               _updateActiveButton(urlStr);
-              // Update VLC button action to current URL
-              overlay.querySelector('.vds-vlc-btn')!.onClick.listen((_) {
-                _openInVlc(urlStr);
-              });
             });
             linksContainer.append(btn);
           }
@@ -452,37 +430,5 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         _loadSource(initialUrl);
       },
     );
-  }
-
-  // --- External Player Helper ---
-  void _openInVlc(String streamUrl) {
-    print('[VIDSTACK] Generating M3U for VLC: $streamUrl');
-
-    // 1. Construct M3U Content with Headers
-    // Header for VLC/MPV to respect User-Agent
-    final m3uContent = '''
-#EXTM3U
-#EXTINF:-1, Hesen Player Stream
-#EXTVLCOPT:http-user-agent=1768615609-1768604809
-$streamUrl
-''';
-
-    // 2. Create Blob
-    final blob = html.Blob([m3uContent], 'audio/x-mpegurl');
-    final url = html.Url.createObjectUrlFromBlob(blob);
-
-    // 3. Trigger Download
-    final anchor = html.AnchorElement()
-      ..href = url
-      ..download = 'watch_in_vlc.m3u';
-
-    html.document.body!.append(anchor);
-    anchor.click();
-    anchor.remove();
-
-    // 4. Revoke Object URL (Clean up)
-    html.Url.revokeObjectUrl(url);
-
-    print('[VIDSTACK] M3U Generated and Download Triggered');
   }
 }

@@ -56,6 +56,68 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // ✅ Intercept HEAD requests for Proxies (CodeTabs triggers 400 Bad Request on HEAD)
+  if (event.request.method === 'HEAD' &&
+    (url.hostname.includes('codetabs.com') ||
+      url.hostname.includes('corsproxy.io') ||
+      url.hostname.includes('workers.dev'))) {
+    event.respondWith(
+      new Response(null, {
+        status: 200,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, HEAD, POST, OPTIONS'
+        }
+      })
+    );
+    return;
+  }
+
+  // ✅ Intercept Proxy requests (CodeTabs & CorsProxy.io) to Fix Headers
+  if (url.hostname.includes('codetabs.com') || url.hostname.includes('corsproxy.io')) {
+    event.respondWith(
+      fetch(event.request).then(response => {
+        const newHeaders = new Headers(response.headers);
+
+        // تصحيح نوع المحتوى بناءً على الامتداد
+        if (event.request.url.includes('.m3u8')) {
+          newHeaders.set('Content-Type', 'application/x-mpegurl');
+        } else if (event.request.url.includes('.ts')) {
+          newHeaders.set('Content-Type', 'video/mp2t');
+        }
+
+        // ضمان وجود CORS
+        newHeaders.set('Access-Control-Allow-Origin', '*');
+
+        return new Response(response.body, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: newHeaders
+        });
+      }).catch(err => {
+        console.error('[SW] Proxy Request Failed:', err);
+        return new Response('Proxy Error', { status: 502 });
+      })
+    );
+    return;
+  }
+
+  // ❌ Ignore non-GET requests (Head, Post, etc.) to prevent Cache errors
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
+  // ❌ Ignore requests to Proxies (Streaming should not be cached)
+  if (
+    url.hostname.includes('corsproxy.io') ||
+    url.hostname.includes('allorigins.win') ||
+    // CodeTabs handled above
+    url.hostname.includes('workers.dev') ||
+    url.hostname.includes('freeboard.io')
+  ) {
+    return;
+  }
+
   // ❌ لا تخزن روابط البث المباشر (M3U8, TS, API)
   if (
     url.pathname.includes('.m3u8') ||

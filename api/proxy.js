@@ -27,38 +27,17 @@ module.exports = (req, res) => {
         // Protocol-agnostic request handler
         const lib = parsedUrl.protocol === 'https:' ? https : http;
 
-        // Determine User-Agent
-        const ua = req.query.ua || req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-
-        // Detect native app simulation
-        const isNativeApp = ua.includes('IPTVSmarters') ||
-            ua.includes('VLC') ||
-            ua.includes('okhttp') ||
-            ua.includes('ExoPlayer');
-
-        // IP Spoofing/Forwarding to bypass Data Center blocks
-        const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-
-        const headers = {
-            'User-Agent': ua,
-            'Accept': '*/*',
-            'Accept-Encoding': 'identity',
-            'Connection': 'keep-alive',
-            'Host': parsedUrl.host, // Crucial for some virtual hosts
-            'X-Forwarded-For': clientIp, // Forward original user IP
-            'X-Real-IP': clientIp       // Forward original user IP
-        };
-
-        // Only spoof Referer/Origin for browser-like requests
-        // Native apps typically don't send these, and sending them with a native UA flags as a bot
-        if (!isNativeApp) {
-            headers['Referer'] = parsedUrl.origin + '/';
-            headers['Origin'] = parsedUrl.origin;
-        }
-
         const options = {
             method: req.method,
-            headers: headers,
+            headers: {
+                // Forward User-Agent or spoof it
+                'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': '*/*',
+                'Accept-Encoding': 'identity', // Important: Disable compression for easy rewriting
+                // Spoof Referer to trick servers
+                'Referer': parsedUrl.origin + '/',
+                'Origin': parsedUrl.origin
+            },
             rejectUnauthorized: false // Allow self-signed/invalid certs (Crucial for IPTV)
         };
 

@@ -7,8 +7,7 @@ class WebProxyService {
 
   // القائمة الذهبية للبروكسيات (تم التحقق منها)
   static final List<String> _proxyTemplates = [
-    '/api/proxy?url=', // Internal Vercel Proxy (Priority #1 - Same Origin)
-    '$_apiProxy?url=', // Custom Worker (Priority #2)
+    '$_apiProxy?url=', // Custom Worker (Priority #1)
     'https://api.codetabs.com/v1/proxy?quest=', // Stable
     'https://corsproxy.io/?', // Reliable
     'https://api.allorigins.win/raw?url=', // Good backup
@@ -31,52 +30,22 @@ class WebProxyService {
     // سيتم استخدام الـ Worker أولاً لأنه في رأس القائمة
 
     final encoded = Uri.encodeComponent(url);
-    List<String> results = [];
 
     // Custom Logic for specific IPTV streams that require a unique User-Agent
-    // We will race MULTIPLE strategies to find the one that works
-    List<String> suffixes = ['']; // Default (empty)
-
+    String workerSuffix = '';
     if (url.contains('cyou.') ||
         url.contains(':8080') ||
         url.contains('fastes.sbs')) {
-      // Strategy 1: Dynamic Token (3 Hours Exact)
-      // Pattern observed: 1768615609-1768604809 (Diff: 10800s)
-      final now = DateTime.now().toUtc();
-      // Start slightly in the past (-300s) to allow for server clock skew
-      // Duration: 3 hours + small buffer? No, let's try exact 3h window logic
-      // observed in logs.
-      // Actually, let's generate a "fresh" 3 hour valid window.
-      // Expiry = Now + 3h. Creation = Now.
-      final creation = now;
-      final expiry = now.add(const Duration(hours: 3));
-
-      final startTs = (creation.millisecondsSinceEpoch / 1000).floor();
-      final endTs = (expiry.millisecondsSinceEpoch / 1000).floor();
-
-      suffixes = [
-        '&ua=$endTs-$startTs', // 1. Dynamic Token (Priority)
-        '&ua=IPTVSmartersPro', // 2. Known App
-        '&ua=VLC/3.0.16 LibVLC/3.0.16', // 3. Standard Player
-        '&ua=okhttp/3.12.1', // 4. Android Standard
-        '' // 5. Fallback (Browser UA)
-      ];
+      // Known IPTV User-Agent from logs
+      workerSuffix = '&ua=1768615609-1768604809';
     }
 
-    // Generate Cartesian Product: Templates x Suffixes
-    for (var tpl in _proxyTemplates) {
-      if (tpl.contains('workers.dev') || tpl.startsWith('/api/proxy')) {
-        // Only internal/worker proxies support &ua= param
-        for (var suffix in suffixes) {
-          results.add('$tpl$encoded$suffix');
-        }
-      } else {
-        // External proxies usually don't support custom params this way, or we don't know the format
-        results.add('$tpl$encoded');
+    return _proxyTemplates.map((tpl) {
+      if (tpl.contains('workers.dev')) {
+        return '$tpl$encoded$workerSuffix';
       }
-    }
-
-    return results;
+      return '$tpl$encoded';
+    }).toList();
   }
 
   /// (Deprecated) Returns the first proxy

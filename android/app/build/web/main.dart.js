@@ -29834,7 +29834,7 @@ r=A.a4($.avy).i("a6<1,m>")
 q=A.a5(new A.a6($.avy,new A.avz(q,s),r),r.i("au.E"))
 return q},
 uM(a){var s
-for(s=0;s<15;++s)if(B.c.aT(a,$.avy[s]))return a
+for(s=0;s<14;++s)if(B.c.aT(a,$.avy[s]))return a
 if(B.c.aT(a,"https://late-dream-51e2.hussona4635.workers.dev"))return a
 if(B.c.n(a,"youtube.com")||B.c.n(a,"youtu.be")||B.c.n(a,"ok.ru/videoembed")||B.c.n(a,"7esenlink.vercel.app"))return a
 return B.b.gU(A.aVs(a))},
@@ -100609,7 +100609,7 @@ if(c0==null)A.AV(b9)
 else c0.$1(b9)
 g=d
 f=c
-if(e>0&&e-1<15)c7.a=$.avy[e-1]
+if(e>0&&e-1<14)c7.a=$.avy[e-1]
 else c7.a=""
 s=15
 break}p=2
@@ -100918,7 +100918,7 @@ s=s==null?null:J.bc(s).toUpperCase()
 return s===this.a.toUpperCase()},
 $S:93}
 A.avz.prototype={
-$1(a){if(B.c.n(a,"workers.dev")||B.c.n(a,"/api/proxy"))return a+this.b+this.a.a
+$1(a){if(B.c.n(a,"workers.dev"))return a+this.b+this.a.a
 return a+this.b},
 $S:33}
 A.aLC.prototype={
@@ -112225,7 +112225,7 @@ $.aOY=A.aI(t.N)
 $.aPC=A.aI(t.uz)
 $.aXE=null
 $.aYC=A.C(t.S,t.lU)
-$.avy=A.b(["/api/proxy?url=","https://api.codetabs.com/v1/proxy?quest=","https://corsproxy.io/?","https://cors.eu.org/","https://api.allorigins.win/raw?url=","https://late-dream-51e2.hussona4635.workers.dev?url=","https://cors-anywhere.herokuapp.com/","https://proxy.cors.sh/","https://cors.bridged.cc/","https://api.cloudflare.com/client/v4/workers/proxy?url=","https://anyorigin.herokuapp.com/get?url=","https://httpsme.herokuapp.com/","https://cors-proxy.htmldriven.com/?url=","https://thingproxy.freeboard.io/fetch/","https://api.allorigins.win/get?url="],t.s)
+$.avy=A.b(["https://api.codetabs.com/v1/proxy?quest=","https://corsproxy.io/?","https://cors.eu.org/","https://api.allorigins.win/raw?url=","https://late-dream-51e2.hussona4635.workers.dev?url=","https://cors-anywhere.herokuapp.com/","https://proxy.cors.sh/","https://cors.bridged.cc/","https://api.cloudflare.com/client/v4/workers/proxy?url=","https://anyorigin.herokuapp.com/get?url=","https://httpsme.herokuapp.com/","https://cors-proxy.htmldriven.com/?url=","https://thingproxy.freeboard.io/fetch/","https://api.allorigins.win/get?url="],t.s)
 $.aKs=null
 $.aL5=null
 $.aOO=null

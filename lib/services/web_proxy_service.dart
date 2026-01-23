@@ -34,15 +34,21 @@ class WebProxyService {
 
     // Custom Logic for specific IPTV streams that require a unique User-Agent
     String workerSuffix = '';
-    /* 
-    // Commented out expired token (Jan 17 2026) -> Causing 401
+    // Dynamic User-Agent generation for specific IPTV streams
+    // Format: EXPIRY_TIMESTAMP-CREATION_TIMESTAMP
     if (url.contains('cyou.') ||
         url.contains(':8080') ||
         url.contains('fastes.sbs')) {
-      // Known IPTV User-Agent from logs
-      workerSuffix = '&ua=1768615609-1768604809';
-    } 
-    */
+      final now = DateTime.now().toUtc();
+      final expiry = now.add(const Duration(hours: 12));
+
+      // Convert to Unix timestamp (seconds)
+      final startTs = (now.millisecondsSinceEpoch / 1000).floor();
+      final endTs = (expiry.millisecondsSinceEpoch / 1000).floor();
+
+      // The format observed was Larger-Smaller (Expiry-Creation)
+      workerSuffix = '&ua=$endTs-$startTs';
+    }
 
     return _proxyTemplates.map((tpl) {
       if (tpl.contains('workers.dev') || tpl.startsWith('/api/proxy')) {

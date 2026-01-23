@@ -30,11 +30,13 @@ module.exports = (req, res) => {
         const options = {
             method: req.method,
             headers: {
-                // Allow overriding User-Agent from client (via &ua=...)
-                // Default to VLC if not specified
-                'User-Agent': req.query.ua ? decodeURIComponent(req.query.ua) : 'VLC/3.0.18 LibVLC/3.0.18',
+                // Forward User-Agent or spoof it
+                'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'Accept': '*/*',
                 'Accept-Encoding': 'identity', // Important: Disable compression for easy rewriting
+                // Spoof Referer to trick servers
+                'Referer': parsedUrl.origin + '/',
+                'Origin': parsedUrl.origin
             },
             rejectUnauthorized: false // Allow self-signed/invalid certs (Crucial for IPTV)
         };

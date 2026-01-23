@@ -34,20 +34,12 @@ class WebProxyService {
 
     // Custom Logic for specific IPTV streams that require a unique User-Agent
     String workerSuffix = '';
-    // Dynamic User-Agent generation for specific IPTV streams
-    // Format: EXPIRY_TIMESTAMP-CREATION_TIMESTAMP
+    // Use standard IPTV player User-Agent to avoid 401
+    // The server rejects dynamic tokens, so we impersonate a known player.
     if (url.contains('cyou.') ||
         url.contains(':8080') ||
         url.contains('fastes.sbs')) {
-      final now = DateTime.now().toUtc();
-      final expiry = now.add(const Duration(hours: 12));
-
-      // Convert to Unix timestamp (seconds)
-      final startTs = (now.millisecondsSinceEpoch / 1000).floor();
-      final endTs = (expiry.millisecondsSinceEpoch / 1000).floor();
-
-      // The format observed was Larger-Smaller (Expiry-Creation)
-      workerSuffix = '&ua=$endTs-$startTs';
+      workerSuffix = '&ua=IPTVSmartersPro';
     }
 
     return _proxyTemplates.map((tpl) {

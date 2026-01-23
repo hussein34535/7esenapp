@@ -45,7 +45,7 @@ class WebProxyService {
     }
 
     return _proxyTemplates.map((tpl) {
-      if (tpl.contains('workers.dev')) {
+      if (tpl.contains('workers.dev') || tpl.contains('/api/proxy')) {
         return '$tpl$encoded$workerSuffix';
       }
       return '$tpl$encoded';

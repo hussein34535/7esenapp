@@ -31,7 +31,7 @@ module.exports = (req, res) => {
             method: req.method,
             headers: {
                 // Forward User-Agent or spoof it
-                'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'User-Agent': req.query.ua || req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'Accept': '*/*',
                 'Accept-Encoding': 'identity', // Important: Disable compression for easy rewriting
                 // Spoof Referer to trick servers

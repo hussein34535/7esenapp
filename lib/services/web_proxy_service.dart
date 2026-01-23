@@ -7,7 +7,8 @@ class WebProxyService {
 
   // القائمة الذهبية للبروكسيات (تم التحقق منها)
   static final List<String> _proxyTemplates = [
-    '$_apiProxy?url=', // Custom Worker (Priority #1)
+    '/api/proxy?url=', // Internal Vercel Proxy (Priority #1 - Same Origin)
+    '$_apiProxy?url=', // Custom Worker (Priority #2)
     'https://api.codetabs.com/v1/proxy?quest=', // Stable
     'https://corsproxy.io/?', // Reliable
     'https://api.allorigins.win/raw?url=', // Good backup
@@ -41,7 +42,7 @@ class WebProxyService {
     }
 
     return _proxyTemplates.map((tpl) {
-      if (tpl.contains('workers.dev')) {
+      if (tpl.contains('workers.dev') || tpl.startsWith('/api/proxy')) {
         return '$tpl$encoded$workerSuffix';
       }
       return '$tpl$encoded';

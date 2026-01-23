@@ -92,8 +92,20 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
     // ونستخدم أول واحد ينجح في جلب المانيفست
     List<String> proxies = WebProxyService.getAllProxiedUrls(finalUrl);
     // إضافة الرابط المباشر كأول خيار للمحاولة (الأسرع والأفضل إذا نجح)
-    // إذا فشل بسبب CORS، سينتقل فوراً للبروكسيات
-    proxies.insert(0, finalUrl);
+    // ولكن فقط إذا كان آمناً (HTTPS) أو إذا كنا في بيئة التطوير (localhost)
+    // لتجنب أخطاء Mixed Content التي تملأ الكونسول
+    bool isSecureContext = html.window.location.protocol.contains('https');
+    bool isLocalhost =
+        html.window.location.hostname?.contains('localhost') ?? false;
+
+    // إذا كان الرابط https أو نحن لسنا في https (مثل localhost http)، يمكن إضافته
+    // أما إذا كنا في https والرابط http، فلا نضيفه كخيار مباشر
+    if (finalUrl.startsWith('https') || !isSecureContext || isLocalhost) {
+      proxies.insert(0, finalUrl);
+    } else {
+      print(
+          '[VIDSTACK] Skipping direct HTTP link to avoid Mixed Content error: $finalUrl');
+    }
 
     String? workingProxiedUrl;
     String? workingManifestContent;
@@ -326,7 +338,8 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         // الخصائص الأساسية
         player.setAttribute('autoplay', 'true');
         player.setAttribute('playsinline', 'true');
-        player.setAttribute('crossorigin', 'true'); // تصحيح لـ CORS
+        player.setAttribute(
+            'crossorigin', 'anonymous'); // تصحيح لـ CORS (true غير قياسي)
         player.setAttribute('aspect-ratio', '16/9');
         player.setAttribute('load', 'eager');
 

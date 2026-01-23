@@ -98,9 +98,11 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
     // على Vercel (HTTPS) لا نجرب روابط HTTP المباشرة لأنها ستفشل دائماً
     final isCurrentlySecure = html.window.location.protocol == 'https:';
     final isTargetSecure = finalUrl.startsWith('https://');
+    bool directUrlInserted = false;
 
     if (isTargetSecure || !isCurrentlySecure) {
       proxies.insert(0, finalUrl);
+      directUrlInserted = true;
     } else {
       print(
           '[VIDSTACK] Skipping direct HTTP URL on HTTPS site (Mixed Content Prevention)');
@@ -131,13 +133,18 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             workingManifestContent = content;
 
             // تحديد القالب بدقة من القائمة الأصلية
-            // ملاحظة: قمنا بإضافة الرابط المباشر في البداية (index 0)
-            // لذا القوالب تبدأ من (i - 1)
-            if (i > 0 && (i - 1) < WebProxyService.proxyTemplates.length) {
-              activeProxyTemplate = WebProxyService.proxyTemplates[i - 1];
+            if (directUrlInserted) {
+              if (i == 0) {
+                activeProxyTemplate = '';
+              } else if (i > 0 &&
+                  (i - 1) < WebProxyService.proxyTemplates.length) {
+                activeProxyTemplate = WebProxyService.proxyTemplates[i - 1];
+              }
             } else {
-              // إذا كان i=0 فهذا الرابط المباشر، لا يوجد قالب
-              activeProxyTemplate = '';
+              // لا يوجد رابط مباشر (على HTTPS)، القائمة تبدأ بالبروكسيات
+              if (i < WebProxyService.proxyTemplates.length) {
+                activeProxyTemplate = WebProxyService.proxyTemplates[i];
+              }
             }
             break;
           }

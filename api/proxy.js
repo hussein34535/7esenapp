@@ -30,9 +30,8 @@ module.exports = (req, res) => {
         const options = {
             method: req.method,
             headers: {
-                // Forward User-Agent if present, otherwise pretend to be a media player (VLC)
-                // Many IPTV servers block browsers but allow players
-                'User-Agent': req.headers['user-agent'] || 'VLC/3.0.18 LibVLC/3.0.18',
+                // FORCE User-Agent to be VLC. Do not use req.headers['user-agent'] because it is always the browser (Chrome/Safari) which the IPTV server blocks.
+                'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18',
                 'Accept': '*/*',
                 'Accept-Encoding': 'identity', // Important: Disable compression for easy rewriting
             },

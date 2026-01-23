@@ -5,21 +5,14 @@ class WebProxyService {
   static const String _apiProxy =
       'https://late-dream-51e2.hussona4635.workers.dev';
 
-  // القائمة الذهبية للبروكسيات (تم التحقق منها)
+  // القائمة الذهبية للبروكسيات (تم التحقق منها) - الـ Worker الخاص أولاً
   static final List<String> _proxyTemplates = [
-    'https://api.codetabs.com/v1/proxy?quest=', // Stable & Handles redirects well (Priority #1)
-    'https://corsproxy.io/?', // Reliable
-    'https://cors.eu.org/', // Slow but very permissive
-    'https://api.allorigins.win/raw?url=', // Good backup
-    '$_apiProxy?url=', // Custom Worker
-    'https://cors-anywhere.herokuapp.com/', // Popular
-    'https://proxy.cors.sh/', // User Validated
-    'https://cors.bridged.cc/', // User Validated
-    'https://api.cloudflare.com/client/v4/workers/proxy?url=', // User Validated
-    'https://anyorigin.herokuapp.com/get?url=', // User Validated
-    'https://httpsme.herokuapp.com/', // User Validated
-    'https://cors-proxy.htmldriven.com/?url=', // User Validated
-    'https://thingproxy.freeboard.io/fetch/', // Backup
+    '$_apiProxy?url=', // Custom Worker (TOP PRIORITY - Most Reliable)
+    'https://api.allorigins.win/raw?url=', // Very stable for HLS
+    'https://api.codetabs.com/v1/proxy?quest=', // Stable & Handles redirects
+    'https://corsproxy.io/?', // Reliable but sometimes rate-limited
+    'https://thingproxy.freeboard.io/fetch/', // Good backup
+    'https://cors-anywhere.herokuapp.com/', // Popular but needs activation
     'https://api.allorigins.win/get?url=', // JSON wrapper variant
   ];
 
@@ -29,18 +22,17 @@ class WebProxyService {
   static List<String> getAllProxiedUrls(String url) {
     if (url.isEmpty) return [];
 
-    // إزالة القيد الحصري عن onrender.com للسماح بالـ Fallback
-    // سيتم استخدام الـ Worker أولاً لأنه في رأس القائمة
-
     final encoded = Uri.encodeComponent(url);
 
-    // Custom Logic for specific IPTV streams that require a unique User-Agent
+    // Real User-Agent for IPTV streams (looks like a real browser/VLC player)
+    // This is critical for streams that check UA headers
     String workerSuffix = '';
     if (url.contains('cyou.') ||
         url.contains(':8080') ||
-        url.contains('fastes.sbs')) {
-      // Known IPTV User-Agent from logs
-      workerSuffix = '&ua=1768615609-1768604809';
+        url.contains('fastes.sbs') ||
+        url.contains('ugeen.live')) {
+      // Use VLC-like User-Agent which most IPTV servers accept
+      workerSuffix = '&ua=${Uri.encodeComponent("VLC/3.0.18 LibVLC/3.0.18")}';
     }
 
     return _proxyTemplates.map((tpl) {

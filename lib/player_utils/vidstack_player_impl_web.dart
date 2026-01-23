@@ -91,9 +91,20 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
     // بما أن لدينا قائمة بروكسيات كبيرة، سنجربها واحدة تلو الأخرى
     // ونستخدم أول واحد ينجح في جلب المانيفست
     List<String> proxies = WebProxyService.getAllProxiedUrls(finalUrl);
-    // إضافة الرابط المباشر كأول خيار للمحاولة (الأسرع والأفضل إذا نجح)
-    // إذا فشل بسبب CORS، سينتقل فوراً للبروكسيات
-    proxies.insert(0, finalUrl);
+
+    // إضافة الرابط المباشر كأول خيار فقط إذا:
+    // 1. الرابط HTTPS (لا يوجد Mixed Content)
+    // 2. أو نحن على localhost (HTTP -> HTTP مسموح)
+    // على Vercel (HTTPS) لا نجرب روابط HTTP المباشرة لأنها ستفشل دائماً
+    final isCurrentlySecure = html.window.location.protocol == 'https:';
+    final isTargetSecure = finalUrl.startsWith('https://');
+
+    if (isTargetSecure || !isCurrentlySecure) {
+      proxies.insert(0, finalUrl);
+    } else {
+      print(
+          '[VIDSTACK] Skipping direct HTTP URL on HTTPS site (Mixed Content Prevention)');
+    }
 
     String? workingProxiedUrl;
     String? workingManifestContent;

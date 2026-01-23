@@ -210,10 +210,16 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           }
 
           // ج) تغليف الرابط بالبروكسي (الناجح)
-          // نتأكد فقط أنه غير مغلف بالفعل
           if (!segmentUrl.startsWith(activeProxyTemplate)) {
-            segmentUrl =
-                '$activeProxyTemplate${Uri.encodeComponent(segmentUrl)}';
+            String proxyPrefix = activeProxyTemplate;
+            // Hotfix: If proxy is relative (starts with /), make it absolute for Blob usage
+            if (proxyPrefix.startsWith('/')) {
+              final origin = html.window.location.origin;
+              // Ensure we don't double slash if origin ends with / (unlikely) or prefix starts with /
+              proxyPrefix = '$origin$proxyPrefix';
+            }
+
+            segmentUrl = '$proxyPrefix${Uri.encodeComponent(segmentUrl)}';
           }
 
           rewrittenLines.add(segmentUrl);

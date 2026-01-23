@@ -34,12 +34,15 @@ class WebProxyService {
 
     // Custom Logic for specific IPTV streams that require a unique User-Agent
     String workerSuffix = '';
+    /* 
+    // Commented out expired token (Jan 17 2026) -> Causing 401
     if (url.contains('cyou.') ||
         url.contains(':8080') ||
         url.contains('fastes.sbs')) {
       // Known IPTV User-Agent from logs
       workerSuffix = '&ua=1768615609-1768604809';
-    }
+    } 
+    */
 
     return _proxyTemplates.map((tpl) {
       if (tpl.contains('workers.dev') || tpl.startsWith('/api/proxy')) {

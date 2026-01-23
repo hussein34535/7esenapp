@@ -29816,14 +29816,11 @@ return A.v($async$NB,r)},
 a7i:function a7i(){},
 anJ:function anJ(){},
 anK:function anK(a){this.a=a},
-aVr(a){var s,r,q={}
+aVr(a){var s
 if(a.length===0)return A.b([],t.s)
-s=A.kX(2,a,B.P,!1)
-q.a=""
-if(B.c.n(a,"cyou.")||B.c.n(a,":8080")||B.c.n(a,"fastes.sbs"))q.a="&ua=1768615609-1768604809"
-r=A.a4($.avx).i("a6<1,m>")
-q=A.a5(new A.a6($.avx,new A.avy(q,s),r),r.i("au.E"))
-return q},
+s=A.a4($.avx).i("a6<1,m>")
+s=A.a5(new A.a6($.avx,new A.avy(A.kX(2,a,B.P,!1),""),s),s.i("au.E"))
+return s},
 uM(a){var s
 for(s=0;s<12;++s)if(B.c.aT(a,$.avx[s]))return a
 if(B.c.aT(a,"https://late-dream-51e2.hussona4635.workers.dev"))return a
@@ -100912,8 +100909,8 @@ s=s==null?null:J.bd(s).toUpperCase()
 return s===this.a.toUpperCase()},
 $S:93}
 A.avy.prototype={
-$1(a){if(B.c.n(a,"workers.dev")||B.c.aT(a,"/api/proxy"))return a+this.b+this.a.a
-return a+this.b},
+$1(a){if(B.c.n(a,"workers.dev")||B.c.aT(a,"/api/proxy"))return a+this.a+this.b
+return a+this.a},
 $S:33}
 A.aLB.prototype={
 $1(a){var s,r,q,p,o=null,n=this.a,m=A.d_(15),l=n.ax,k=l.y,j=k.a4(0.5),i=t.p,h=A.b([],i),g=this.b

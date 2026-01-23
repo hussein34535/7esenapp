@@ -7,7 +7,8 @@ class WebProxyService {
 
   // القائمة الذهبية للبروكسيات (تم التحقق منها)
   static final List<String> _proxyTemplates = [
-    'https://api.codetabs.com/v1/proxy?quest=', // Stable & Handles redirects well (Priority #1)
+    '/api/proxy?url=', // ✅ Vercel Serverless Proxy (Best for Vercel Deployments)
+    'https://api.codetabs.com/v1/proxy?quest=', // Stable & Handles redirects well
     'https://corsproxy.io/?', // Reliable
     'https://cors.eu.org/', // Slow but very permissive
     'https://api.allorigins.win/raw?url=', // Good backup

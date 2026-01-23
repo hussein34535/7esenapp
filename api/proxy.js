@@ -36,10 +36,17 @@ module.exports = (req, res) => {
             ua.includes('okhttp') ||
             ua.includes('ExoPlayer');
 
+        // IP Spoofing/Forwarding to bypass Data Center blocks
+        const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
         const headers = {
             'User-Agent': ua,
             'Accept': '*/*',
-            'Accept-Encoding': 'identity' // Important: Disable compression for easy rewriting
+            'Accept-Encoding': 'identity',
+            'Connection': 'keep-alive',
+            'Host': parsedUrl.host, // Crucial for some virtual hosts
+            'X-Forwarded-For': clientIp, // Forward original user IP
+            'X-Real-IP': clientIp       // Forward original user IP
         };
 
         // Only spoof Referer/Origin for browser-like requests

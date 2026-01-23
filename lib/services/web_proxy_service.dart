@@ -7,10 +7,11 @@ class WebProxyService {
 
   // القائمة الذهبية للبروكسيات (تم التحقق منها)
   static final List<String> _proxyTemplates = [
-    '$_apiProxy?url=', // Custom Worker (Priority #1)
-    'https://api.codetabs.com/v1/proxy?quest=', // Stable
+    'https://api.codetabs.com/v1/proxy?quest=', // Stable & Handles redirects well (Priority #1)
     'https://corsproxy.io/?', // Reliable
+    'https://cors.eu.org/', // Slow but very permissive
     'https://api.allorigins.win/raw?url=', // Good backup
+    '$_apiProxy?url=', // Custom Worker
     'https://cors-anywhere.herokuapp.com/', // Popular
     'https://proxy.cors.sh/', // User Validated
     'https://cors.bridged.cc/', // User Validated
@@ -18,6 +19,8 @@ class WebProxyService {
     'https://anyorigin.herokuapp.com/get?url=', // User Validated
     'https://httpsme.herokuapp.com/', // User Validated
     'https://cors-proxy.htmldriven.com/?url=', // User Validated
+    'https://thingproxy.freeboard.io/fetch/', // Backup
+    'https://api.allorigins.win/get?url=', // JSON wrapper variant
   ];
 
   static List<String> get proxyTemplates => _proxyTemplates;

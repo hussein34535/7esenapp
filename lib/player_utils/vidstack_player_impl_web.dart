@@ -110,9 +110,9 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         final proxyUrl = proxies[i];
         try {
           print('[VIDSTACK] Trying Proxy: $proxyUrl');
-          // Timeout قصير (5 ثواني) لتسريع الفحص
+          // Timeout متوسط (10 ثواني) لأن بعض البروكسيات مثل codetabs بطيئة
           final content = await html.HttpRequest.getString(proxyUrl)
-              .timeout(const Duration(seconds: 4));
+              .timeout(const Duration(seconds: 10));
 
           if (content.contains('#EXTM3U')) {
             print('[VIDSTACK] ✅ Success with Proxy: $proxyUrl');
@@ -131,7 +131,12 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             break;
           }
         } catch (e) {
-          print('[VIDSTACK] ❌ Proxy Failed: $e');
+          String errorMsg = e.toString();
+          if (e is html.ProgressEvent && e.target is html.HttpRequest) {
+            final req = e.target as html.HttpRequest;
+            errorMsg = 'Status: ${req.status}, StatusText: ${req.statusText}';
+          }
+          print('[VIDSTACK] ❌ Proxy Failed ($proxyUrl): $errorMsg');
         }
       }
     } else {
@@ -294,10 +299,17 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             display: flex; align-items: center; z-index: 100; opacity: 0;
             transition: opacity 0.3s ease; pointer-events: none;
           }
-          .vds-player:hover .vds-overlay-header,
+          /* Logic for showing overlay: 
+             1. User is active (user-idle="false") OR Video Paused.
+             2. Mouse Hover (Only on devices with mouse to avoid sticky hover on mobile). */
           .vds-player[paused] .vds-overlay-header,
           .vds-player[user-idle="false"] .vds-overlay-header {
             opacity: 1; pointer-events: auto;
+          }
+          @media (hover: hover) {
+            .vds-player:hover .vds-overlay-header {
+              opacity: 1; pointer-events: auto;
+            }
           }
           .vds-back-btn {
             background: rgba(255, 255, 255, 0.1); border-radius: 50%;

@@ -391,19 +391,28 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
 
         // 1. استمع لحدث "يمكن التشغيل" بدلاً من إجبار التشغيل فوراً
         player.addEventListener('can-play', (event) {
-          print('[VIDSTACK] Media Ready - Attempting Play');
-          try {
-            final playPromise = js_util.callMethod(player, 'play', []);
-            if (playPromise != null) {
-              js_util.promiseToFuture(playPromise).then((_) {
-                print('[VIDSTACK] Playback started successfully');
-              }).catchError((e) {
-                // AbortError is common when switching sources quickly or auto-play logic interferes
-                print('[VIDSTACK] Play request handled: $e');
-              });
+          // Check if paused before forcing play to avoid unnecessary requests
+          final isPaused = js_util.getProperty(player, 'paused');
+          if (isPaused == true) {
+            print('[VIDSTACK] Media Ready - Attempting Play');
+            try {
+              final playPromise = js_util.callMethod(player, 'play', []);
+              if (playPromise != null) {
+                js_util.promiseToFuture(playPromise).then((_) {
+                  print('[VIDSTACK] Playback started successfully');
+                }).catchError((e) {
+                  // AbortError is expected if user pauses immediately or network interrupts
+                  // We ignore it to prevent console noise
+                  if (e.toString().contains('AbortError')) {
+                    print('[VIDSTACK] Play request was interrupted (Harmless)');
+                  } else {
+                    print('[VIDSTACK] Play request handled: $e');
+                  }
+                });
+              }
+            } catch (e) {
+              print('[VIDSTACK] Data connection to play failed: $e');
             }
-          } catch (e) {
-            print('[VIDSTACK] Data connection to play failed: $e');
           }
         });
 

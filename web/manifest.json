@@ -4,26 +4,12 @@
     "description": "شاهد القنوات الرياضية والمباريات مباشرة مع جودة عالية",
     "start_url": "/",
     "display": "standalone",
-    "background_color": "#000000",
-    "theme_color": "#673AB7",
+    "background_color": "#hex_code",
+    "theme_color": "#hex_code",
     "orientation": "any",
     "dir": "rtl",
     "lang": "ar",
     "scope": "/",
-    "icons": [
-        {
-            "src": "icons/icon-192.png",
-            "sizes": "192x192",
-            "type": "image/png",
-            "purpose": "any maskable"
-        },
-        {
-            "src": "icons/icon-512.png",
-            "sizes": "512x512",
-            "type": "image/png",
-            "purpose": "any maskable"
-        }
-    ],
     "categories": [
         "entertainment",
         "sports",
@@ -39,6 +25,30 @@
             "name": "المباريات",
             "url": "/?tab=matches",
             "description": "شاهد المباريات الحية"
+        }
+    ],
+    "icons": [
+        {
+            "src": "icons/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-maskable-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icons/Icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
         }
     ]
 }

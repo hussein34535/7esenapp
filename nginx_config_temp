@@ -1,0 +1,18 @@
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+
+    root /var/www/hesen/web;
+    index index.html;
+
+    server_name web.7esentv.com _;
+
+    location / {
+        # Security: Allow only iPhone
+        if ($http_user_agent !~* iPhone) {
+            return 403;
+        }
+
+        try_files $uri $uri/ /index.html;
+    }
+}

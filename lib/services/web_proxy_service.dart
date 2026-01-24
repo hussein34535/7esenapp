@@ -7,11 +7,7 @@ class WebProxyService {
 
   // القائمة الذهبية للبروكسيات - مرتبة حسب الموثوقية من الـ Logs
   static final List<String> _proxyTemplates = [
-    'https://api.codetabs.com/v1/proxy?quest=', // #1 - الأكثر موثوقية من الـ Logs ✅
-    'https://api.allorigins.win/raw?url=', // #2 - جيد لكن بطيء أحياناً
-    '$_apiProxy?url=', // #3 - Worker (يفشل أحياناً بسبب IP blocking)
-    'https://corsproxy.io/?', // #4 - Rate limited
-    'https://thingproxy.freeboard.io/fetch/', // #5 - Backup
+    'https://api.codetabs.com/v1/proxy?quest=', // الوحيد المستخدم
   ];
 
   static List<String> get proxyTemplates => _proxyTemplates;

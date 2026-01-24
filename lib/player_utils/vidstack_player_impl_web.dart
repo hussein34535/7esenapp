@@ -95,8 +95,8 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
 
     // CANCEL PREVIOUS SAFETY TIMER
     _safetyTimer?.cancel();
-    // START NEW SAFETY TIMER (10 seconds)
-    _safetyTimer = Timer(const Duration(seconds: 10), () {
+    // START NEW SAFETY TIMER (5 seconds for faster switching)
+    _safetyTimer = Timer(const Duration(seconds: 5), () {
       print(
           '[VIDSTACK] ⚠️ Safety Timer Expired: Video did not start. Force-switching...');
       // Manually trigger error event logic
@@ -385,6 +385,11 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             z-index: 0; 
           }
           media-icon { width: 28px; height: 28px; }
+          
+          /* HIDE VIDSTACK DEFAULT BUFFERING INDICATOR */
+          .vds-buffering-indicator, media-buffering-indicator, .vds-spinner, media-spinner {
+            display: none !important;
+          }
 
           .vds-overlay-header {
             position: absolute; top: 0; left: 0; width: 100%; 
@@ -395,21 +400,25 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             
             background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
             display: flex; align-items: center; z-index: 100; /* Above player */
-            /* Forced Visibility to prevent Black Screen of Death */
+            /* Start VISIBLE */
             opacity: 1; 
             transition: opacity 0.3s ease; 
-            pointer-events: auto;
+            pointer-events: none; /* Let clicks pass through container */
           }
 
-          /* --- VISIBILITY LOGIC (Refined) --- */
-          /* We toggle a class on the CONTAINER now, or just handle manually */
-          .vds-overlay-header.hidden {
+          /* --- VISIBILITY LOGIC: Sync with Native Controls using 'controls-visible' class --- */
+          /* Hide overlay when player does NOT have controls-visible class */
+          .vds-player:not(.controls-visible) ~ .vds-overlay-header {
              opacity: 0; pointer-events: none;
           }
+          /* Show overlay when player HAS controls-visible class */
+          .vds-player.controls-visible ~ .vds-overlay-header {
+             opacity: 1; pointer-events: auto;
+          }
           
-          /* 2. Hover (Desktop) */
+          /* 2. Hover (Desktop) - Always show on hover */
           @media (hover: hover) {
-            #element-container:hover .vds-overlay-header {
+            .vds-player:hover ~ .vds-overlay-header {
               opacity: 1 !important; pointer-events: auto !important;
             }
           }
@@ -418,15 +427,16 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             background: rgba(255, 255, 255, 0.1); border-radius: 50%;
             width: 40px; height: 40px; cursor: pointer; display: flex;
             align-items: center; justify-content: center; color: white;
-            margin-right: 15px; border: none; z-index: 101; /* Ensure clickable */
+            margin-right: 15px; border: none; z-index: 101; 
+            pointer-events: auto; /* Ensure clickable since parent has none */
           }
           .vds-links-container {
             display: flex; gap: 10px; overflow-x: auto; flex: 1; 
             padding: 5px; align-items: center; scrollbar-width: none;
             z-index: 101;
+            pointer-events: auto; /* Ensure clickable since parent has none */
             /* Fix Overlap: Increased space for Settings Icon & Notch */
             padding-right: 80px; 
-            /* Optional: Pointer events only on content? keeping container generic is safer for scroll */
           }
           .vds-link-btn {
             background: rgba(124, 82, 216, 0.3); color: white;
@@ -435,7 +445,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           }
           .vds-link-btn.active { background: #7C52D8; border-color: #fff; }
 
-          /* --- LOADER (Spinner) --- */
+          /* --- CUSTOM LOADER (Spinner) --- */
           .vds-loader {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             width: 48px; height: 48px;
@@ -488,32 +498,16 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
 
         _controlsVisible = true;
 
-        // Update Visibility Logic to target the SIBLING overlay
-        // We override the previous methods to toggle classes on this specific overlay element references logic,
-        // but since we are inside the builder, let's redefine the helpers or rely on the classes.
-        // Actually, since _showControls/_hideControls use _currentPlayer?.classes, that won't affect the verified overlay anymore if it's outside.
-        // WE NECESSARILY NEED TO UPDATE _showControls and _hideControls or duplicate logic here?
-        // Wait, _showControls serves specific instance... but it's defined on the State.
-        // State methods access _currentPlayer.
-        // We need to change how _showControls works OR bind opacity to player state via listeners here.
+        // CLICK HANDLER ON MAIN CONTAINER TO TOGGLE OVERLAY
+        element.onClick.listen((event) {
+          // If clicking active controls (buttons), do not toggle (bubbling stops there).
 
-        // Let's attach the new overlay to the state (if we hadn't defined a var for it).
-        // But the State class doesn't have an _overlay variable exposed well.
-        // However, I can update the CSS above to:
-        // .vds-player.controls-visible ~ .vds-overlay-header { opacity: 1; }
-        // .vds-player:not(.controls-visible) ~ .vds-overlay-header { opacity: 0; }
-        // This uses the sibling selector `~`. Since player is before overlay, this works perfectly!
-
-        // Let's update the CSS in the `style` block above to use sibling selectors.
-        style.innerText += """
-          /* SIBLING SELECTOR LOGIC: When player has 'controls-visible', show sibling overlay */
-          .vds-player.controls-visible ~ .vds-overlay-header {
-             opacity: 1; pointer-events: auto;
+          if (_controlsVisible) {
+            _hideControls();
+          } else {
+            _showControls();
           }
-          .vds-player:not(.controls-visible) ~ .vds-overlay-header {
-             opacity: 0; pointer-events: none;
-          }
-        """;
+        });
 
         // Back Button Logic
         overlay.querySelector('.vds-back-btn')?.onClick.listen((e) {

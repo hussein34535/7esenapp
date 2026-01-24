@@ -207,7 +207,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
       }
 
       // 4. Manifest Rewriting
-      String sourceToUse = workingProxiedUrl!;
+      String sourceToUse = workingProxiedUrl;
 
       if (workingManifestContent != null && activeProxyTemplate.isNotEmpty) {
         try {
@@ -219,7 +219,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           final baseUrl = Uri.parse(baseUrlString);
           final parentQueryParams = uri.query;
 
-          final lines = workingManifestContent!.split('\n');
+          final lines = workingManifestContent.split('\n');
           final rewrittenLines = [];
 
           for (var line in lines) {
@@ -267,7 +267,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           sourceToUse = html.Url.createObjectUrlFromBlob(blob);
         } catch (e) {
           print('[VIDSTACK] Manifest Rewriting Failed: $e');
-          sourceToUse = workingProxiedUrl!;
+          sourceToUse = workingProxiedUrl;
         }
       }
 
@@ -368,6 +368,10 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         if (element == null) return;
 
         element.innerHtml = '';
+        element.style.position = 'relative'; // Anchor for absolute children
+        element.style.width = '100%';
+        element.style.height = '100%';
+        element.style.display = 'block';
 
         // --- CSS Styles ---
         final style = html.StyleElement();
@@ -376,7 +380,9 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             width: 100%; height: 100%; background-color: #000; overflow: hidden;
             --media-brand: #7C52D8;
             --media-focus-ring: 0 0 0 3px rgba(124, 82, 216, 0.5);
-            position: relative; /* Context for overlay */
+            position: absolute; /* Absolute within container */
+            top: 0; left: 0;
+            z-index: 0; 
           }
           media-icon { width: 28px; height: 28px; }
 
@@ -388,7 +394,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             padding-left: env(safe-area-inset-left, 20px);
             
             background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
-            display: flex; align-items: center; z-index: 100;
+            display: flex; align-items: center; z-index: 100; /* Above player */
             /* Forced Visibility to prevent Black Screen of Death */
             opacity: 1; 
             transition: opacity 0.3s ease; 
@@ -396,15 +402,15 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           }
 
           /* --- VISIBILITY LOGIC (Refined) --- */
-          /* Hide only when explicitly hidden AND playing */
-          .vds-player:not(.controls-visible) .vds-overlay-header {
+          /* We toggle a class on the CONTAINER now, or just handle manually */
+          .vds-overlay-header.hidden {
              opacity: 0; pointer-events: none;
           }
           
           /* 2. Hover (Desktop) */
           @media (hover: hover) {
-            .vds-player:hover .vds-overlay-header {
-              opacity: 1; pointer-events: auto;
+            #element-container:hover .vds-overlay-header {
+              opacity: 1 !important; pointer-events: auto !important;
             }
           }
 
@@ -438,7 +444,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             border-radius: 50%;
             display: none; /* Hidden by default, toggled by JS */
             animation: vds-spin 1s linear infinite;
-            z-index: 50; /* Below overlay, above video */
+            z-index: 50; /* Above player, below overlay */
             pointer-events: none;
           }
           .vds-loader.visible { display: block; }
@@ -446,16 +452,10 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         """;
         element.append(style);
 
-        // إنشاء المشغل
+        // إنشاء المشغل (Player)
         final player = html.Element.tag('media-player');
-        player.className = 'vds-player controls-visible'; // Start visible
+        player.className = 'vds-player controls-visible';
         _currentPlayer = player;
-        _controlsVisible = true; // Sync state
-
-        // ADD CUSTOM LOADER ELEMENT
-        final loader = html.DivElement()
-          ..className = 'vds-loader visible'; // Start visible
-        player.append(loader);
 
         // الخصائص الأساسية
         player.setAttribute('autoplay', 'true');
@@ -468,65 +468,104 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         player.append(html.Element.tag('media-provider'));
         player.append(html.Element.tag('media-video-layout'));
 
-        // --- OVERLAY ---
+        // APPEND PLAYER FIRST (Layer 0)
+        element.append(player);
+
+        // --- CUSTOM LOADER (Layer 1) ---
+        // Defined OUTSIDE media-player to avoid Shadow DOM clipping
+        final loader = html.DivElement()
+          ..className = 'vds-loader visible'; // Start visible
+        element.append(loader);
+
+        // --- OVERLAY HEADER (Layer 2) ---
+        // Defined OUTSIDE media-player
         final overlay = html.DivElement()..className = 'vds-overlay-header';
         overlay.setInnerHtml(
           '''<button class="vds-back-btn"><span style="font-size:24px;">&#x276E;</span></button><div class="vds-links-container"></div>''',
           treeSanitizer: html.NodeTreeSanitizer.trusted,
         );
+        element.append(overlay);
 
-        // Back Button
+        _controlsVisible = true;
+
+        // Update Visibility Logic to target the SIBLING overlay
+        // We override the previous methods to toggle classes on this specific overlay element references logic,
+        // but since we are inside the builder, let's redefine the helpers or rely on the classes.
+        // Actually, since _showControls/_hideControls use _currentPlayer?.classes, that won't affect the verified overlay anymore if it's outside.
+        // WE NECESSARILY NEED TO UPDATE _showControls and _hideControls or duplicate logic here?
+        // Wait, _showControls serves specific instance... but it's defined on the State.
+        // State methods access _currentPlayer.
+        // We need to change how _showControls works OR bind opacity to player state via listeners here.
+
+        // Let's attach the new overlay to the state (if we hadn't defined a var for it).
+        // But the State class doesn't have an _overlay variable exposed well.
+        // However, I can update the CSS above to:
+        // .vds-player.controls-visible ~ .vds-overlay-header { opacity: 1; }
+        // .vds-player:not(.controls-visible) ~ .vds-overlay-header { opacity: 0; }
+        // This uses the sibling selector `~`. Since player is before overlay, this works perfectly!
+
+        // Let's update the CSS in the `style` block above to use sibling selectors.
+        style.innerText += """
+          /* SIBLING SELECTOR LOGIC: When player has 'controls-visible', show sibling overlay */
+          .vds-player.controls-visible ~ .vds-overlay-header {
+             opacity: 1; pointer-events: auto;
+          }
+          .vds-player:not(.controls-visible) ~ .vds-overlay-header {
+             opacity: 0; pointer-events: none;
+          }
+        """;
+
+        // Back Button Logic
         overlay.querySelector('.vds-back-btn')?.onClick.listen((e) {
-          e.stopPropagation(); // Prevent toggling when clicking button
-          _startOverlayTimer(); // Interactions keep controls alive
+          e.stopPropagation();
+          _startOverlayTimer();
           if (mounted) Navigator.of(context).maybePop();
         });
 
-        // Links Container
-        final linksContainer = overlay.querySelector('.vds-links-container');
-        if (linksContainer == null) return;
-        _linksContainer = linksContainer;
-
-        // Prevent toggling when scrolling links
-        linksContainer.onClick.listen((e) => e.stopPropagation());
-
+        // Initial URL Logic
         String initialUrl = widget.url;
         if (initialUrl.isEmpty && widget.streamLinks.isNotEmpty) {
           initialUrl = widget.streamLinks.first['url'];
         }
 
-        for (var link in widget.streamLinks) {
-          final name = link['name'] ?? 'Stream';
-          final urlStr = link['url']?.toString();
-          if (urlStr != null && urlStr.isNotEmpty) {
-            final btn = html.ButtonElement()
-              ..className = 'vds-link-btn'
-              ..innerText = name
-              ..dataset['raw-url'] = urlStr;
+        // Links Container Logic
+        final linksContainer = overlay.querySelector('.vds-links-container');
+        if (linksContainer != null) {
+          _linksContainer = linksContainer;
+          linksContainer.onClick.listen((e) => e.stopPropagation());
 
-            if (urlStr == initialUrl) btn.classes.add('active');
+          // (initialUrl logic moved up)
 
-            btn.onClick.listen((e) {
-              e.stopPropagation(); // Prevent toggle
-              _startOverlayTimer();
-              _loadSource(urlStr);
-              _updateActiveButton(urlStr);
-            });
-            linksContainer.append(btn);
+          for (var link in widget.streamLinks) {
+            final name = link['name'] ?? 'Stream';
+            final urlStr = link['url']?.toString();
+            if (urlStr != null && urlStr.isNotEmpty) {
+              final btn = html.ButtonElement()
+                ..className = 'vds-link-btn'
+                ..innerText = name
+                ..dataset['raw-url'] = urlStr;
+
+              if (urlStr == initialUrl) btn.classes.add('active');
+
+              btn.onClick.listen((e) {
+                e.stopPropagation();
+                _startOverlayTimer();
+                _loadSource(urlStr);
+                _updateActiveButton(urlStr);
+              });
+              linksContainer.append(btn);
+            }
           }
         }
-        player.append(overlay);
 
-        // --- Interaction Logic (Tap to Toggle) ---
-        player.onClick.listen((e) {
-          // If we clicked something else interactive (like built-in controls), ignore.
-          // But here we are clicking the main container.
+        // --- Interaction Logic (Tap Container to Toggle) ---
+        // We listen on the MAIN CONTAINER (element) now, not just the player
+        element.onClick.listen((e) {
           _toggleControls();
         });
 
-        // --- Event Listeners & Auto-Play Fix ---
+        // --- Event Listeners ---
 
-        // Helper to toggle loader
         void setLoader(bool visible) {
           if (visible) {
             loader.classes.add('visible');
@@ -535,18 +574,17 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           }
         }
 
-        // 1. Media Ready (can-play)
         player.addEventListener('can-play', (event) {
-          setLoader(false); // Hide loader when ready
-          _safetyTimer?.cancel(); // SUCCESS! Cancel safety timer
-          _retryCount = 0; // Reset retry count on success
+          setLoader(false);
+          _safetyTimer?.cancel();
+          _retryCount = 0;
           _startOverlayTimer();
 
           final isPaused = js_util.getProperty(player, 'paused');
           if (isPaused == true) {
             try {
               js_util.callMethod(player, 'play', []);
-              setLoader(true); // Show loader when trying to play
+              setLoader(true);
             } catch (e) {/* ignore */}
           }
         });
@@ -559,8 +597,6 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           setLoader(false);
         });
 
-        // 2. iOS PiP/Fullscreen Exit Resume Fix
-        // Safari often pauses video when exiting native fullscreen. We force resume.
         void handleFullscreenExit(html.Event e) {
           final isPaused = js_util.getProperty(player, 'paused');
           if (isPaused == true) {
@@ -577,37 +613,27 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             'webkitpresentationmodechanged', handleFullscreenExit);
         player.addEventListener('fullscreen-change', handleFullscreenExit);
 
-        // Pause/Play Listeners to manage visibility state
         player.addEventListener('pause', (event) {
-          _showControls(); // Always show when paused
-          _overlayTimer?.cancel(); // Cancel timer so it stays visible
-          // Don't show loader on manual pause
+          _showControls();
+          _overlayTimer?.cancel();
         });
 
         player.addEventListener('play', (event) {
-          setLoader(true); // Likely waiting for buffer
-          _startOverlayTimer(); // Restart timer when playing resumes
+          setLoader(true);
+          _startOverlayTimer();
         });
 
-        // 3. Error Handling & Auto-Retry
         player.addEventListener('error', (event) {
           print('[VIDSTACK] Error Event Triggered');
-          setLoader(true); // Keep loading while retrying
+          setLoader(true);
           _handleErrorLogic();
-
-          try {
-            final eventObj = js.JsObject.fromBrowserObject(event);
-            if (eventObj.hasProperty('detail')) {
-              final detail = eventObj['detail'];
-              if (detail != null) {
-                // print('[VIDSTACK] Error Detail: $detail');
-              }
-            }
-          } catch (e) {/* ignore */}
         });
 
-        // تحميل المصدر الأولي
+        // تشغيل المصدر
         _loadSource(initialUrl);
+
+        // Debug Border to confirm new structure (Temporary)
+        // element.style.border = "2px solid red";
       },
     );
   }

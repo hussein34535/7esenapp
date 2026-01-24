@@ -297,6 +297,10 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
 
   void _handleErrorLogic() {
     _safetyTimer?.cancel();
+
+    // Safety check: if unmounted, stop.
+    if (!mounted) return;
+
     if (_retryCount < 2) {
       _retryCount++;
       print('[VIDSTACK] Auto-Retrying same stream (Attempt $_retryCount)...');
@@ -424,6 +428,21 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             padding: 6px 12px; cursor: pointer; white-space: nowrap;
           }
           .vds-link-btn.active { background: #7C52D8; border-color: #fff; }
+
+          /* --- LOADER (Spinner) --- */
+          .vds-loader {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 48px; height: 48px;
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            border-bottom-color: #7C52D8;
+            border-radius: 50%;
+            display: none; /* Hidden by default, toggled by JS */
+            animation: vds-spin 1s linear infinite;
+            z-index: 50; /* Below overlay, above video */
+            pointer-events: none;
+          }
+          .vds-loader.visible { display: block; }
+          @keyframes vds-spin { 0% { transform: translate(-50%, -50%) rotate(0deg); } 100% { transform: translate(-50%, -50%) rotate(360deg); } }
         """;
         element.append(style);
 
@@ -432,6 +451,11 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         player.className = 'vds-player controls-visible'; // Start visible
         _currentPlayer = player;
         _controlsVisible = true; // Sync state
+
+        // ADD CUSTOM LOADER ELEMENT
+        final loader = html.DivElement()
+          ..className = 'vds-loader visible'; // Start visible
+        player.append(loader);
 
         // الخصائص الأساسية
         player.setAttribute('autoplay', 'true');
@@ -502,8 +526,18 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
 
         // --- Event Listeners & Auto-Play Fix ---
 
+        // Helper to toggle loader
+        void setLoader(bool visible) {
+          if (visible) {
+            loader.classes.add('visible');
+          } else {
+            loader.classes.remove('visible');
+          }
+        }
+
         // 1. Media Ready (can-play)
         player.addEventListener('can-play', (event) {
+          setLoader(false); // Hide loader when ready
           _safetyTimer?.cancel(); // SUCCESS! Cancel safety timer
           _retryCount = 0; // Reset retry count on success
           _startOverlayTimer();
@@ -512,8 +546,17 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           if (isPaused == true) {
             try {
               js_util.callMethod(player, 'play', []);
+              setLoader(true); // Show loader when trying to play
             } catch (e) {/* ignore */}
           }
+        });
+
+        player.addEventListener('waiting', (event) {
+          setLoader(true);
+        });
+
+        player.addEventListener('playing', (event) {
+          setLoader(false);
         });
 
         // 2. iOS PiP/Fullscreen Exit Resume Fix
@@ -525,6 +568,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
                 '[VIDSTACK] iOS Fullscreen Exit Detected - Resuming Playback');
             try {
               js_util.callMethod(player, 'play', []);
+              setLoader(true);
             } catch (e) {/* ignore */}
           }
         }
@@ -537,15 +581,18 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         player.addEventListener('pause', (event) {
           _showControls(); // Always show when paused
           _overlayTimer?.cancel(); // Cancel timer so it stays visible
+          // Don't show loader on manual pause
         });
 
         player.addEventListener('play', (event) {
+          setLoader(true); // Likely waiting for buffer
           _startOverlayTimer(); // Restart timer when playing resumes
         });
 
         // 3. Error Handling & Auto-Retry
         player.addEventListener('error', (event) {
           print('[VIDSTACK] Error Event Triggered');
+          setLoader(true); // Keep loading while retrying
           _handleErrorLogic();
 
           try {

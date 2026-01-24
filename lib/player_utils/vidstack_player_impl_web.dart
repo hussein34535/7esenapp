@@ -25,6 +25,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
   html.Element? _currentPlayer;
   html.Element? _linksContainer;
   Timer? _overlayTimer;
+  Timer? _safetyTimer; // Safety timer for black screen
   bool _controlsVisible = true;
   int _retryCount = 0; // Track retries for current stream
 
@@ -92,190 +93,251 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
   Future<void> _loadSource(String rawUrl) async {
     if (_currentPlayer == null) return;
 
-    String finalUrl = rawUrl;
-
-    // 1. Handle 7esenlink (JSON)
-    if (finalUrl.contains('7esenlink.vercel.app')) {
-      try {
-        final jsonUri = Uri.parse(finalUrl).replace(queryParameters: {
-          ...Uri.parse(finalUrl).queryParameters,
-          'json': 'true'
-        });
-        final request = await html.HttpRequest.request(jsonUri.toString());
-        final jsonResponse =
-            js.context['JSON'].callMethod('parse', [request.responseText]);
-        if (jsonResponse['url'] != null) {
-          finalUrl = jsonResponse['url'];
-        }
-      } catch (e) {
-        print('[VIDSTACK] Error resolving 7esenlink: $e');
-      }
-    }
-
-    // 2. Handle IPTV (TS -> HLS)
-    if (finalUrl.contains(':8080') ||
-        (finalUrl.contains(':80') && !finalUrl.contains('stream.php'))) {
-      Uri uri = Uri.parse(finalUrl);
-      List<String> segments = List.from(uri.pathSegments);
-      if (segments.length == 3 && segments[0] != 'live') {
-        segments.insert(0, 'live');
-        String lastSegment = segments.last;
-        if (!lastSegment.endsWith('.m3u8')) segments.last = '$lastSegment.m3u8';
-        finalUrl = uri.replace(pathSegments: segments).toString();
-      } else if (!finalUrl.endsWith('.m3u8')) {
-        finalUrl = '$finalUrl.m3u8';
-      }
-    }
-
-    // 3. Multi-Proxy Race Strategy
-    List<String> proxies = WebProxyService.getAllProxiedUrls(finalUrl);
-
-    final isCurrentlySecure = html.window.location.protocol == 'https:';
-    final isTargetSecure = finalUrl.startsWith('https://');
-    bool directUrlInserted = false;
-
-    if (isTargetSecure || !isCurrentlySecure) {
-      proxies.insert(0, finalUrl);
-      directUrlInserted = true;
-    } else {
+    // CANCEL PREVIOUS SAFETY TIMER
+    _safetyTimer?.cancel();
+    // START NEW SAFETY TIMER (10 seconds)
+    _safetyTimer = Timer(const Duration(seconds: 10), () {
       print(
-          '[VIDSTACK] Skipping direct HTTP URL on HTTPS site (Mixed Content Prevention)');
-    }
+          '[VIDSTACK] ⚠️ Safety Timer Expired: Video did not start. Force-switching...');
+      // Manually trigger error event logic
+      _handleErrorLogic();
+    });
 
-    String? workingProxiedUrl;
-    String? workingManifestContent;
-    String activeProxyTemplate = '';
+    try {
+      String finalUrl = rawUrl;
 
-    print('[VIDSTACK] Starting Multi-Proxy Race for: $finalUrl');
-
-    if (finalUrl.contains('.m3u8') ||
-        finalUrl.contains('stream.php') ||
-        finalUrl.contains('/live/')) {
-      for (var i = 0; i < proxies.length; i++) {
-        final proxyUrl = proxies[i];
+      // 1. Handle 7esenlink (JSON)
+      if (finalUrl.contains('7esenlink.vercel.app')) {
         try {
-          print('[VIDSTACK] Trying Proxy: $proxyUrl');
-          final content = await html.HttpRequest.getString(proxyUrl)
-              .timeout(const Duration(seconds: 10));
-
-          if (content.contains('#EXTM3U')) {
-            print('[VIDSTACK] ✅ Success with Proxy: $proxyUrl');
-            workingProxiedUrl = proxyUrl;
-            workingManifestContent = content;
-
-            if (directUrlInserted) {
-              if (i == 0) {
-                activeProxyTemplate = '';
-              } else if (i > 0 &&
-                  (i - 1) < WebProxyService.proxyTemplates.length) {
-                activeProxyTemplate = WebProxyService.proxyTemplates[i - 1];
-              }
-            } else {
-              if (i < WebProxyService.proxyTemplates.length) {
-                activeProxyTemplate = WebProxyService.proxyTemplates[i];
-              }
-            }
-            break;
+          final jsonUri = Uri.parse(finalUrl).replace(queryParameters: {
+            ...Uri.parse(finalUrl).queryParameters,
+            'json': 'true'
+          });
+          final request = await html.HttpRequest.request(jsonUri.toString());
+          final jsonResponse =
+              js.context['JSON'].callMethod('parse', [request.responseText]);
+          if (jsonResponse['url'] != null) {
+            finalUrl = jsonResponse['url'];
           }
         } catch (e) {
-          // print('[VIDSTACK] ❌ Proxy Failed ($proxyUrl): $e');
+          print('[VIDSTACK] Error resolving 7esenlink: $e');
         }
       }
-    } else {
-      workingProxiedUrl = proxies.first;
-    }
 
-    if (workingProxiedUrl == null) {
-      print('[VIDSTACK] ⚠️ All proxies failed. Using primary fallback.');
-      workingProxiedUrl = proxies.isNotEmpty ? proxies.first : finalUrl;
-      activeProxyTemplate = proxies.isNotEmpty
-          ? proxies.first.split(Uri.encodeComponent(finalUrl))[0]
-          : '';
-    }
+      // 2. Handle IPTV (TS -> HLS)
+      if (finalUrl.contains(':8080') ||
+          (finalUrl.contains(':80') && !finalUrl.contains('stream.php'))) {
+        Uri uri = Uri.parse(finalUrl);
+        List<String> segments = List.from(uri.pathSegments);
+        if (segments.length == 3 && segments[0] != 'live') {
+          segments.insert(0, 'live');
+          String lastSegment = segments.last;
+          if (!lastSegment.endsWith('.m3u8'))
+            segments.last = '$lastSegment.m3u8';
+          finalUrl = uri.replace(pathSegments: segments).toString();
+        } else if (!finalUrl.endsWith('.m3u8')) {
+          finalUrl = '$finalUrl.m3u8';
+        }
+      }
 
-    // 4. Manifest Rewriting
-    String sourceToUse = workingProxiedUrl!;
+      // 3. Multi-Proxy Race Strategy
+      List<String> proxies = WebProxyService.getAllProxiedUrls(finalUrl);
 
-    if (workingManifestContent != null && activeProxyTemplate.isNotEmpty) {
-      try {
-        print('[VIDSTACK] Intercepting Manifest for Rewriting...');
+      final isCurrentlySecure = html.window.location.protocol == 'https:';
+      final isTargetSecure = finalUrl.startsWith('https://');
+      bool directUrlInserted = false;
 
-        final uri = Uri.parse(finalUrl);
-        final baseUrlString =
-            uri.toString().substring(0, uri.toString().lastIndexOf('/') + 1);
-        final baseUrl = Uri.parse(baseUrlString);
-        final parentQueryParams = uri.query;
+      if (isTargetSecure || !isCurrentlySecure) {
+        proxies.insert(0, finalUrl);
+        directUrlInserted = true;
+      } else {
+        print(
+            '[VIDSTACK] Skipping direct HTTP URL on HTTPS site (Mixed Content Prevention)');
+      }
 
-        final lines = workingManifestContent!.split('\n');
-        final rewrittenLines = [];
+      String? workingProxiedUrl;
+      String? workingManifestContent;
+      String activeProxyTemplate = '';
 
-        for (var line in lines) {
-          line = line.trim();
-          if (line.isEmpty) {
-            rewrittenLines.add(line);
-            continue;
-          }
+      print('[VIDSTACK] Starting Multi-Proxy Race for: $finalUrl');
 
-          if (line.startsWith('#')) {
-            if (line.startsWith('#EXT-X-KEY') && line.contains('URI="')) {
-              line = line.replaceAllMapped(RegExp(r'URI="([^"]+)"'), (match) {
-                String keyUri = match.group(1)!;
-                if (!keyUri.startsWith('http')) {
-                  keyUri = baseUrl.resolve(keyUri).toString();
-                  if (parentQueryParams.isNotEmpty && !keyUri.contains('?')) {
-                    keyUri += '?$parentQueryParams';
-                  }
+      if (finalUrl.contains('.m3u8') ||
+          finalUrl.contains('stream.php') ||
+          finalUrl.contains('/live/')) {
+        for (var i = 0; i < proxies.length; i++) {
+          final proxyUrl = proxies[i];
+          try {
+            print('[VIDSTACK] Trying Proxy: $proxyUrl');
+            final content = await html.HttpRequest.getString(proxyUrl)
+                .timeout(const Duration(seconds: 10));
+
+            if (content.contains('#EXTM3U')) {
+              print('[VIDSTACK] ✅ Success with Proxy: $proxyUrl');
+              workingProxiedUrl = proxyUrl;
+              workingManifestContent = content;
+
+              if (directUrlInserted) {
+                if (i == 0) {
+                  activeProxyTemplate = '';
+                } else if (i > 0 &&
+                    (i - 1) < WebProxyService.proxyTemplates.length) {
+                  activeProxyTemplate = WebProxyService.proxyTemplates[i - 1];
                 }
-                return 'URI="${activeProxyTemplate}${Uri.encodeComponent(keyUri)}"';
-              });
+              } else {
+                if (i < WebProxyService.proxyTemplates.length) {
+                  activeProxyTemplate = WebProxyService.proxyTemplates[i];
+                }
+              }
+              break;
             }
-            rewrittenLines.add(line);
-            continue;
+          } catch (e) {
+            // print('[VIDSTACK] ❌ Proxy Failed ($proxyUrl): $e');
+          }
+        }
+      } else {
+        workingProxiedUrl = proxies.first;
+      }
+
+      if (workingProxiedUrl == null) {
+        print('[VIDSTACK] ⚠️ All proxies failed. Using primary fallback.');
+        workingProxiedUrl = proxies.isNotEmpty ? proxies.first : finalUrl;
+        activeProxyTemplate = proxies.isNotEmpty
+            ? proxies.first.split(Uri.encodeComponent(finalUrl))[0]
+            : '';
+      }
+
+      // 4. Manifest Rewriting
+      String sourceToUse = workingProxiedUrl!;
+
+      if (workingManifestContent != null && activeProxyTemplate.isNotEmpty) {
+        try {
+          print('[VIDSTACK] Intercepting Manifest for Rewriting...');
+
+          final uri = Uri.parse(finalUrl);
+          final baseUrlString =
+              uri.toString().substring(0, uri.toString().lastIndexOf('/') + 1);
+          final baseUrl = Uri.parse(baseUrlString);
+          final parentQueryParams = uri.query;
+
+          final lines = workingManifestContent!.split('\n');
+          final rewrittenLines = [];
+
+          for (var line in lines) {
+            line = line.trim();
+            if (line.isEmpty) {
+              rewrittenLines.add(line);
+              continue;
+            }
+
+            if (line.startsWith('#')) {
+              if (line.startsWith('#EXT-X-KEY') && line.contains('URI="')) {
+                line = line.replaceAllMapped(RegExp(r'URI="([^"]+)"'), (match) {
+                  String keyUri = match.group(1)!;
+                  if (!keyUri.startsWith('http')) {
+                    keyUri = baseUrl.resolve(keyUri).toString();
+                    if (parentQueryParams.isNotEmpty && !keyUri.contains('?')) {
+                      keyUri += '?$parentQueryParams';
+                    }
+                  }
+                  return 'URI="${activeProxyTemplate}${Uri.encodeComponent(keyUri)}"';
+                });
+              }
+              rewrittenLines.add(line);
+              continue;
+            }
+
+            String segmentUrl = line;
+            if (!segmentUrl.startsWith('http')) {
+              segmentUrl = baseUrl.resolve(segmentUrl).toString();
+            }
+            if (parentQueryParams.isNotEmpty) {
+              if (!segmentUrl.contains('?')) {
+                segmentUrl += '?$parentQueryParams';
+              }
+            }
+            if (!segmentUrl.startsWith(activeProxyTemplate)) {
+              segmentUrl =
+                  '$activeProxyTemplate${Uri.encodeComponent(segmentUrl)}';
+            }
+            rewrittenLines.add(segmentUrl);
           }
 
-          String segmentUrl = line;
-          if (!segmentUrl.startsWith('http')) {
-            segmentUrl = baseUrl.resolve(segmentUrl).toString();
-          }
-          if (parentQueryParams.isNotEmpty) {
-            if (!segmentUrl.contains('?')) {
-              segmentUrl += '?$parentQueryParams';
+          final rewrittenContent = rewrittenLines.join('\n');
+          final blob = html.Blob([rewrittenContent], 'application/x-mpegurl');
+          sourceToUse = html.Url.createObjectUrlFromBlob(blob);
+        } catch (e) {
+          print('[VIDSTACK] Manifest Rewriting Failed: $e');
+          sourceToUse = workingProxiedUrl!;
+        }
+      }
+
+      final srcObj = js_util.newObject();
+      js_util.setProperty(srcObj, 'src', sourceToUse);
+
+      String mimeType = '';
+      if (finalUrl.contains('.m3u8') ||
+          finalUrl.contains('stream.php') ||
+          finalUrl.contains('/live/')) {
+        mimeType = 'application/x-mpegurl';
+      } else if (finalUrl.contains('.mp4')) {
+        mimeType = 'video/mp4';
+      }
+
+      if (mimeType.isNotEmpty) {
+        js_util.setProperty(srcObj, 'type', mimeType);
+      }
+
+      js_util.setProperty(_currentPlayer!, 'src', srcObj);
+      _currentPlayer!.setAttribute('title', 'Live Stream');
+    } catch (e) {
+      print('[VIDSTACK] Critical Error in _loadSource: $e');
+      _handleErrorLogic();
+    }
+  }
+
+  void _handleErrorLogic() {
+    _safetyTimer?.cancel();
+    if (_retryCount < 2) {
+      _retryCount++;
+      print('[VIDSTACK] Auto-Retrying same stream (Attempt $_retryCount)...');
+      Timer(const Duration(milliseconds: 1000), () {
+        if (mounted) _loadSource(widget.url);
+      });
+    } else {
+      print('[VIDSTACK] Max retries reached. Switching to Next Stream...');
+      if (widget.streamLinks.isNotEmpty) {
+        int currentIndex = -1;
+        String? currentRawUrl;
+        if (_linksContainer != null) {
+          for (var child in _linksContainer!.children) {
+            if (child.classes.contains('active')) {
+              currentRawUrl = child.dataset['raw-url'];
+              break;
             }
           }
-          if (!segmentUrl.startsWith(activeProxyTemplate)) {
-            segmentUrl =
-                '$activeProxyTemplate${Uri.encodeComponent(segmentUrl)}';
+        }
+        currentRawUrl ??= widget.url;
+
+        for (int i = 0; i < widget.streamLinks.length; i++) {
+          if (widget.streamLinks[i]['url'] == currentRawUrl) {
+            currentIndex = i;
+            break;
           }
-          rewrittenLines.add(segmentUrl);
         }
 
-        final rewrittenContent = rewrittenLines.join('\n');
-        final blob = html.Blob([rewrittenContent], 'application/x-mpegurl');
-        sourceToUse = html.Url.createObjectUrlFromBlob(blob);
-      } catch (e) {
-        print('[VIDSTACK] Manifest Rewriting Failed: $e');
-        sourceToUse = workingProxiedUrl!;
+        if (currentIndex != -1 &&
+            currentIndex + 1 < widget.streamLinks.length) {
+          final nextStream = widget.streamLinks[currentIndex + 1];
+          final nextUrl = nextStream['url'];
+          print('[VIDSTACK] Switching to Next Stream: ${nextStream['name']}');
+          _retryCount = 0;
+          if (mounted) {
+            _loadSource(nextUrl);
+            _updateActiveButton(nextUrl);
+          }
+        }
       }
     }
-
-    final srcObj = js_util.newObject();
-    js_util.setProperty(srcObj, 'src', sourceToUse);
-
-    String mimeType = '';
-    if (finalUrl.contains('.m3u8') ||
-        finalUrl.contains('stream.php') ||
-        finalUrl.contains('/live/')) {
-      mimeType = 'application/x-mpegurl';
-    } else if (finalUrl.contains('.mp4')) {
-      mimeType = 'video/mp4';
-    }
-
-    if (mimeType.isNotEmpty) {
-      js_util.setProperty(srcObj, 'type', mimeType);
-    }
-
-    js_util.setProperty(_currentPlayer!, 'src', srcObj);
-    _currentPlayer!.setAttribute('title', 'Live Stream');
   }
 
   void _updateActiveButton(String currentUrl) {
@@ -323,16 +385,16 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             
             background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
             display: flex; align-items: center; z-index: 100;
-            opacity: 0; 
+            /* Forced Visibility to prevent Black Screen of Death */
+            opacity: 1; 
             transition: opacity 0.3s ease; 
-            pointer-events: none;
+            pointer-events: auto;
           }
 
-          /* --- VISIBILITY LOGIC --- */
-          /* 1. Explicit Class Toggle AND user-idle sync */
-          .vds-player.controls-visible .vds-overlay-header,
-          .vds-player[user-idle="false"] .vds-overlay-header {
-             opacity: 1; pointer-events: auto;
+          /* --- VISIBILITY LOGIC (Refined) --- */
+          /* Hide only when explicitly hidden AND playing */
+          .vds-player:not(.controls-visible) .vds-overlay-header {
+             opacity: 0; pointer-events: none;
           }
           
           /* 2. Hover (Desktop) */
@@ -442,6 +504,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
 
         // 1. Media Ready (can-play)
         player.addEventListener('can-play', (event) {
+          _safetyTimer?.cancel(); // SUCCESS! Cancel safety timer
           _retryCount = 0; // Reset retry count on success
           _startOverlayTimer();
 
@@ -483,53 +546,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         // 3. Error Handling & Auto-Retry
         player.addEventListener('error', (event) {
           print('[VIDSTACK] Error Event Triggered');
-
-          // Retry Logic
-          if (_retryCount < 2) {
-            _retryCount++;
-            print(
-                '[VIDSTACK] Error detected. Auto-Retrying same stream (Attempt $_retryCount)...');
-            // Delay slightly to prevent rapid loops
-            Timer(const Duration(milliseconds: 1000), () {
-              if (mounted) _loadSource(widget.url);
-            });
-          } else {
-            print('[VIDSTACK] Max retries reached for current stream.');
-            // Try Next Stream if available
-            if (widget.streamLinks.isNotEmpty) {
-              int currentIndex = -1;
-              String? currentRawUrl;
-              if (_linksContainer != null) {
-                for (var child in _linksContainer!.children) {
-                  if (child.classes.contains('active')) {
-                    currentRawUrl = child.dataset['raw-url'];
-                    break;
-                  }
-                }
-              }
-              currentRawUrl ??= widget.url;
-
-              for (int i = 0; i < widget.streamLinks.length; i++) {
-                if (widget.streamLinks[i]['url'] == currentRawUrl) {
-                  currentIndex = i;
-                  break;
-                }
-              }
-
-              if (currentIndex != -1 &&
-                  currentIndex + 1 < widget.streamLinks.length) {
-                final nextStream = widget.streamLinks[currentIndex + 1];
-                final nextUrl = nextStream['url'];
-                print(
-                    '[VIDSTACK] Switching to Next Stream: ${nextStream['name']}');
-                _retryCount = 0; // Reset for new stream
-                if (mounted) {
-                  _loadSource(nextUrl);
-                  _updateActiveButton(nextUrl);
-                }
-              }
-            }
-          }
+          _handleErrorLogic();
 
           try {
             final eventObj = js.JsObject.fromBrowserObject(event);

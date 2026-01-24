@@ -37,25 +37,30 @@ class _ChannelsSectionState extends State<ChannelsSection> {
                   // Calculate item height *only* once
                   _itemHeight ??= 72; // Keep this consistent
 
-                  return GridView.builder(
-                    key: _gridKey,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount:
-                          orientation == Orientation.portrait ? 1 : 2,
-                      childAspectRatio: _calculateAspectRatio(
-                          orientation, constraints), //Dynamic
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 10,
+                  return Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 800),
+                      child: GridView.builder(
+                        key: _gridKey,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount:
+                              orientation == Orientation.portrait ? 1 : 2,
+                          childAspectRatio: _calculateAspectRatio(
+                              orientation, constraints), //Dynamic
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                        ),
+                        itemCount: widget.channelCategories.length,
+                        padding: EdgeInsets.all(10),
+                        itemBuilder: (context, index) {
+                          return ChannelBox(
+                              category: widget.channelCategories[index],
+                              openVideo: widget.openVideo,
+                              isAdLoading: widget.isAdLoading);
+                        },
+                      ),
                     ),
-                    itemCount: widget.channelCategories.length,
-                    padding: EdgeInsets.all(10),
-                    itemBuilder: (context, index) {
-                      return ChannelBox(
-                          category: widget.channelCategories[index],
-                          openVideo: widget.openVideo,
-                          isAdLoading: widget.isAdLoading);
-                    },
                   );
                 },
               );
@@ -171,38 +176,44 @@ class _CategoryChannelsScreenState extends State<CategoryChannelsScreen> {
             //  Calculate the item height *only* once.  VERY IMPORTANT.
             _itemHeight ??= 72; // Or get it from your original ChannelBox
 
-            return GridView.builder(
-              key: _gridKey,
-              physics: const AlwaysScrollableScrollPhysics(),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: orientation == Orientation.portrait ? 1 : 2,
-                childAspectRatio: _calculateAspectRatio(
-                    orientation, constraints), // Calculate dynamically
-                mainAxisSpacing: 8,
-                crossAxisSpacing: 8,
-              ),
-              itemCount: widget.channels.length,
-              padding: EdgeInsets.all(8),
-              itemBuilder: (context, index) {
-                return SizedBox(
-                  // Enforce the height
-                  height: _itemHeight,
-                  child: ChannelTile(
-                    key: ValueKey(widget.channels[index]['id']),
-                    channel: widget.channels[index],
-                    openVideo: widget.openVideo,
-                    isSelected:
-                        _selectedChannel == widget.channels[index]['id'],
-                    onChannelTap: (channelId) {
-                      setState(() {
-                        _selectedChannel =
-                            (_selectedChannel == channelId) ? null : channelId;
-                      });
-                    },
-                    isAdLoading: widget.isAdLoading, // -->> مرر الحالة
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 800),
+                child: GridView.builder(
+                  key: _gridKey,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: orientation == Orientation.portrait ? 1 : 2,
+                    childAspectRatio: _calculateAspectRatio(
+                        orientation, constraints), // Calculate dynamically
+                    mainAxisSpacing: 8,
+                    crossAxisSpacing: 8,
                   ),
-                );
-              },
+                  itemCount: widget.channels.length,
+                  padding: EdgeInsets.all(8),
+                  itemBuilder: (context, index) {
+                    return SizedBox(
+                      // Enforce the height
+                      height: _itemHeight,
+                      child: ChannelTile(
+                        key: ValueKey(widget.channels[index]['id']),
+                        channel: widget.channels[index],
+                        openVideo: widget.openVideo,
+                        isSelected:
+                            _selectedChannel == widget.channels[index]['id'],
+                        onChannelTap: (channelId) {
+                          setState(() {
+                            _selectedChannel = (_selectedChannel == channelId)
+                                ? null
+                                : channelId;
+                          });
+                        },
+                        isAdLoading: widget.isAdLoading, // -->> مرر الحالة
+                      ),
+                    );
+                  },
+                ),
+              ),
             );
           });
         },
@@ -632,7 +643,8 @@ class MatchBox extends StatelessWidget {
           ? CachedNetworkImage(
               imageUrl: logoUrl,
               fit: BoxFit.contain,
-              placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
+              placeholder: (context, url) =>
+                  const Center(child: CircularProgressIndicator()),
               errorWidget: (context, url, error) => Image.asset(
                 'assets/no-image.png',
                 width: size * 0.8,
@@ -709,8 +721,7 @@ class NewsSection extends StatelessWidget {
             ],
           );
         } else {
-          final articles =
-              snapshot.data!; // Removed .reversed.toList()
+          final articles = snapshot.data!; // Removed .reversed.toList()
           return Column(
             // Wrap ListView in a Column
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1049,7 +1060,8 @@ class GoalsSection extends StatelessWidget {
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 18,
-                                      color: Theme.of(context).primaryColor, // Changed to primaryColor
+                                      color: Theme.of(context)
+                                          .primaryColor, // Changed to primaryColor
                                     ),
                                   ),
                                   const SizedBox(height: 8),

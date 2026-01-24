@@ -4,7 +4,7 @@ import 'dart:js_util' as js_util;
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:hesen/player_utils/video_player_web.dart';
-import 'package:hesen/services/web_proxy_service.dart';
+
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 class VidstackPlayerImpl extends StatefulWidget {
@@ -24,10 +24,16 @@ class VidstackPlayerImpl extends StatefulWidget {
 class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
   html.Element? _currentPlayer;
   html.Element? _linksContainer;
-  Timer? _overlayTimer;
+  Timer? _overlayTimer; // MASTER AUTO-HIDE TIMER
   Timer? _safetyTimer; // Safety timer for black screen
   bool _controlsVisible = true;
   int _retryCount = 0; // Track retries for current stream
+
+  @override
+  void initState() {
+    super.initState();
+    WakelockPlus.enable();
+  }
 
   @override
   void didUpdateWidget(VidstackPlayerImpl oldWidget) {
@@ -39,18 +45,10 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
     }
   }
 
-  // ... [initState, dispose, _showControls, _hideControls, _toggleControls, _startOverlayTimer, _onPlayerInteraction, _loadSource, _updateActiveButton remain unchanged] ...
-
-  @override
-  void initState() {
-    super.initState();
-    WakelockPlus.enable();
-  }
-
   @override
   void dispose() {
     WakelockPlus.disable();
-    _overlayTimer?.cancel();
+    _safetyTimer?.cancel();
     super.dispose();
   }
 
@@ -59,7 +57,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
     _currentPlayer?.classes.add('controls-visible');
     // Sync with Native Controls
     _currentPlayer?.setAttribute('user-idle', 'false');
-    _startOverlayTimer();
+    _startHideTimer();
   }
 
   void _hideControls() {
@@ -82,14 +80,18 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
     }
   }
 
-  void _startOverlayTimer() {
+  void _startHideTimer() {
     _overlayTimer?.cancel();
     _overlayTimer = Timer(const Duration(seconds: 4), () {
-      if (mounted) _hideControls();
+      if (mounted) {
+        // Enforce Hide on both Dart side and Native side
+        _hideControls();
+        _currentPlayer?.setAttribute('user-idle', 'true');
+      }
     });
   }
 
-  // Helper function to load source (Same as before)
+  // Helper function to load source
   Future<void> _loadSource(String rawUrl) async {
     if (_currentPlayer == null) return;
 
@@ -140,136 +142,23 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         }
       }
 
-      // 3. Multi-Proxy Race Strategy
-      List<String> proxies = WebProxyService.getAllProxiedUrls(finalUrl);
+      // 3. Direct Play with CORS Proxy Fallback
+      // Browsers BLOCK direct access to IPTV servers due to CORS security.
+      // We MUST use a proxy to add the required Access-Control-Allow-Origin headers.
 
-      final isCurrentlySecure = html.window.location.protocol == 'https:';
-      final isTargetSecure = finalUrl.startsWith('https://');
-      bool directUrlInserted = false;
+      String sourceToUse = finalUrl;
 
-      if (isTargetSecure || !isCurrentlySecure) {
-        proxies.insert(0, finalUrl);
-        directUrlInserted = true;
-      } else {
-        print(
-            '[VIDSTACK] Skipping direct HTTP URL on HTTPS site (Mixed Content Prevention)');
+      // Check if we need a proxy (IPTV usually needs it)
+      if (finalUrl.contains(':8080') || finalUrl.contains('.m3u8')) {
+        // Use a high-performance specific proxy for IPTV
+        const proxyPrefix = 'https://api.codetabs.com/v1/proxy?quest=';
+        // const proxyPrefix = 'https://corsproxy.io/?'; // Backup
+
+        print('[VIDSTACK] 🔒 Applying CORS Proxy for IPTV: $finalUrl');
+        sourceToUse = '$proxyPrefix${Uri.encodeComponent(finalUrl)}';
       }
 
-      String? workingProxiedUrl;
-      String? workingManifestContent;
-      String activeProxyTemplate = '';
-
-      print('[VIDSTACK] Starting Multi-Proxy Race for: $finalUrl');
-
-      if (finalUrl.contains('.m3u8') ||
-          finalUrl.contains('stream.php') ||
-          finalUrl.contains('/live/')) {
-        for (var i = 0; i < proxies.length; i++) {
-          final proxyUrl = proxies[i];
-          try {
-            print('[VIDSTACK] Trying Proxy: $proxyUrl');
-            final content = await html.HttpRequest.getString(proxyUrl)
-                .timeout(const Duration(seconds: 10));
-
-            if (content.contains('#EXTM3U')) {
-              print('[VIDSTACK] ✅ Success with Proxy: $proxyUrl');
-              workingProxiedUrl = proxyUrl;
-              workingManifestContent = content;
-
-              if (directUrlInserted) {
-                if (i == 0) {
-                  activeProxyTemplate = '';
-                } else if (i > 0 &&
-                    (i - 1) < WebProxyService.proxyTemplates.length) {
-                  activeProxyTemplate = WebProxyService.proxyTemplates[i - 1];
-                }
-              } else {
-                if (i < WebProxyService.proxyTemplates.length) {
-                  activeProxyTemplate = WebProxyService.proxyTemplates[i];
-                }
-              }
-              break;
-            }
-          } catch (e) {
-            // print('[VIDSTACK] ❌ Proxy Failed ($proxyUrl): $e');
-          }
-        }
-      } else {
-        workingProxiedUrl = proxies.first;
-      }
-
-      if (workingProxiedUrl == null) {
-        print('[VIDSTACK] ⚠️ All proxies failed. Using primary fallback.');
-        workingProxiedUrl = proxies.isNotEmpty ? proxies.first : finalUrl;
-        activeProxyTemplate = proxies.isNotEmpty
-            ? proxies.first.split(Uri.encodeComponent(finalUrl))[0]
-            : '';
-      }
-
-      // 4. Manifest Rewriting
-      String sourceToUse = workingProxiedUrl;
-
-      if (workingManifestContent != null && activeProxyTemplate.isNotEmpty) {
-        try {
-          print('[VIDSTACK] Intercepting Manifest for Rewriting...');
-
-          final uri = Uri.parse(finalUrl);
-          final baseUrlString =
-              uri.toString().substring(0, uri.toString().lastIndexOf('/') + 1);
-          final baseUrl = Uri.parse(baseUrlString);
-          final parentQueryParams = uri.query;
-
-          final lines = workingManifestContent.split('\n');
-          final rewrittenLines = [];
-
-          for (var line in lines) {
-            line = line.trim();
-            if (line.isEmpty) {
-              rewrittenLines.add(line);
-              continue;
-            }
-
-            if (line.startsWith('#')) {
-              if (line.startsWith('#EXT-X-KEY') && line.contains('URI="')) {
-                line = line.replaceAllMapped(RegExp(r'URI="([^"]+)"'), (match) {
-                  String keyUri = match.group(1)!;
-                  if (!keyUri.startsWith('http')) {
-                    keyUri = baseUrl.resolve(keyUri).toString();
-                    if (parentQueryParams.isNotEmpty && !keyUri.contains('?')) {
-                      keyUri += '?$parentQueryParams';
-                    }
-                  }
-                  return 'URI="${activeProxyTemplate}${Uri.encodeComponent(keyUri)}"';
-                });
-              }
-              rewrittenLines.add(line);
-              continue;
-            }
-
-            String segmentUrl = line;
-            if (!segmentUrl.startsWith('http')) {
-              segmentUrl = baseUrl.resolve(segmentUrl).toString();
-            }
-            if (parentQueryParams.isNotEmpty) {
-              if (!segmentUrl.contains('?')) {
-                segmentUrl += '?$parentQueryParams';
-              }
-            }
-            if (!segmentUrl.startsWith(activeProxyTemplate)) {
-              segmentUrl =
-                  '$activeProxyTemplate${Uri.encodeComponent(segmentUrl)}';
-            }
-            rewrittenLines.add(segmentUrl);
-          }
-
-          final rewrittenContent = rewrittenLines.join('\n');
-          final blob = html.Blob([rewrittenContent], 'application/x-mpegurl');
-          sourceToUse = html.Url.createObjectUrlFromBlob(blob);
-        } catch (e) {
-          print('[VIDSTACK] Manifest Rewriting Failed: $e');
-          sourceToUse = workingProxiedUrl;
-        }
-      }
+      print('[VIDSTACK] Final Source URL: $sourceToUse');
 
       final srcObj = js_util.newObject();
       js_util.setProperty(srcObj, 'src', sourceToUse);
@@ -473,6 +362,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         player.setAttribute('crossorigin', 'true');
         player.setAttribute('aspect-ratio', '16/9');
         player.setAttribute('load', 'eager');
+        player.setAttribute('user-idle-delay', '3000'); // Explicit 3s delay
 
         // إضافة المزود والتخطيط
         player.append(html.Element.tag('media-provider'));
@@ -498,21 +388,36 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
 
         _controlsVisible = true;
 
-        // CLICK HANDLER ON MAIN CONTAINER TO TOGGLE OVERLAY
-        element.onClick.listen((event) {
-          // If clicking active controls (buttons), do not toggle (bubbling stops there).
+        // CLICK/TOUCH HANDLER: TOGGLE VISIBILITY EXPLICITLY
+
+        // We use pointerup in capture phase to reliably detect interaction
+        // even if the video player swallows 'click' events.
+        void handleToggle(html.Event e) {
+          // If visible, hide immediately.
+          // If hidden, show and start timer.
 
           if (_controlsVisible) {
-            _hideControls();
+            // Force Hide
+            player.setAttribute('user-idle', 'true');
+            _overlayTimer?.cancel();
           } else {
-            _showControls();
+            // Force Show
+            player.setAttribute('user-idle', 'false');
+            _startHideTimer();
           }
-        });
+        }
+
+        // Listen to pointerup on the wrapper with capture
+        element.addEventListener('pointerup', (event) {
+          handleToggle(event);
+        }, true /* capture */);
 
         // Back Button Logic
         overlay.querySelector('.vds-back-btn')?.onClick.listen((e) {
           e.stopPropagation();
-          _startOverlayTimer();
+          e.stopPropagation();
+          player.setAttribute('user-idle', 'false');
+
           if (mounted) Navigator.of(context).maybePop();
         });
 
@@ -543,7 +448,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
 
               btn.onClick.listen((e) {
                 e.stopPropagation();
-                _startOverlayTimer();
+                player.setAttribute('user-idle', 'false');
                 _loadSource(urlStr);
                 _updateActiveButton(urlStr);
               });
@@ -551,12 +456,6 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             }
           }
         }
-
-        // --- Interaction Logic (Tap Container to Toggle) ---
-        // We listen on the MAIN CONTAINER (element) now, not just the player
-        element.onClick.listen((e) {
-          _toggleControls();
-        });
 
         // --- Event Listeners ---
 
@@ -572,7 +471,6 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           setLoader(false);
           _safetyTimer?.cancel();
           _retryCount = 0;
-          _startOverlayTimer();
 
           final isPaused = js_util.getProperty(player, 'paused');
           if (isPaused == true) {
@@ -609,12 +507,31 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
 
         player.addEventListener('pause', (event) {
           _showControls();
-          _overlayTimer?.cancel();
+          _overlayTimer?.cancel(); // Keep visible when paused
         });
 
         player.addEventListener('play', (event) {
           setLoader(true);
-          _startOverlayTimer();
+          _startHideTimer();
+        });
+
+        // LISTEN TO USER IDLE CHANGE
+        player.addEventListener('user-idle-change', (html.Event event) {
+          // Strictly sync our overlay with Vidstack's idle state
+          final isIdle = js_util.getProperty(event, 'detail') as bool;
+          if (isIdle) {
+            _hideControls();
+          } else {
+            // Note: We don't call _showControls() here blindly to avoid loop,
+            // but effectively if controls-visible is removed, it hides.
+            // If isIdle is false, it means it's active.
+            _showControls();
+
+            // If it became active externally (e.g. key press), restart timer
+            if (_overlayTimer == null || !_overlayTimer!.isActive) {
+              _startHideTimer();
+            }
+          }
         });
 
         player.addEventListener('error', (event) {

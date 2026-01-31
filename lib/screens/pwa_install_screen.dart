@@ -47,7 +47,7 @@ class _PwaInstallScreenState extends State<PwaInstallScreen> {
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF7C52D8).withOpacity(0.5),
+                      color: const Color(0xFF7C52D8).withValues(alpha: 0.5),
                       blurRadius: 20,
                       spreadRadius: 2,
                     )
@@ -100,7 +100,7 @@ class _PwaInstallScreenState extends State<PwaInstallScreen> {
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF7C52D8).withOpacity(0.4),
+                          color: const Color(0xFF7C52D8).withValues(alpha: 0.4),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),

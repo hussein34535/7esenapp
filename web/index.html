@@ -51,6 +51,11 @@
   <link rel="stylesheet" href="https://cdn.vidstack.io/player/theme.css" />
   <link rel="stylesheet" href="https://cdn.vidstack.io/player/video.css" />
   <script type="module" src="https://cdn.vidstack.io/player"></script>
+  <script src="xhr_interceptor.js"></script>
+  <!-- Security Measures -->
+  <script src="anti_debug.js"></script>
+  <!-- PWA Install Prompt -->
+  <script src="install_prompt.js"></script>
 
   <style>
     body {
@@ -147,7 +152,7 @@
       const splash = document.getElementById('splash');
       if (splash) {
         splash.classList.add('hidden');
-        setTimeout(() => splash.remove(), 500);
+        // setTimeout(() => splash.remove(), 500); // Don't remove, just hide to prevent flash on back nav
       }
     };
 
@@ -161,19 +166,19 @@
     }
 
     // ✅ PWA Install Prompt
-    let deferredPrompt;
+    window.deferredPrompt = null;
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
-      deferredPrompt = e;
+      window.deferredPrompt = e;
       console.log('[PWA] Install prompt available');
     });
 
     window.triggerInstallPrompt = function () {
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        deferredPrompt.userChoice.then((choice) => {
+      if (window.deferredPrompt) {
+        window.deferredPrompt.prompt();
+        window.deferredPrompt.userChoice.then((choice) => {
           console.log('[PWA] User choice:', choice.outcome);
-          deferredPrompt = null;
+          window.deferredPrompt = null;
         });
       } else {
         console.log('[PWA] No install prompt available');

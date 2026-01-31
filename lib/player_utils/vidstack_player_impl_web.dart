@@ -28,10 +28,16 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
   Timer? _safetyTimer; // Safety timer for black screen
   bool _controlsVisible = true;
   int _retryCount = 0; // Track retries for current stream
+  bool _usedProxyForCurrentStream =
+      false; // Flag to track if we switched to proxy
+  String _currentUrl = ""; // Track the ACTUAL current playing URL
+  int _loadRequestId = 0; // Prevent race conditions in async load
+  Timer? _retryTimer; // To cancel pending retries
 
   @override
   void initState() {
     super.initState();
+    _currentUrl = widget.url;
     WakelockPlus.enable();
   }
 
@@ -40,6 +46,8 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
     super.didUpdateWidget(oldWidget);
     if (widget.url != oldWidget.url && _currentPlayer != null) {
       _retryCount = 0; // Reset on new URL
+      _usedProxyForCurrentStream = false; // direct first
+      _currentUrl = widget.url;
       _loadSource(widget.url);
       _updateActiveButton(widget.url);
     }
@@ -95,13 +103,16 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
   Future<void> _loadSource(String rawUrl) async {
     if (_currentPlayer == null) return;
 
+    _loadRequestId++; // New request invalidates older ones
+    final myRequestId = _loadRequestId;
+    _retryTimer?.cancel(); // Cancel any pending retry
+
     // CANCEL PREVIOUS SAFETY TIMER
     _safetyTimer?.cancel();
-    // START NEW SAFETY TIMER (5 seconds for faster switching)
-    _safetyTimer = Timer(const Duration(seconds: 5), () {
+    // Start Safety Timer (Give it 25 seconds for slow IPTV)
+    _safetyTimer = Timer(const Duration(seconds: 25), () {
       print(
           '[VIDSTACK] ⚠️ Safety Timer Expired: Video did not start. Force-switching...');
-      // Manually trigger error event logic
       _handleErrorLogic();
     });
 
@@ -116,6 +127,8 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             'json': 'true'
           });
           final request = await html.HttpRequest.request(jsonUri.toString());
+          if (myRequestId != _loadRequestId) return; // Stale request
+
           final jsonResponse =
               js.context['JSON'].callMethod('parse', [request.responseText]);
           if (jsonResponse['url'] != null) {
@@ -142,39 +155,30 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         }
       }
 
-      // 3. Direct Play with CORS Proxy Fallback
-      // Browsers BLOCK direct access to IPTV servers due to CORS security.
-      // We MUST use a proxy to add the required Access-Control-Allow-Origin headers.
+      // 3. Direct Play with CORS Proxy Fallback (Using Custom JS Loader)
+      // We no longer manually rewrite manifest in Dart to avoid "Static Blob" issue.
+      // We delegate to 'HlsProxyLoader' in JS.
 
       String sourceToUse = finalUrl;
+      bool shouldProxy = _usedProxyForCurrentStream;
 
-      // Check if we need a proxy (IPTV usually needs it)
-      if (finalUrl.contains(':8080') || finalUrl.contains('.m3u8')) {
-        // Use a high-performance specific proxy for IPTV
-        const proxyPrefix = 'https://api.codetabs.com/v1/proxy?quest=';
-        // const proxyPrefix = 'https://corsproxy.io/?'; // Backup
+      if (shouldProxy) {
+        print('[VIDSTACK] 🔒 Activate JS Proxy Loader for: $finalUrl');
 
-        print('[VIDSTACK] 🔒 Applying CORS Proxy for IPTV: $finalUrl');
-        sourceToUse = '$proxyPrefix${Uri.encodeComponent(finalUrl)}';
+        // 1. Set Global Variable for JS Loader
+        js.context['currentStreamUrl'] = finalUrl;
+
+        // 2. Use a Fake URL to trigger HLS provider but allow Loader to intercept
+        // We use a dummy .m3u8 extension to ensure HLS provider is chosen.
+        sourceToUse = 'http://proxy-live-stream/index.m3u8';
       }
 
       print('[VIDSTACK] Final Source URL: $sourceToUse');
 
       final srcObj = js_util.newObject();
       js_util.setProperty(srcObj, 'src', sourceToUse);
-
-      String mimeType = '';
-      if (finalUrl.contains('.m3u8') ||
-          finalUrl.contains('stream.php') ||
-          finalUrl.contains('/live/')) {
-        mimeType = 'application/x-mpegurl';
-      } else if (finalUrl.contains('.mp4')) {
-        mimeType = 'video/mp4';
-      }
-
-      if (mimeType.isNotEmpty) {
-        js_util.setProperty(srcObj, 'type', mimeType);
-      }
+      // ALWAYS force HLS for our fake URL or real m3u8
+      js_util.setProperty(srcObj, 'type', 'application/x-mpegurl');
 
       js_util.setProperty(_currentPlayer!, 'src', srcObj);
       _currentPlayer!.setAttribute('title', 'Live Stream');
@@ -191,10 +195,23 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
     if (!mounted) return;
 
     if (_retryCount < 2) {
+      // PROXY FALLBACK LOGIC
+      // If we haven't tried proxy yet, try it now for ANY url.
+      if (!_usedProxyForCurrentStream) {
+        print('[VIDSTACK] Direct Play Failed. Retrying with Proxy Fallback...');
+        _usedProxyForCurrentStream = true;
+        // Small delay to ensure state cleanliness before retry
+        Timer(const Duration(milliseconds: 100), () {
+          if (mounted) _loadSource(_currentUrl);
+        });
+        return; // Don't increment retryCount yet, this is a mode switch
+      }
+
       _retryCount++;
       print('[VIDSTACK] Auto-Retrying same stream (Attempt $_retryCount)...');
-      Timer(const Duration(milliseconds: 1000), () {
-        if (mounted) _loadSource(widget.url);
+      _retryTimer?.cancel();
+      _retryTimer = Timer(const Duration(milliseconds: 1000), () {
+        if (mounted) _loadSource(_currentUrl);
       });
     } else {
       print('[VIDSTACK] Max retries reached. Switching to Next Stream...');
@@ -209,7 +226,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             }
           }
         }
-        currentRawUrl ??= widget.url;
+        currentRawUrl ??= _currentUrl;
 
         for (int i = 0; i < widget.streamLinks.length; i++) {
           if (widget.streamLinks[i]['url'] == currentRawUrl) {
@@ -224,7 +241,9 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           final nextUrl = nextStream['url'];
           print('[VIDSTACK] Switching to Next Stream: ${nextStream['name']}');
           _retryCount = 0;
+          _usedProxyForCurrentStream = false; // Reset for new stream
           if (mounted) {
+            _currentUrl = nextUrl;
             _loadSource(nextUrl);
             _updateActiveButton(nextUrl);
           }
@@ -291,7 +310,8 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             display: flex; align-items: center; z-index: 100; /* Above player */
             /* Start VISIBLE */
             opacity: 1; 
-            transition: opacity 0.3s ease; 
+            /* APPEAR: Snappier (~0.35s) + Tiny Delay (0.1s) to match Native Momentum */
+            transition: opacity 0.35s ease-out 0.1s; 
             pointer-events: none; /* Let clicks pass through container */
           }
 
@@ -299,6 +319,8 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           /* Hide overlay when player does NOT have controls-visible class */
           .vds-player:not(.controls-visible) ~ .vds-overlay-header {
              opacity: 0; pointer-events: none;
+             /* DISAPPEAR: Fast + No Delay (Immediate) */
+             transition: opacity 0.2s ease 0s; 
           }
           /* Show overlay when player HAS controls-visible class */
           .vds-player.controls-visible ~ .vds-overlay-header {
@@ -393,17 +415,15 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         // We use pointerup in capture phase to reliably detect interaction
         // even if the video player swallows 'click' events.
         void handleToggle(html.Event e) {
-          // If visible, hide immediately.
-          // If hidden, show and start timer.
+          // Explicitly update UI state + Force Native Attribute
+          // This ensures immediate response even if Vidstack is loading/buffered
 
           if (_controlsVisible) {
-            // Force Hide
+            _hideControls();
             player.setAttribute('user-idle', 'true');
-            _overlayTimer?.cancel();
           } else {
-            // Force Show
+            _showControls();
             player.setAttribute('user-idle', 'false');
-            _startHideTimer();
           }
         }
 
@@ -449,6 +469,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
               btn.onClick.listen((e) {
                 e.stopPropagation();
                 player.setAttribute('user-idle', 'false');
+                _currentUrl = urlStr;
                 _loadSource(urlStr);
                 _updateActiveButton(urlStr);
               });
@@ -515,6 +536,13 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           _startHideTimer();
         });
 
+        // LISTEN TO PROVIDER CHANGE
+        player.addEventListener('provider-change', (html.Event event) {
+          // We no longer need to inject custom loader.
+          // The global XHR Interceptor handles everything automatically.
+          print('[VIDSTACK] Provider changed.');
+        });
+
         // LISTEN TO USER IDLE CHANGE
         player.addEventListener('user-idle-change', (html.Event event) {
           // Strictly sync our overlay with Vidstack's idle state
@@ -535,10 +563,25 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         });
 
         player.addEventListener('error', (event) {
-          print('[VIDSTACK] Error Event Triggered');
+          final detail = js_util.getProperty(event, 'detail');
+          print('[VIDSTACK] Error Event: $detail');
           setLoader(true);
           _handleErrorLogic();
         });
+
+        // Debugging Stalls
+        player.addEventListener('loaded-metadata',
+            (e) => print('[VIDSTACK] Event: loaded-metadata'));
+        player.addEventListener(
+            'loaded-data', (e) => print('[VIDSTACK] Event: loaded-data'));
+        player.addEventListener(
+            'can-play', (e) => print('[VIDSTACK] Event: can-play'));
+        player.addEventListener(
+            'stalled', (e) => print('[VIDSTACK] Event: stalled'));
+        player.addEventListener(
+            'suspend', (e) => print('[VIDSTACK] Event: suspend'));
+        player.addEventListener(
+            'waiting', (e) => print('[VIDSTACK] Event: waiting'));
 
         // تشغيل المصدر
         _loadSource(initialUrl);

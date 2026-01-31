@@ -14,7 +14,31 @@ Future<StreamDetails> handleHesenTvStream(String url) async {
     throw Exception("API call failed with status code: ${response.statusCode}");
   }
 
-  final Map<String, dynamic> data = jsonDecode(response.body);
+  if (response.body.trim().startsWith('#EXTM3U')) {
+    // If it's a direct M3U8 playlist, return it directly
+    return StreamDetails(
+      videoUrlToLoad: url,
+      fetchedQualities: [
+        {'name': 'Auto', 'url': url}
+      ],
+      selectedQualityIndex: 0,
+    );
+  }
+
+  Map<String, dynamic> data;
+  try {
+    data = jsonDecode(response.body);
+  } catch (e) {
+    // Fallback if not JSON and not starting with #EXTM3U but still successful
+    return StreamDetails(
+      videoUrlToLoad: url,
+      fetchedQualities: [
+        {'name': 'Stream', 'url': url}
+      ],
+      selectedQualityIndex: 0,
+    );
+  }
+
   List<Map<String, dynamic>> parsedQualities = [];
 
   // 1. Parse all available qualities from the JSON response
@@ -23,7 +47,7 @@ Future<StreamDetails> handleHesenTvStream(String url) async {
       final parts = key.split('@');
       final int quality = int.tryParse(parts[0]) ?? 0;
       final int fps = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
-      
+
       parsedQualities.add({
         'key': key,
         'url': value.toString(),
@@ -56,13 +80,15 @@ Future<StreamDetails> handleHesenTvStream(String url) async {
     if (int.tryParse(name) != null) {
       name = '${name}p';
     } else {
-        name = name.replaceFirstMapped(RegExp(r'(\d+)'), (match) => '${match.group(1)}p');
+      name = name.replaceFirstMapped(
+          RegExp(r'(\d+)'), (match) => '${match.group(1)}p');
     }
     return {'name': name, 'url': q['url']};
   }).toList();
-  
+
   // 5. Find the index of the selected stream in the display list
-  int selectedQualityIndex = _findUrlIndexInList(videoUrlToLoad, apiQualitiesForDisplay);
+  int selectedQualityIndex =
+      _findUrlIndexInList(videoUrlToLoad, apiQualitiesForDisplay);
 
   return StreamDetails(
     videoUrlToLoad: videoUrlToLoad,

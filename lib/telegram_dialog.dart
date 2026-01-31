@@ -15,7 +15,7 @@ void showTelegramDialog(BuildContext context, {String? userName}) {
           // Add rounded corners and a border
           borderRadius: BorderRadius.circular(15.0),
           side: BorderSide(
-              color: theme.colorScheme.secondary.withOpacity(0.5),
+              color: theme.colorScheme.secondary.withValues(alpha: 0.5),
               width: 1), // Add border
         ),
         content: Column(
@@ -24,10 +24,12 @@ void showTelegramDialog(BuildContext context, {String? userName}) {
           children: [
             // Display user name if available
             if (userName != null && userName.isNotEmpty)
-              Flexible( // Wrap with Flexible to allow text to wrap/ellipsis
+              Flexible(
+                // Wrap with Flexible to allow text to wrap/ellipsis
                 child: Directionality(
                   textDirection: TextDirection.rtl, // Force RTL direction
-                  child: FittedBox( // Added FittedBox to make text shrink to fit
+                  child: FittedBox(
+                    // Added FittedBox to make text shrink to fit
                     fit: BoxFit.scaleDown,
                     child: RichText(
                       textAlign: TextAlign.center,
@@ -58,7 +60,8 @@ void showTelegramDialog(BuildContext context, {String? userName}) {
                           TextSpan(
                             text: ' أتمنى أن تكون بخير ❤️',
                             style: TextStyle(
-                              fontSize: 18, // Slightly smaller for the trailing text
+                              fontSize:
+                                  18, // Slightly smaller for the trailing text
                               color: theme.textTheme.bodyLarge?.color,
                             ),
                           ),
@@ -75,10 +78,11 @@ void showTelegramDialog(BuildContext context, {String? userName}) {
                   horizontal: 16.0, vertical: 8.0), // Add padding
               decoration: BoxDecoration(
                 color: theme.colorScheme.secondaryContainer
-                    .withOpacity(0.3), // Transparent background
+                    .withValues(alpha: 0.3), // Transparent background
                 borderRadius: BorderRadius.circular(20.0), // Oval shape
               ),
-              child: FittedBox( // Added FittedBox to make text shrink to fit
+              child: FittedBox(
+                // Added FittedBox to make text shrink to fit
                 fit: BoxFit.scaleDown,
                 child: Text(
                   'اللهم صل وسلم وبارك على سيدنا محمد',
@@ -108,8 +112,8 @@ void showTelegramDialog(BuildContext context, {String? userName}) {
           SizedBox(width: 10), // Add space between buttons
           ElevatedButton.icon(
             // Use ElevatedButton.icon for Join button
-            icon: Icon(FontAwesomeIcons.telegram,
-                size: 18), // Add telegram icon
+            icon:
+                Icon(FontAwesomeIcons.telegram, size: 18), // Add telegram icon
             label: Text('انضم للتيليجرام'),
             style: ElevatedButton.styleFrom(
               backgroundColor:

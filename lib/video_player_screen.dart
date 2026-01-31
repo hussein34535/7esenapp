@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'dart:io'; // Platform check
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
@@ -10,12 +11,17 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:android_pip/android_pip.dart';
 import 'package:hesen/okru_stream_extractor.dart';
 import 'dart:convert'; // Added for jsonDecode
+import 'package:media_kit/media_kit.dart'; // MediaKit Player
+import 'package:media_kit_video/media_kit_video.dart'; // MediaKit Video Widget
+import 'package:window_manager/window_manager.dart'; // Window control for fullscreen
 
 import 'player_utils/hesentv_handler.dart';
 import 'player_utils/okru_playlist_parser.dart';
 import 'player_utils/youtube_handler.dart';
 import 'player_utils/vidstack_player_widget.dart'; // Added for Vidstack Web Player
 import 'package:hesen/services/web_proxy_service.dart';
+import 'package:hesen/services/auth_service.dart';
+import 'package:hesen/screens/login_screen.dart';
 
 const String _userAgent = 'VLC/3.0.18 LibVLC/3.0.18';
 
@@ -31,13 +37,14 @@ class VideoPlayerScreen extends StatefulWidget {
   final String initialUrl;
   final List<Map<String, dynamic>> streamLinks;
   final Color progressBarColor;
-  // ... other properties
+  final bool isLocked; // New flag for premium content that failed to unlock
 
   const VideoPlayerScreen({
     Key? key,
     required this.initialUrl,
     required this.streamLinks,
     this.progressBarColor = Colors.red,
+    this.isLocked = false, // Default to false
     // ... other initializers
   }) : super(key: key);
 
@@ -47,6 +54,7 @@ class VideoPlayerScreen extends StatefulWidget {
 
 class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  // ... existing variables ...
   VideoPlayerController? _videoPlayerController;
   ChewieController? _chewieController;
   late AnimationController _animationController;
@@ -58,6 +66,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   bool _hasError = false;
   List<Map<String, dynamic>> _validStreamLinks = [];
   bool _isControlsVisible = false;
+  bool _isFullScreen = false; // Track window fullscreen state (Desktop)
+
+  // MediaKit (Desktop Only)
+  Player? _mediaKitPlayer;
+  VideoController? _mediaKitController;
+
   String? _currentStreamUrl;
   int _selectedStreamIndex = 0;
   bool _isCurrentStreamApi = false;
@@ -75,19 +89,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   Timer? _bufferingRetryTimer; // ADDED: To handle buffering timeouts
   Duration? _lastPosition; // ADDED: To store position before a retry
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
-
-  // initState, dispose, etc. remain the same as your provided code
-  // I will skip them for brevity but they are in the final complete code block.
-
-  // --- OMITTING UNCHANGED METHODS FOR BREVITY ---
-  // initState, dispose, didChangeAppLifecycleState, _initializeScreen,
-  // didUpdateWidget, _prepareAndInitializePlayer, _findUrlIndexInList,
-  // _initializePlayerInternal, _releaseControllers, _videoPlayerListener,
-  // _tryNextStream, _changeStream, _changeApiQuality, timers, visibility toggles,
-  // _formatDuration, _buildErrorWidget, _buildStreamSelector,
-  // _showQualitySelectionDialog, _showError, _handleDoubleTap, _cancelAllTimers
-  // These are all correct from your last version. The changes are in the build methods.
-  // The full code is below.
 
   @override
   void initState() {
@@ -125,7 +126,142 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         vsync: this, duration: const Duration(milliseconds: 300));
     _opacityAnimation =
         Tween<double>(begin: 0.0, end: 1.0).animate(_animationController);
-    _initializeScreen();
+
+    // Check access immediately
+    _checkAccess();
+  }
+
+  Future<void> _checkAccess() async {
+    // If passed externally as locked, trust it.
+    if (widget.isLocked) {
+      if (!mounted) return;
+      _showPremiumDialog();
+      return;
+    }
+
+    // Otherwise, check local subscription status (just in case)
+    final authService = AuthService();
+    bool isSubscribed = await authService.checkSubscription();
+
+    // If streamLinks are empty (and we are here), it likely means it's premium content that wasn't unlocked.
+    // However, widget.isLocked should handle the explicit failure case.
+    // We will keep a check here: if not subscribed and no streams -> Lock it.
+
+    // Actually, if we have a URL, we play it. The API is the source of truth for URLs.
+    // If isLocked is false, we assume we have a URL or it's free.
+
+    // BUT, let's keep the existing check for safety, but simplify it.
+    // Only block if we truly have NO playable links AND user is not subscribed.
+
+    bool hasPlayableLinks = widget.streamLinks.any(
+        (link) => link['url'] != null && link['url'].toString().isNotEmpty);
+
+    if (!isSubscribed && !hasPlayableLinks) {
+      if (!mounted) return;
+      _showPremiumDialog();
+    } else {
+      // User is subscribed OR has free links, proceed
+      _initializeScreen();
+    }
+  }
+
+  Future<void> _showPremiumDialog() async {
+    // Show Dialog
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: Row(
+          children: [
+            const Icon(Icons.star, color: Colors.amber, size: 28),
+            const SizedBox(width: 10),
+            const Text('محتوى مميز',
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'هذه القناة تتطلب اشتراكاً للمشاهدة بجودة عالية (HD).',
+              style: TextStyle(color: Colors.white70, fontSize: 16),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.amber.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.amber.withOpacity(0.5)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: const [
+                  Text('سعر الاشتراك:',
+                      style: TextStyle(color: Colors.amber, fontSize: 14)),
+                  Text('50 ج.م / شهرياً',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'يمكنك المشاهدة بجودة منخفضة مجاناً (إذا توفرت).',
+              style: TextStyle(color: Colors.grey, fontSize: 12),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx, false);
+              // Demo logic: Show msg that free quality is not available for this stream
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content: Text(
+                        'عذراً، الجودة المجانية غير متاحة لهذا الحدث حالياً.')),
+              );
+            },
+            child: const Text('مشاهدة مجانية (SD)',
+                style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF673ab7),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx, true); // Go to Profile/Login
+            },
+            child: const Text('اشتراك الآن',
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      if (!mounted) return;
+      // Navigate to Login Screen
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+      // Re-check after return
+      _checkAccess();
+    } else {
+      if (!mounted) return;
+      Navigator.of(context).pop(); // Close Video Screen
+    }
   }
 
   @override
@@ -158,7 +294,20 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
   Future<void> _initializeScreen() async {
     await Future.delayed(const Duration(milliseconds: 100));
-    if (mounted) _prepareAndInitializePlayer();
+    if (!mounted) return;
+
+    if (widget.initialUrl == null || widget.initialUrl!.trim().isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text("عذراً، لا يوجد بث متاح حالياً لهذه القناة.")),
+        );
+        Navigator.pop(context);
+      }
+      return;
+    }
+
+    _prepareAndInitializePlayer();
   }
 
   @override
@@ -415,6 +564,44 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       else if (videoUrlToLoad.toLowerCase().contains('.m3u8'))
         formatHint = VideoFormat.hls;
 
+      // ====== DESKTOP: Use MediaKit (MPV Backend) ======
+      if (!kIsWeb &&
+          (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+        debugPrint('[HESEN PLAYER] Desktop detected - Using MediaKit');
+        try {
+          // Create Player if needed
+          _mediaKitPlayer ??= Player();
+          _mediaKitController ??= VideoController(_mediaKitPlayer!);
+
+          // Listen for errors to trigger failover
+          _mediaKitPlayer!.stream.error.listen((error) {
+            debugPrint('[MEDIAKIT ERROR] $error');
+            if (mounted) _tryNextStream();
+          });
+
+          await _mediaKitPlayer!.open(Media(videoUrlToLoad));
+          await _mediaKitPlayer!.play();
+
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+              _hasError = false;
+            });
+            _showControls();
+          }
+        } catch (e) {
+          debugPrint('[MEDIAKIT INIT ERROR] $e');
+          if (mounted) {
+            setState(() {
+              _hasError = true;
+              _isLoading = false;
+            });
+          }
+        }
+        return; // Skip VideoPlayer initialization for Desktop
+      }
+
+      // ====== MOBILE: Use VideoPlayer + Chewie ======
       _videoPlayerController = VideoPlayerController.networkUrl(
           Uri.parse(videoUrlToLoad),
           httpHeaders: httpHeaders,
@@ -485,6 +672,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     if (video != null) {
       video.removeListener(_videoPlayerListener);
       video.dispose();
+    }
+
+    // MediaKit Cleanup (Desktop)
+    if (_mediaKitPlayer != null) {
+      await _mediaKitPlayer!.dispose();
+      _mediaKitPlayer = null;
+      _mediaKitController = null;
     }
   }
 
@@ -901,13 +1095,41 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         ignoring: !_isControlsVisible,
         child: Stack(
           children: [
-            // Top Stream Selector
+            // Back Button (Top Left)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 10,
+              left: 10,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.5),
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () async {
+                    // Desktop: Exit fullscreen first if active
+                    if (!kIsWeb &&
+                        (Platform.isWindows ||
+                            Platform.isLinux ||
+                            Platform.isMacOS)) {
+                      if (_isFullScreen) {
+                        await windowManager.setFullScreen(false);
+                        _isFullScreen = false;
+                      }
+                    }
+                    if (mounted) Navigator.of(context).pop();
+                  },
+                ),
+              ),
+            ),
+
+            // Top Stream Selector (Center)
             // MODIFIED: Show if there is at least one valid link.
 
             if (_validStreamLinks.isNotEmpty)
               Positioned(
                 top: MediaQuery.of(context).padding.top + 10,
-                left: 0,
+                left: 60, // Offset for back button
                 right: 0,
                 child: Center(child: _buildStreamSelector()),
               ),
@@ -916,39 +1138,79 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
             Center(
               child: (_isLoading && !_hasError)
                   ? const SizedBox
-                      .shrink() // Loading indicator is now at the root stack
-                  : (_videoPlayerController == null ||
-                          !_videoPlayerController!.value.isInitialized
-                      ? const SizedBox.shrink()
-                      : ValueListenableBuilder<VideoPlayerValue>(
-                          valueListenable: _videoPlayerController!,
-                          builder: (context, value, child) {
-                            return GestureDetector(
-                              onTap: () {
-                                if (value.isPlaying)
-                                  _videoPlayerController!.pause();
-                                else
-                                  _videoPlayerController!.play();
-                                _cancelAllTimers(); // MODIFIED: Cancel timers on interaction
-                                _startHideControlsTimer();
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.4),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  value.isPlaying
-                                      ? Icons.pause
-                                      : Icons.play_arrow,
-                                  color: Colors.white,
-                                  size: 48,
-                                ),
-                              ),
-                            );
+                      .shrink() // Loading indicator is at root stack
+                  : Builder(builder: (context) {
+                      // Desktop: MediaKit
+                      final bool isDesktop = !kIsWeb &&
+                          (Platform.isWindows ||
+                              Platform.isLinux ||
+                              Platform.isMacOS);
+                      if (isDesktop) {
+                        if (_mediaKitController == null)
+                          return const SizedBox.shrink();
+                        return GestureDetector(
+                          onTap: () {
+                            if (_mediaKitPlayer != null) {
+                              if (_mediaKitPlayer!.state.playing) {
+                                _mediaKitPlayer!.pause();
+                              } else {
+                                _mediaKitPlayer!.play();
+                              }
+                            }
+                            _cancelAllTimers();
+                            _startHideControlsTimer();
                           },
-                        )),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.4),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              (_mediaKitPlayer?.state.playing ?? false)
+                                  ? Icons.pause
+                                  : Icons.play_arrow,
+                              color: Colors.white,
+                              size: 48,
+                            ),
+                          ),
+                        );
+                      }
+                      // Mobile: VideoPlayerController
+                      if (_videoPlayerController == null ||
+                          !_videoPlayerController!.value.isInitialized) {
+                        return const SizedBox.shrink();
+                      }
+                      return ValueListenableBuilder<VideoPlayerValue>(
+                        valueListenable: _videoPlayerController!,
+                        builder: (context, value, child) {
+                          return GestureDetector(
+                            onTap: () {
+                              if (value.isPlaying)
+                                _videoPlayerController!.pause();
+                              else
+                                _videoPlayerController!.play();
+                              _cancelAllTimers();
+                              _startHideControlsTimer();
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.4),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                value.isPlaying
+                                    ? Icons.pause
+                                    : Icons.play_arrow,
+                                color: Colors.white,
+                                size: 48,
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    }),
             ),
 
             // Bottom controls bar
@@ -967,15 +1229,39 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   Widget _buildBottomControls(BuildContext context) {
     final controller = _videoPlayerController;
 
+    // Desktop: MediaKit doesn't expose position/duration the same way,
+    // so we detect live streams by URL pattern and show simplified controls.
+    final bool isDesktop =
+        !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+
     return AnimatedBuilder(
       animation: controller ?? kAlwaysCompleteAnimation,
       builder: (context, child) {
-        final isInitialized = controller?.value.isInitialized ?? false;
+        // Desktop uses MediaKit, Mobile uses VideoPlayerController
+        final bool isInitialized = isDesktop
+            ? (_mediaKitController != null)
+            : (controller?.value.isInitialized ?? false);
 
-        final position =
-            isInitialized ? controller!.value.position : Duration.zero;
-        final duration =
-            isInitialized ? controller!.value.duration : Duration.zero;
+        // On Desktop, detect live by URL pattern:
+        // - m3u8 streams are typically live
+        // - 7esenlink API streams are live IPTV
+        final bool isLiveUrl =
+            (_currentStreamUrl?.toLowerCase().contains('.m3u8') ?? false) ||
+                (_currentStreamUrl
+                        ?.contains('7esenlink.vercel.app/api/stream') ??
+                    false);
+
+        final position = isDesktop
+            ? Duration
+                .zero // MediaKit position tracking would need stream.position.listen
+            : (controller?.value.isInitialized == true
+                ? controller!.value.position
+                : Duration.zero);
+        final duration = isDesktop
+            ? Duration.zero // Live streams have no duration
+            : (controller?.value.isInitialized == true
+                ? controller!.value.duration
+                : Duration.zero);
 
         // --- Buttons ---
         Widget qualityButton = const SizedBox.shrink();
@@ -1021,7 +1307,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         }
 
         // --- Progress Bar Items ---
-        final bool isLive = isInitialized && duration.inMilliseconds == 0;
+        // Desktop: use URL pattern to detect live (m3u8 = live), Mobile: duration == 0 = live
+        final bool isLive = isDesktop
+            ? isLiveUrl
+            : (isInitialized && duration.inMilliseconds == 0);
         final double durationMs =
             (isInitialized && !isLive && duration.inMilliseconds > 0)
                 ? duration.inMilliseconds.toDouble()
@@ -1030,7 +1319,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
             ? position.inMilliseconds.clamp(0.0, durationMs).toDouble()
             : 0.0;
         double bufferedMs = 0.0;
-        if (isInitialized && !isLive && controller!.value.buffered.isNotEmpty) {
+        // Only get buffer info on Mobile (Desktop MediaKit handles buffering differently)
+        if (!isDesktop &&
+            isInitialized &&
+            !isLive &&
+            controller!.value.buffered.isNotEmpty) {
           bufferedMs = controller.value.buffered.last.end.inMilliseconds
               .clamp(0.0, durationMs)
               .toDouble();
@@ -1108,6 +1401,20 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                   _startHideControlsTimer();
                 },
               ),
+              // Fullscreen Toggle (Desktop only)
+              if (isDesktop)
+                IconButton(
+                  icon: Icon(
+                    _isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen,
+                    color: Colors.white,
+                  ),
+                  onPressed: () async {
+                    _isFullScreen = !_isFullScreen;
+                    await windowManager.setFullScreen(_isFullScreen);
+                    if (mounted) setState(() {});
+                    _startHideControlsTimer();
+                  },
+                ),
             ],
           ),
         );
@@ -1128,6 +1435,44 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       return Container(color: Colors.black);
     }
 
+    // DESKTOP: Use MediaKit Video widget
+    if (!kIsWeb &&
+        (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+      if (_mediaKitController != null) {
+        // Cover mode: Fill entire screen (may crop video edges)
+        if (_currentVideoSize == VideoSize.cover) {
+          return SizedBox.expand(
+            child: Video(
+              controller: _mediaKitController!,
+              controls: null,
+              fit: BoxFit.cover, // Fill entire space
+            ),
+          );
+        }
+
+        // Other modes: Use aspect ratio
+        final videoWidth = _mediaKitPlayer?.state.width ?? 16;
+        final videoHeight = _mediaKitPlayer?.state.height ?? 9;
+        final videoAspectRatio = videoWidth > 0 && videoHeight > 0
+            ? videoWidth / videoHeight
+            : 16 / 9;
+
+        return Center(
+          child: AspectRatio(
+            aspectRatio:
+                _getAspectRatioForSize(_currentVideoSize, videoAspectRatio),
+            child: Video(
+              controller: _mediaKitController!,
+              controls: null,
+              fit: BoxFit.contain, // Fit within bounds
+            ),
+          ),
+        );
+      }
+      return Container(color: Colors.black);
+    }
+
+    // MOBILE: Use Chewie
     final chewie = _chewieController;
     if (chewie == null || !chewie.videoPlayerController.value.isInitialized) {
       return Container(color: Colors.black);

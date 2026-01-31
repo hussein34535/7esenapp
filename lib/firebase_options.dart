@@ -41,13 +41,13 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDwH7wGp-8_8vw_GlWcvCiJRbBWKWobqM4',
-    appId: '1:415589112214:web:9e46f64bc53ef4e4da65b7',
-    messagingSenderId: '415589112214',
-    projectId: 'hesen-notification',
-    authDomain: 'hesen-notification.firebaseapp.com',
-    storageBucket: 'hesen-notification.appspot.com',
-    measurementId: 'G-K3M054KY45',
+    apiKey: 'AIzaSyC01PEs2nFUXrwxKLvjOKkdFHM18DBO_CA',
+    appId: '1:555639744428:web:27822969de854b937d3c09',
+    messagingSenderId: '555639744428',
+    projectId: 'esen-notifications',
+    authDomain: 'esen-notifications.firebaseapp.com',
+    storageBucket: 'esen-notifications.firebasestorage.app',
+    measurementId: 'G-Y80JLHBVRB',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
@@ -76,13 +76,13 @@ class DefaultFirebaseOptions {
     iosBundleId: 'com.tv.hesen',
   );
 
-    static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyDwH7wGp-8_8vw_GlWcvCiJRbBWKWobqM4',
-    appId: '1:415589112214:web:74a477abaa98579cda65b7',
-    messagingSenderId: '415589112214',
-    projectId: 'hesen-notification',
-    authDomain: 'hesen-notification.firebaseapp.com',
-    storageBucket: 'hesen-notification.appspot.com',
-    measurementId: 'G-RJFYTCC6R0',
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyC01PEs2nFUXrwxKLvjOKkdFHM18DBO_CA',
+    appId: '1:555639744428:web:f4eed4699536a1db7d3c09',
+    messagingSenderId: '555639744428',
+    projectId: 'esen-notifications',
+    authDomain: 'esen-notifications.firebaseapp.com',
+    storageBucket: 'esen-notifications.firebasestorage.app',
+    measurementId: 'G-1MR20G4J19',
   );
 }

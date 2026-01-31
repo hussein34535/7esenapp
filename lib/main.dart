@@ -1,7 +1,10 @@
+import 'package:window_manager/window_manager.dart';
+import 'package:media_kit/media_kit.dart'; // MediaKit
 import 'package:flutter/material.dart';
 import 'package:hesen/web_utils.dart'
     if (dart.library.io) 'package:hesen/web_utils_stub.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 import 'package:hesen/firebase_api.dart';
 import 'package:http/http.dart' as http;
@@ -29,10 +32,12 @@ import 'package:provider/provider.dart';
 import 'package:hesen/theme_customization_screen.dart';
 import 'dart:io';
 import 'package:hesen/telegram_dialog.dart';
+import 'package:hesen/screens/profile_screen.dart';
 import 'package:hesen/notification_page.dart';
 import 'package:hesen/services/promo_code_service.dart';
 import 'package:hesen/services/ad_service.dart';
 import 'package:hesen/player_utils/web_player_registry.dart';
+import 'package:hesen/services/auth_service.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -41,11 +46,31 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 
 SharedPreferences? prefs;
 
-// ... imports ...
-
 Future<void> main() async {
   runZonedGuarded<Future<void>>(() async {
     WidgetsFlutterBinding.ensureInitialized();
+    MediaKit.ensureInitialized(); // Initialize MediaKit
+
+    // WINDOW MANAGER INIT (Desktop)
+    if (!kIsWeb &&
+        (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+      try {
+        await windowManager.ensureInitialized();
+        WindowOptions windowOptions = const WindowOptions(
+          size: Size(1280, 720),
+          center: true,
+          backgroundColor: Colors.black,
+          skipTaskbar: false,
+          titleBarStyle: TitleBarStyle.normal,
+        );
+        windowManager.waitUntilReadyToShow(windowOptions, () async {
+          await windowManager.show();
+          await windowManager.focus();
+        });
+      } catch (e) {
+        debugPrint("WindowManager Init Failed (Native mixin missing?): $e");
+      }
+    }
 
     // REDIRECT LOGS TO CONSOLE OVERLAY REMOVED
     FlutterError.onError = (FlutterErrorDetails details) {
@@ -81,8 +106,10 @@ Future<void> main() async {
     if (kIsWeb) {
       try {
         registerVidstackPlayer();
+        // Signal to JS to remove the HTML splash screen
+        removeWebSplash();
       } catch (e) {
-        debugPrint("Vidstack Reg Error: $e");
+        debugPrint("Vidstack Reg/Splash Remove Error: $e");
       }
     }
 
@@ -93,24 +120,36 @@ Future<void> main() async {
       debugPrint(".env warning (safely ignored).");
     }
 
-    // 2. Remove Web Splash Immediately (Flutter is taking over)
-    // 2. Remove Web Splash Immediately (Flutter is taking over)
-    if (kIsWeb) {
-      debugPrint("Registering Vidstack Player...");
-      try {
-        registerVidstackPlayer();
-      } catch (e) {
-        debugPrint("Vidstack Reg Error: $e");
-      }
-    }
+    // (Duplicate Vidstack block removed)
 
     // 3. Initialize Firebase & Services in Background
-    Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    ).then((_) {
-      debugPrint("Firebase initialized.");
+    // 3. Initialize Firebase & Services in Background
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      debugPrint("Firebase initialized successfully.");
+
+      // Wait for auth state to be restored - on Windows, the first emission is usually null
+      // We wait for a non-null user OR timeout after 2 seconds
+      User? user;
+      try {
+        user = await FirebaseAuth.instance
+            .authStateChanges()
+            .where((u) => u != null) // Skip null emissions
+            .first
+            .timeout(const Duration(seconds: 2));
+      } catch (e) {
+        // Timeout or no user - that's ok, user stays null
+        debugPrint("DEBUG AUTH STATE: Timeout or no user found");
+      }
+      debugPrint(
+          "DEBUG AUTH STATE: User after init = ${user?.email ?? 'NULL (Not Logged In)'}");
+      AuthService().checkSubscription();
+
       // Initialize other services that depend on Firebase
-      if (!kIsWeb) {
+      // Note: Some services like Messaging might not support Windows yet
+      if (!kIsWeb && defaultTargetPlatform != TargetPlatform.windows) {
         try {
           final firebaseApi = FirebaseApi();
           firebaseApi.initNotification();
@@ -121,12 +160,12 @@ Future<void> main() async {
             onFailed: (error, message) {},
           );
         } catch (e) {
-          debugPrint("Services init error: $e");
+          debugPrint("Mobile Services init error: $e");
         }
       }
-    }).catchError((e) {
-      debugPrint("FIREBASE INIT FAILED (IGNORING): $e");
-    });
+    } catch (e) {
+      debugPrint("FIREBASE INIT FAILED: $e");
+    }
   }, (error, stack) {
     debugPrint("ZONED ERROR: $error");
     if (!error.toString().contains("Firebase") &&
@@ -136,29 +175,17 @@ Future<void> main() async {
   });
 }
 
-// Fallback error UI
+// Fallback error UI - DO NOT call runApp here to avoid Zone mismatch!
 void _displayError(dynamic error, StackTrace? stack) {
+  // Just log the error - cannot call runApp from inside runZonedGuarded
+  debugPrint("CRITICAL ERROR: $error");
+  if (stack != null) {
+    debugPrint("STACK: $stack");
+  }
+  // On web, also print to console
   if (kIsWeb) {
-    // Attempt to log to console explicitly for web
     print("CRITICAL WRAPPER ERROR: $error\n$stack");
   }
-  runApp(
-    MaterialApp(
-      home: Scaffold(
-        backgroundColor: Colors.red,
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Center(
-            child: Text(
-              "CRITICAL ERROR:\n$error\n\nSTACK:\n$stack",
-              style: const TextStyle(color: Colors.white, fontSize: 16),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
 }
 
 // --- Top-level function for background processing ---
@@ -170,62 +197,62 @@ Future<Map<String, dynamic>> _processFetchedData(List<dynamic> results) async {
 
   final uuid = Uuid();
 
-  List<Map<String, dynamic>> sortedCategories = [];
-  for (var categoryData in fetchedChannels) {
-    if (categoryData is Map) {
-      sortedCategories.add(Map<String, dynamic>.from(categoryData));
+  // New API returns channels directly, each channel has categories as nested array.
+  // We need to group channels by category for the existing UI.
+  Map<String, Map<String, dynamic>> categoryMap = {};
+
+  for (var channelData in fetchedChannels) {
+    if (channelData is! Map) continue;
+    final channel = Map<String, dynamic>.from(channelData);
+
+    // Ensure channel has an ID
+    if (channel['id'] == null) {
+      channel['id'] = uuid.v4();
+    }
+
+    // Get categories for this channel
+    final categories = channel['categories'] as List<dynamic>? ?? [];
+
+    if (categories.isEmpty) {
+      // No category, add to "Uncategorized"
+      const unCatId = 'uncategorized';
+      categoryMap.putIfAbsent(
+          unCatId,
+          () => {
+                'id': unCatId,
+                'name': 'قنوات أخرى',
+                'sort_order': 9999,
+                'channels': <Map<String, dynamic>>[],
+              });
+      (categoryMap[unCatId]!['channels'] as List).add(channel);
+    } else {
+      // Add channel to each of its categories
+      for (var cat in categories) {
+        if (cat is! Map) continue;
+        final catId = cat['id']?.toString() ?? uuid.v4();
+        categoryMap.putIfAbsent(
+            catId,
+            () => {
+                  'id': catId,
+                  'name': cat['name'] ?? 'Unknown',
+                  'is_premium': cat['is_premium'] ?? false,
+                  'sort_order': cat['sort_order'] ?? 0,
+                  'channels': <Map<String, dynamic>>[],
+                });
+        (categoryMap[catId]!['channels'] as List).add(channel);
+      }
     }
   }
-  sortedCategories.sort((a, b) {
-    if (a['createdAt'] == null || b['createdAt'] == null) return 0;
-    try {
-      final dateA = DateTime.parse(a['createdAt'].toString());
-      final dateB = DateTime.parse(b['createdAt'].toString());
-      return dateA.compareTo(dateB);
-    } catch (e) {
-      return a['createdAt'].toString().compareTo(b['createdAt'].toString());
-    }
+
+  // Convert to list and sort by sort_order
+  List<Map<String, dynamic>> processedChannels = categoryMap.values.toList();
+  processedChannels.sort((a, b) {
+    final orderA = a['sort_order'] as int? ?? 0;
+    final orderB = b['sort_order'] as int? ?? 0;
+    return orderA.compareTo(orderB);
   });
 
-  List<Map<String, dynamic>> processedChannels = [];
-  for (var categoryData in sortedCategories) {
-    Map<String, dynamic> newCategory = categoryData;
-    if (newCategory['id'] == null) {
-      newCategory['id'] = uuid.v4();
-    }
-    if (newCategory['channels'] is List) {
-      List originalChannels = newCategory['channels'];
-      List<Map<String, dynamic>> sortedChannelsList = [];
-      for (var channelData in originalChannels) {
-        if (channelData is Map) {
-          Map<String, dynamic> newChannel = Map<String, dynamic>.from(
-            channelData,
-          );
-          if (newChannel['id'] == null) {
-            newChannel['id'] = uuid.v4();
-          }
-          sortedChannelsList.add(newChannel);
-        }
-      }
-      sortedChannelsList.sort((a, b) {
-        if (a['createdAt'] == null || b['createdAt'] == null) return 0;
-        try {
-          final dateA = DateTime.parse(a['createdAt'].toString());
-          final dateB = DateTime.parse(b['createdAt'].toString());
-          return dateA.compareTo(dateB);
-        } catch (e) {
-          return a['createdAt'].toString().compareTo(
-                b['createdAt'].toString(),
-              );
-        }
-      });
-      newCategory['channels'] = sortedChannelsList;
-    } else {
-      newCategory['channels'] = [];
-    }
-    processedChannels.add(newCategory);
-  }
-
+  // Sort news by date (descending)
   fetchedNews.sort((a, b) {
     final bool aHasDate = a is Map && a['date'] != null;
     final bool bHasDate = b is Map && b['date'] != null;
@@ -237,13 +264,11 @@ Future<Map<String, dynamic>> _processFetchedData(List<dynamic> results) async {
       final dateB = DateTime.parse(b['date'].toString());
       return dateB.compareTo(dateA);
     } catch (e) {
-      if (aHasDate && bHasDate) return 0;
-      if (aHasDate) return 1;
-      if (bHasDate) return -1;
       return 0;
     }
   });
 
+  // Sort goals by createdAt (descending)
   fetchedGoals.sort((a, b) {
     final bool aHasDate = a is Map && a['createdAt'] != null;
     final bool bHasDate = b is Map && b['createdAt'] != null;
@@ -255,9 +280,6 @@ Future<Map<String, dynamic>> _processFetchedData(List<dynamic> results) async {
       final dateB = DateTime.parse(b['createdAt'].toString());
       return dateB.compareTo(dateA);
     } catch (e) {
-      if (aHasDate && bHasDate) return 0;
-      if (aHasDate) return 1;
-      if (bHasDate) return -1;
       return 0;
     }
   });
@@ -274,58 +296,62 @@ Future<Map<String, dynamic>> _processFetchedData(List<dynamic> results) async {
 Future<List<Map<String, dynamic>>> _processRefreshedChannelsData(
     List<dynamic> fetchedChannels) async {
   final uuid = Uuid();
-  List<Map<String, dynamic>> sortedCategories = [];
-  for (var categoryData in fetchedChannels) {
-    if (categoryData is Map) {
-      sortedCategories.add(Map<String, dynamic>.from(categoryData));
+
+  // New API returns channels directly, each channel has categories as nested array.
+  // We need to group channels by category for the existing UI.
+  Map<String, Map<String, dynamic>> categoryMap = {};
+
+  for (var channelData in fetchedChannels) {
+    if (channelData is! Map) continue;
+    final channel = Map<String, dynamic>.from(channelData);
+
+    // Ensure channel has an ID
+    if (channel['id'] == null) {
+      channel['id'] = uuid.v4();
+    }
+
+    // Get categories for this channel
+    final categories = channel['categories'] as List<dynamic>? ?? [];
+
+    if (categories.isEmpty) {
+      // No category, add to "Uncategorized"
+      const unCatId = 'uncategorized';
+      categoryMap.putIfAbsent(
+          unCatId,
+          () => {
+                'id': unCatId,
+                'name': 'قنوات أخرى',
+                'sort_order': 9999,
+                'channels': <Map<String, dynamic>>[],
+              });
+      (categoryMap[unCatId]!['channels'] as List).add(channel);
+    } else {
+      // Add channel to each of its categories
+      for (var cat in categories) {
+        if (cat is! Map) continue;
+        final catId = cat['id']?.toString() ?? uuid.v4();
+        categoryMap.putIfAbsent(
+            catId,
+            () => {
+                  'id': catId,
+                  'name': cat['name'] ?? 'Unknown',
+                  'is_premium': cat['is_premium'] ?? false,
+                  'sort_order': cat['sort_order'] ?? 0,
+                  'channels': <Map<String, dynamic>>[],
+                });
+        (categoryMap[catId]!['channels'] as List).add(channel);
+      }
     }
   }
-  sortedCategories.sort((a, b) {
-    if (a['createdAt'] == null || b['createdAt'] == null) return 0;
-    try {
-      final dateA = DateTime.parse(a['createdAt'].toString());
-      final dateB = DateTime.parse(b['createdAt'].toString());
-      return dateA.compareTo(dateB);
-    } catch (e) {
-      return a['createdAt'].toString().compareTo(b['createdAt'].toString());
-    }
+
+  // Convert to list and sort by sort_order
+  List<Map<String, dynamic>> processedChannels = categoryMap.values.toList();
+  processedChannels.sort((a, b) {
+    final orderA = a['sort_order'] as int? ?? 0;
+    final orderB = b['sort_order'] as int? ?? 0;
+    return orderA.compareTo(orderB);
   });
 
-  List<Map<String, dynamic>> processedChannels = [];
-  for (var categoryData in sortedCategories) {
-    Map<String, dynamic> newCategory = Map<String, dynamic>.from(categoryData);
-    if (newCategory['id'] == null) {
-      newCategory['id'] = uuid.v4();
-    }
-    if (newCategory['channels'] is List) {
-      List originalChannels = newCategory['channels'];
-      List<Map<String, dynamic>> sortedChannelsList = [];
-      for (var channelData in originalChannels) {
-        if (channelData is Map) {
-          Map<String, dynamic> newChannel =
-              Map<String, dynamic>.from(channelData);
-          if (newChannel['id'] == null) {
-            newChannel['id'] = uuid.v4();
-          }
-          sortedChannelsList.add(newChannel);
-        }
-      }
-      sortedChannelsList.sort((a, b) {
-        if (a['createdAt'] == null || b['createdAt'] == null) return 0;
-        try {
-          final dateA = DateTime.parse(a['createdAt'].toString());
-          final dateB = DateTime.parse(b['createdAt'].toString());
-          return dateA.compareTo(dateB);
-        } catch (e) {
-          return a['createdAt'].toString().compareTo(b['createdAt'].toString());
-        }
-      });
-      newCategory['channels'] = sortedChannelsList;
-    } else {
-      newCategory['channels'] = [];
-    }
-    processedChannels.add(newCategory);
-  }
   return processedChannels;
 }
 
@@ -392,7 +418,7 @@ class _MyAppState extends State<MyApp> {
     final themeProvider = Provider.of<ThemeProvider>(context);
 
     return MaterialApp(
-      title: 'Hesen TV',
+      title: '7eSen TV',
       debugShowCheckedModeBanner: false,
       themeMode: themeProvider.themeMode,
       theme: ThemeData(
@@ -406,12 +432,10 @@ class _MyAppState extends State<MyApp> {
           primary: themeProvider.getPrimaryColor(false),
           secondary: themeProvider.getSecondaryColor(false),
           surface: Colors.white,
-          background: themeProvider.getScaffoldBackgroundColor(false),
           error: Colors.red,
           onPrimary: Colors.white,
           onSecondary: Colors.white,
           onSurface: Colors.black,
-          onBackground: Colors.black,
           onError: Colors.white,
           brightness: Brightness.light,
         ),
@@ -442,12 +466,10 @@ class _MyAppState extends State<MyApp> {
           primary: themeProvider.getPrimaryColor(true),
           secondary: themeProvider.getSecondaryColor(true),
           surface: const Color(0xFF1C1C1C),
-          background: themeProvider.getScaffoldBackgroundColor(true),
           error: Colors.red,
           onPrimary: Colors.white,
           onSecondary: Colors.white,
           onSurface: Colors.white,
-          onBackground: Colors.white,
           onError: Colors.white,
           brightness: Brightness.dark,
         ),
@@ -505,7 +527,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   List<dynamic> news = [];
   List<dynamic> goals = [];
   int _selectedIndex = 0;
-  Future<void>? _dataFuture;
+
   final TextEditingController _searchController = TextEditingController();
   List<dynamic> _filteredChannels = [];
   late bool _isDarkMode;
@@ -526,7 +548,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     super.initState();
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     _isDarkMode = themeProvider.themeMode == ThemeMode.dark;
-    _dataFuture = _initData();
+    _initData();
     _initNotifications();
     checkForUpdate().then((_) => _checkAndAskForName());
   }
@@ -639,7 +661,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Future<void> _initNotifications() async {
     // On Web (especially iOS), requesting token immediately can freeze the app or cause issues.
     // It should be done via user interaction. Disabling auto-init for Web.
-    if (kIsWeb) return;
+    // Also skip on Windows where Firebase is not initialized.
+    if (kIsWeb || defaultTargetPlatform == TargetPlatform.windows) return;
 
     final firebaseApi = FirebaseApi();
     _fcmToken = await firebaseApi.initNotification();
@@ -784,7 +807,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     List<dynamic> fetchedResults = List.filled(4, null);
 
     try {
-      fetchedResults[0] = await ApiService.fetchChannelCategories();
+      fetchedResults[0] = await ApiService.fetchChannels();
     } catch (e) {
       debugPrint('Error fetching channels: $e');
       if (mounted) setState(() => _channelsHasError = true);
@@ -863,7 +886,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         _newsHasError = false;
         _goalsHasError = false;
         _matchesHasError = false;
-        _dataFuture = _initData();
+        _initData();
       });
     }
   }
@@ -1106,21 +1129,130 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   void openVideo(
     BuildContext context,
-    String initialUrl,
+    String? initialUrl,
     List<Map<String, dynamic>> streamLinks,
-    String sourceSection,
-  ) async {
-    // WEB SPECIFIC: Skip all ad logic on web
+    String sourceSection, {
+    int? contentId,
+    bool isPremium = false,
+  }) async {
+    // WEB SPECIFIC: Skip all ad/premium logic on web for now (or handle differently)
+    // If premium logic is needed on web, it should be mirrored here.
+    // For now, adhering to existing web skip.
     if (kIsWeb) {
-      _navigateToVideoPlayer(context, initialUrl, streamLinks);
+      _navigateToVideoPlayer(context, initialUrl ?? '', streamLinks);
       return;
     }
+
+    // --- PREMIUM CONTENT UNLOCK LOGIC ---
+    // If it's premium, ALWAYS try to verify/unlock it, regardless of whether we have a link.
+    bool needsUnlock = isPremium;
+    debugPrint(
+        "OPEN_VIDEO: initialUrl='$initialUrl', streamCount=${streamLinks.length}, isPremium=$isPremium, contentId=$contentId");
+
+    if (needsUnlock) {
+      if (contentId == null) {
+        debugPrint(
+            "OPEN_VIDEO: Premium but ContentID is NULL. Treating as locked.");
+        // Error: Premium content but no ID to unlock with.
+        _navigateToVideoPlayer(context, '', [], isLocked: true);
+        return;
+      }
+
+      debugPrint(
+          "OPEN_VIDEO: Attempting unlock for ID: $contentId type: $sourceSection");
+
+      // Show loading dialog while unlocking using navigatorKey for reliable dismissal
+      navigatorKey.currentState?.push(
+        PageRouteBuilder(
+          opaque: false,
+          barrierDismissible: false,
+          pageBuilder: (_, __, ___) => const Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
+          ),
+        ),
+      );
+
+      // Map sourceSection to API type (singular form)
+      String apiType = sourceSection;
+      if (sourceSection == 'channels') apiType = 'channel';
+      if (sourceSection == 'goals') apiType = 'goal';
+      if (sourceSection == 'news') apiType = 'news';
+      if (sourceSection == 'matches') apiType = 'match';
+
+      final authService = AuthService();
+      final unlockedData = await authService.unlockPremiumContent(
+        type: apiType,
+        id: contentId,
+      );
+
+      debugPrint(
+          "OPEN_VIDEO: unlockPremiumContent returned: ${unlockedData != null ? 'DATA' : 'NULL'}");
+
+      // Close loading dialog safely using navigatorKey
+      try {
+        if (navigatorKey.currentState?.canPop() == true) {
+          navigatorKey.currentState?.pop();
+        }
+      } catch (e) {
+        debugPrint("OPEN_VIDEO: Dialog dismiss error (ignored): $e");
+      }
+
+      debugPrint("OPEN_VIDEO: About to check unlockedData...");
+
+      if (unlockedData != null) {
+        debugPrint("OPEN_VIDEO: Unlocked Data Keys: ${unlockedData.keys}");
+
+        // Unlock successful! Update streams and URL.
+        // Parse the new stream links from the unlocked data
+        List<dynamic> newLinksJson = unlockedData['stream_link'] ?? [];
+        List<Map<String, dynamic>> newStreamLinks = [];
+
+        // Handle single link or list (API dependent)
+        if (unlockedData['link'] != null && unlockedData['link'] is String) {
+          newStreamLinks.add({'name': 'Watch', 'url': unlockedData['link']});
+        } else if (unlockedData['url'] != null &&
+            unlockedData['url'] is String) {
+          newStreamLinks.add({'name': 'Watch', 'url': unlockedData['url']});
+        }
+
+        // Merge/Override
+        for (var link in newLinksJson) {
+          if (link is Map) {
+            newStreamLinks.add(Map<String, dynamic>.from(link));
+          }
+        }
+
+        debugPrint("OPEN_VIDEO: Parsed ${newStreamLinks.length} stream links");
+
+        // If we found new links, use the first one as initialUrl
+        if (newStreamLinks.isNotEmpty) {
+          final firstUrl = newStreamLinks[0]['url']?.toString() ?? '';
+          debugPrint("OPEN_VIDEO: First URL = '$firstUrl'");
+          if (firstUrl.isNotEmpty) {
+            await _navigateToVideoPlayer(context, firstUrl, newStreamLinks,
+                isLocked: false);
+            // Refresh UI after returning from video player
+            if (mounted) setState(() {});
+            return;
+          }
+        }
+      }
+
+      // If unlock failed or returned no data -> Proceed as Locked
+      await _navigateToVideoPlayer(context, '', [], isLocked: true);
+      if (mounted) setState(() {});
+      return;
+    }
+
+    // --- EXISTING AD LOGIC (Only runs if content is NOT locked/premium-blocking) ---
 
     // Check if the user has an active ad-free session
     final bool adFree = await AdService.isAdFree();
     if (adFree) {
       print("Ad-free period is active. Skipping ad.");
-      _navigateToVideoPlayer(context, initialUrl, streamLinks);
+      _navigateToVideoPlayer(context, initialUrl ?? '', streamLinks);
       return;
     }
 
@@ -1214,7 +1346,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       if (Navigator.canPop(effectiveContext)) {
         Navigator.pop(effectiveContext);
       }
-      _navigateToVideoPlayer(effectiveContext, initialUrl, validStreamLinks);
+      _navigateToVideoPlayer(
+          effectiveContext, initialUrl ?? '', validStreamLinks);
     }
 
     void cancelAdAndDismiss() {
@@ -1258,7 +1391,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     });
 
     try {
-      if (!kIsWeb) {
+      // Skip Ads on Web AND Windows
+      if (!kIsWeb && defaultTargetPlatform != TargetPlatform.windows) {
         UnityAds.load(
           placementId: placementId,
           onComplete: (loadedPlacementId) async {
@@ -1324,8 +1458,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           },
         );
       } else {
-        // Fallback for web if somehow reached here
-        _navigateToVideoPlayer(context, initialUrl, streamLinks);
+        // Fallback for web or Windows -> Skip Ad
+        loadTimer?.cancel();
+        // BUGFIX: Close the loading dialog before navigating
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context);
+        }
+        await _navigateToVideoPlayer(context, initialUrl ?? '', streamLinks);
+        _resetAdLock(); // ✅ Fix: Reset loading state after returning from video
       }
     } catch (e) {
       loadTimer.cancel();
@@ -1336,21 +1476,36 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
-  void _navigateToVideoPlayer(
+  Future<void> _navigateToVideoPlayer(
     BuildContext context,
     String initialUrl,
-    List<Map<String, dynamic>> streamLinks,
-  ) {
-    navigatorKey.currentState?.push(
+    List<Map<String, dynamic>> streamLinks, {
+    bool isLocked = false,
+  }) async {
+    await navigatorKey.currentState?.push(
       MaterialPageRoute(
-        builder: (context) =>
-            VideoPlayerScreen(initialUrl: initialUrl, streamLinks: streamLinks),
+        builder: (context) => VideoPlayerScreen(
+          initialUrl: initialUrl,
+          streamLinks: streamLinks,
+          isLocked: isLocked,
+        ),
       ),
     );
   }
 
   List<Widget> _buildAppBarActions() {
     List<Widget> actions = [];
+
+    actions.add(
+      IconButton(
+        icon: const Icon(Icons.account_circle, color: Colors.white),
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (context) => const ProfileScreen()),
+          );
+        },
+      ),
+    );
 
     actions.add(
       Transform.scale(
@@ -1464,7 +1619,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       switch (index) {
         case 0:
           try {
-            final fetchedChannels = await ApiService.fetchChannelCategories();
+            final fetchedChannels = await ApiService.fetchChannels();
             final processedChannels =
                 await compute(_processRefreshedChannelsData, fetchedChannels);
 
@@ -1564,13 +1719,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (kIsWeb && _isLoading) {
       return const Scaffold(
         backgroundColor: Colors.black,
-        // Remove redundant logo here, because HTML splash already shows it.
-        // Just show a subtle loader to signal Flutter is taking over.
-        body: Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF7C52D8)),
-          ),
-        ),
+        // Double Loading Fix:
+        // Do NOT show a Flutter loader. Keep the HTML splash screen visible
+        // until we manually remove it in _initData() when data is ready.
+        // We render an empty black box behind the HTML splash.
+        body: SizedBox.shrink(),
       );
     }
 
@@ -1899,10 +2052,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       ),
       body: _isSearchBarVisible
           ? _buildSearchBar()
-          : FutureBuilder<void>(
-              future: _dataFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
+          : Builder(
+              builder: (context) {
+                // Use _isLoading directly instead of FutureBuilder
+                // This prevents loading indicator when returning from other screens
+                if (_isLoading && channels.isEmpty) {
                   return Center(child: CircularProgressIndicator());
                 } else if (_hasError) {
                   return _buildGeneralErrorWidget();

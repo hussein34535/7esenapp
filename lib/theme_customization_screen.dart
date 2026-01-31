@@ -62,31 +62,31 @@ class ThemeProvider with ChangeNotifier {
     SharedPreferences prefs = await SharedPreferences.getInstance();
 
     // Load light mode colors
-    _lightPrimaryColor = Color(
-        prefs.getInt('lightPrimaryColor') ?? const Color(0xFF673AB7).value);
+    _lightPrimaryColor = Color(prefs.getInt('lightPrimaryColor') ??
+        const Color(0xFF673AB7).toARGB32());
     _lightScaffoldBackgroundColor = Color(
         prefs.getInt('lightScaffoldBackgroundColor') ??
-            const Color(0xFF673AB7).value);
-    _lightCardColor =
-        Color(prefs.getInt('lightCardColor') ?? const Color(0xFF673AB7).value);
+            const Color(0xFF673AB7).toARGB32());
+    _lightCardColor = Color(
+        prefs.getInt('lightCardColor') ?? const Color(0xFF673AB7).toARGB32());
     _lightAppBarBackgroundColor = Color(
         prefs.getInt('lightAppBarBackgroundColor') ??
-            const Color(0xFF673AB7).value);
-    _lightSecondaryColor = Color(
-        prefs.getInt('lightSecondaryColor') ?? const Color(0xFF00BCD4).value);
+            const Color(0xFF673AB7).toARGB32());
+    _lightSecondaryColor = Color(prefs.getInt('lightSecondaryColor') ??
+        const Color(0xFF00BCD4).toARGB32());
 
     // Load dark mode colors
     _darkPrimaryColor = Color(
-        prefs.getInt('darkPrimaryColor') ?? const Color(0xFF673AB7).value);
+        prefs.getInt('darkPrimaryColor') ?? const Color(0xFF673AB7).toARGB32());
     _darkScaffoldBackgroundColor = Color(
-        prefs.getInt('darkScaffoldBackgroundColor') ?? Colors.black.value);
-    _darkCardColor =
-        Color(prefs.getInt('darkCardColor') ?? const Color(0xFF1C1C1C).value);
+        prefs.getInt('darkScaffoldBackgroundColor') ?? Colors.black.toARGB32());
+    _darkCardColor = Color(
+        prefs.getInt('darkCardColor') ?? const Color(0xFF1C1C1C).toARGB32());
     _darkAppBarBackgroundColor = Color(
         prefs.getInt('darkAppBarBackgroundColor') ??
-            const Color.fromARGB(255, 0, 0, 0).value);
+            const Color.fromARGB(255, 0, 0, 0).toARGB32());
     _darkSecondaryColor = Color(prefs.getInt('darkSecondaryColor') ??
-        const Color.fromARGB(255, 184, 28, 176).value);
+        const Color.fromARGB(255, 184, 28, 176).toARGB32());
 
     notifyListeners();
   }
@@ -95,10 +95,10 @@ class ThemeProvider with ChangeNotifier {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     if (isDarkMode) {
       _darkPrimaryColor = color;
-      await prefs.setInt('darkPrimaryColor', color.value);
+      await prefs.setInt('darkPrimaryColor', color.toARGB32());
     } else {
       _lightPrimaryColor = color;
-      await prefs.setInt('lightPrimaryColor', color.value);
+      await prefs.setInt('lightPrimaryColor', color.toARGB32());
     }
     notifyListeners();
   }
@@ -107,10 +107,10 @@ class ThemeProvider with ChangeNotifier {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     if (isDarkMode) {
       _darkScaffoldBackgroundColor = color;
-      await prefs.setInt('darkScaffoldBackgroundColor', color.value);
+      await prefs.setInt('darkScaffoldBackgroundColor', color.toARGB32());
     } else {
       _lightScaffoldBackgroundColor = color;
-      await prefs.setInt('lightScaffoldBackgroundColor', color.value);
+      await prefs.setInt('lightScaffoldBackgroundColor', color.toARGB32());
     }
     notifyListeners();
   }
@@ -119,10 +119,10 @@ class ThemeProvider with ChangeNotifier {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     if (isDarkMode) {
       _darkCardColor = color;
-      await prefs.setInt('darkCardColor', color.value);
+      await prefs.setInt('darkCardColor', color.toARGB32());
     } else {
       _lightCardColor = color;
-      await prefs.setInt('lightCardColor', color.value);
+      await prefs.setInt('lightCardColor', color.toARGB32());
     }
     notifyListeners();
   }
@@ -131,10 +131,10 @@ class ThemeProvider with ChangeNotifier {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     if (isDarkMode) {
       _darkAppBarBackgroundColor = color;
-      await prefs.setInt('darkAppBarBackgroundColor', color.value);
+      await prefs.setInt('darkAppBarBackgroundColor', color.toARGB32());
     } else {
       _lightAppBarBackgroundColor = color;
-      await prefs.setInt('lightAppBarBackgroundColor', color.value);
+      await prefs.setInt('lightAppBarBackgroundColor', color.toARGB32());
     }
     notifyListeners();
   }
@@ -143,10 +143,10 @@ class ThemeProvider with ChangeNotifier {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     if (isDarkMode) {
       _darkSecondaryColor = color;
-      await prefs.setInt('darkSecondaryColor', color.value);
+      await prefs.setInt('darkSecondaryColor', color.toARGB32());
     } else {
       _lightSecondaryColor = color;
-      await prefs.setInt('lightSecondaryColor', color.value);
+      await prefs.setInt('lightSecondaryColor', color.toARGB32());
     }
     notifyListeners();
   }

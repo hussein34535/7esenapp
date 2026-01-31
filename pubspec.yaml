@@ -14,7 +14,9 @@ dependencies:
   flutter_local_notifications: ^19.3.0
   firebase_messaging: ^16.0.0
   firebase_analytics: ^12.0.0
-  firebase_core: ^4.1.1
+  firebase_core:
+  firebase_auth:
+  cloud_firestore:
   http: ^1.2.1
   video_player: ^2.8.6
   chewie: ^1.7.5
@@ -40,6 +42,11 @@ dependencies:
   html_unescape: ^2.0.0 # Added for HTML entity decoding
   youtube_explode_dart: ^2.5.2
   google_fonts: ^6.2.1
+  video_player_win: ^3.2.2
+  window_manager: ^0.5.1
+  media_kit: ^1.2.6
+  media_kit_video: ^2.0.1
+  media_kit_libs_windows_video: ^1.0.11
 
 
   
@@ -49,6 +56,10 @@ dev_dependencies:
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
+  windows:
+    generate: true
+    image_path: "assets/icon/icon.png"
+    icon_size: 256 # Recommended size for Windows ICO
   web:
     generate: true
     image_path: "assets/icon/icon.png"

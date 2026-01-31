@@ -5,11 +5,26 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "type": "chrome",
+            "name": "hesen (Chrome)",
             "request": "launch",
-            "name": "Launch Chrome against localhost",
-            "url": "http://localhost:8080",
-            "webRoot": "${workspaceFolder}"
+            "type": "dart",
+            "flutterMode": "debug",
+            "args": [
+                "-d",
+                "chrome",
+                "--web-renderer",
+                "html"
+            ]
+        },
+        {
+            "name": "hesen (Windows)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "debug",
+            "args": [
+                "-d",
+                "windows"
+            ]
         }
     ]
 }

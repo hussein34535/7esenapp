@@ -1207,6 +1207,62 @@ class _MatchBoxState extends State<MatchBox> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
+                      const SizedBox(height: 6),
+                      // Divider Line (Centered, not full width)
+                      Container(
+                        width: 80,
+                        height: 1,
+                        color: Colors.white24,
+                      ),
+                      const SizedBox(height: 6),
+                      // Commentator & Champion Row
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          if (commentator.isNotEmpty)
+                            Flexible(
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.mic,
+                                      size: 14, color: Colors.grey[400]),
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      commentator,
+                                      style: TextStyle(
+                                          color: Colors.grey[400],
+                                          fontSize: 11),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          if (champion.isNotEmpty)
+                            Flexible(
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.emoji_events,
+                                      size: 14, color: Colors.grey[400]),
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      champion,
+                                      style: TextStyle(
+                                          color: Colors.grey[400],
+                                          fontSize: 11),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
                     ],
                   ),
                 ),

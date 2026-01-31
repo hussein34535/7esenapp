@@ -7,12 +7,13 @@ class ApiService {
   static const String baseUrl = 'https://7esentvbackend.vercel.app/api/mobile';
 
   /// Fetches all channels with categories and stream links.
-  /// Premium stream URLs will be null if user is not subscribed.
-  static Future<List<dynamic>> fetchChannels() async {
+  static Future<List<dynamic>> fetchChannels({String? authToken}) async {
     final url = '$baseUrl/channels';
 
     final response = await http.get(
       Uri.parse(WebProxyService.proxiedUrl(url)),
+      headers:
+          authToken != null ? {'Authorization': 'Bearer $authToken'} : null,
     );
 
     if (response.statusCode == 200) {
@@ -26,31 +27,13 @@ class ApiService {
     }
   }
 
-  /// Fetches all categories.
-  static Future<List<dynamic>> fetchCategories() async {
-    final url = '$baseUrl/categories';
-
-    final response = await http.get(
-      Uri.parse(WebProxyService.proxiedUrl(url)),
-    );
-
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      if (data['success'] == true) {
-        return List.from(data['data'] ?? []);
-      }
-      throw Exception('API returned success=false');
-    } else {
-      throw Exception('Failed to load categories: ${response.statusCode}');
-    }
-  }
-
   /// Fetches all news items.
-  /// Premium news links will be null if user is not subscribed.
-  static Future<List<dynamic>> fetchNews() async {
+  static Future<List<dynamic>> fetchNews({String? authToken}) async {
     final url = '$baseUrl/news';
     final response = await http.get(
       Uri.parse(WebProxyService.proxiedUrl(url)),
+      headers:
+          authToken != null ? {'Authorization': 'Bearer $authToken'} : null,
     );
 
     if (response.statusCode == 200) {
@@ -65,11 +48,12 @@ class ApiService {
   }
 
   /// Fetches all matches.
-  /// Premium stream URLs will be null if user is not subscribed.
-  static Future<List<Match>> fetchMatches() async {
+  static Future<List<Match>> fetchMatches({String? authToken}) async {
     final url = '$baseUrl/matches';
     final response = await http.get(
       Uri.parse(WebProxyService.proxiedUrl(url)),
+      headers:
+          authToken != null ? {'Authorization': 'Bearer $authToken'} : null,
     );
 
     if (response.statusCode == 200) {
@@ -85,11 +69,12 @@ class ApiService {
   }
 
   /// Fetches all goals.
-  /// Premium goal URLs will be null if user is not subscribed.
-  static Future<List<dynamic>> fetchGoals() async {
+  static Future<List<dynamic>> fetchGoals({String? authToken}) async {
     final url = '$baseUrl/goals';
     final response = await http.get(
       Uri.parse(WebProxyService.proxiedUrl(url)),
+      headers:
+          authToken != null ? {'Authorization': 'Bearer $authToken'} : null,
     );
 
     if (response.statusCode == 200) {

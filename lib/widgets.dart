@@ -192,8 +192,9 @@ class _ChannelBoxState extends State<ChannelBox> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOut,
-        transform:
-            _isHovered ? (Matrix4.identity()..scale(1.03)) : Matrix4.identity(),
+        transform: _isHovered
+            ? Matrix4.diagonal3Values(1.03, 1.03, 1.0)
+            : Matrix4.identity(),
         child: Card(
           elevation: _isHovered ? 8 : 4,
           shadowColor: _isHovered ? const Color(0xFF673ab7) : Colors.black45,
@@ -212,7 +213,7 @@ class _ChannelBoxState extends State<ChannelBox> {
                 colors: _isHovered
                     ? [
                         Theme.of(context).cardColor,
-                        Theme.of(context).cardColor.withOpacity(0.9),
+                        Theme.of(context).cardColor.withValues(alpha: 0.9),
                       ]
                     : [
                         Theme.of(context).cardColor,
@@ -555,7 +556,7 @@ class _ChannelTileState extends State<ChannelTile> {
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOut,
         transform: _isHovered
-            ? (Matrix4.identity()..scale(1.03)) // Slight scale on hover
+            ? Matrix4.diagonal3Values(1.03, 1.03, 1.0) // Slight scale on hover
             : Matrix4.identity(),
         child: Card(
           elevation: _isHovered ? 8 : 4,
@@ -575,7 +576,7 @@ class _ChannelTileState extends State<ChannelTile> {
                 colors: _isHovered
                     ? [
                         Theme.of(context).cardColor,
-                        Theme.of(context).cardColor.withOpacity(0.9),
+                        Theme.of(context).cardColor.withValues(alpha: 0.9),
                       ]
                     : [
                         Theme.of(context).cardColor,
@@ -849,196 +850,9 @@ class _MatchBoxState extends State<MatchBox> {
       }
     }
 
-    // Detect Windows platform for hover effects
-    final bool isDesktop =
-        defaultTargetPlatform == TargetPlatform.windows && !kIsWeb;
-
-    if (!isDesktop) {
-      // --- MOBILE LAYOUT (Original) ---
-      return GestureDetector(
-        onTap: widget.isAdLoading
-            ? null
-            : () {
-                final scaffoldMessenger = ScaffoldMessenger.of(context);
-                bool isPremium = widget.match.isPremium;
-
-                if (streams.isEmpty && !isPremium) {
-                  scaffoldMessenger.showSnackBar(
-                    const SnackBar(content: Text('لا يوجد رابط للبث المباشر')),
-                  );
-                  return;
-                }
-
-                String firstUrl =
-                    streams.isNotEmpty ? streams.first['url']! : '';
-
-                widget.openVideo(
-                  context,
-                  firstUrl,
-                  streams.map((e) => Map<String, dynamic>.from(e)).toList(),
-                  'matches',
-                  contentId: widget.match.id,
-                  isPremium: isPremium,
-                );
-              },
-        child: Opacity(
-          opacity: widget.isAdLoading ? 0.5 : 1.0,
-          child: Container(
-            decoration: BoxDecoration(
-              // Gradient Background for Premium Look
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [const Color(0xFF141414), Colors.black], // Dark default
-              ),
-              borderRadius: BorderRadius.circular(20.0),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.1),
-                width: 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.5),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                )
-              ],
-            ),
-            margin: const EdgeInsets.all(9),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Column(
-                mainAxisSize: MainAxisSize.max,
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              _buildTeamLogo(logoA, size: 55),
-                              SizedBox(height: 8),
-                              Text(teamA,
-                                  maxLines: 2,
-                                  textAlign: TextAlign.center,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                      color: Colors.white)),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Column(
-                        children: [
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: borderColor,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              timeStatus,
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                  color: Colors.white),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              _buildTeamLogo(logoB, size: 55),
-                              SizedBox(height: 8),
-                              Text(teamB,
-                                  maxLines: 2,
-                                  textAlign: TextAlign.center,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                      color: Colors.white)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  Divider(color: Colors.white10),
-                  SizedBox(height: 5),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      Flexible(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.mic, size: 16, color: Colors.grey),
-                            SizedBox(width: 4),
-                            Flexible(
-                              child: Text(commentator,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                      color: Colors.grey, fontSize: 11)),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Flexible(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.emoji_events,
-                                size: 16, color: Colors.grey),
-                            SizedBox(width: 4),
-                            Flexible(
-                              child: Text(champion,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                      color: Colors.grey, fontSize: 11)),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.tv, size: 16, color: Colors.grey),
-                        SizedBox(width: 4),
-                        Text(channel,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: Colors.grey, fontSize: 11)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
+    // --- UNIFIED LAYOUT (Uses Desktop Design for All) ---
+    // The previous mobile-specific layout is removed to match the user's request
+    // for a consistent "Classic Card" look across Windows and Mobile.
 
     // --- DESKTOP LAYOUT (Enhanced) ---
     return MouseRegion(
@@ -1048,15 +862,11 @@ class _MatchBoxState extends State<MatchBox> {
         onTap: widget.isAdLoading
             ? null
             : () {
-                final scaffoldMessenger = ScaffoldMessenger.of(context);
                 bool isPremium = widget.match.isPremium;
 
-                if (streams.isEmpty && !isPremium) {
-                  scaffoldMessenger.showSnackBar(
-                    const SnackBar(content: Text('لا يوجد رابط للبث المباشر')),
-                  );
-                  return;
-                }
+                // Removed restrictive check "if (streams.isEmpty && !isPremium)"
+                // We now let openVideo handle the logic, as it can attempt to unlock
+                // premium content even if the initial public stream list is empty.
 
                 String firstUrl =
                     streams.isNotEmpty ? streams.first['url']! : '';
@@ -1076,7 +886,7 @@ class _MatchBoxState extends State<MatchBox> {
             duration: const Duration(milliseconds: 200),
             curve: Curves.easeOut,
             transform: _isHovered
-                ? (Matrix4.identity()..scale(1.02)) // Slight scale
+                ? Matrix4.diagonal3Values(1.02, 1.02, 1.0) // Slight scale
                 : Matrix4.identity(),
             decoration: BoxDecoration(
               // Gradient Background for Premium Look
@@ -1094,179 +904,212 @@ class _MatchBoxState extends State<MatchBox> {
               border: Border.all(
                 color: _isHovered
                     ? const Color(0xFF673ab7)
-                    : Colors.white.withOpacity(0.1),
+                    : Colors.white.withValues(alpha: 0.1),
                 width: _isHovered ? 2 : 1,
               ),
               boxShadow: _isHovered
                   ? [
                       BoxShadow(
-                        color: const Color(0xFF673ab7).withOpacity(0.4),
+                        color: const Color(0xFF673ab7).withValues(alpha: 0.4),
                         blurRadius: 15,
                         spreadRadius: 2,
                       )
                     ]
                   : [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.5),
+                        color: Colors.black.withValues(alpha: 0.5),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       )
                     ],
             ),
             margin: const EdgeInsets.all(8),
-            child: Center(
-              child: SingleChildScrollView(
-                physics: const NeverScrollableScrollPhysics(),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Row(
-                        // Team A
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Expanded(
-                            child: Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 4.0),
+            child: Stack(
+              children: [
+                Column(
+                  mainAxisSize: MainAxisSize.max,
+                  children: [
+                    // --- TEAMS & SCORE (Centered) ---
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // TEAM A
+                            Expanded(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  _buildTeamLogo(logoA, size: 50),
-                                  const SizedBox(height: 6),
-                                  Text(teamA,
-                                      maxLines: 2,
+                                  _buildTeamLogo(logoA, size: 45),
+                                  const SizedBox(height: 4),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 4),
+                                    child: Text(
+                                      teamA,
+                                      maxLines: 1,
                                       textAlign: TextAlign.center,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 13,
-                                          color: Colors.white)),
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
-                          ),
-                          Column(
-                            // Time/Score
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: borderColor,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  timeStatus,
-                                  style: const TextStyle(
+
+                            // TIME / VS
+                            Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                // Champion Removed
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: borderColor.withValues(alpha: 0.2),
+                                    border: Border.all(
+                                        color: borderColor, width: 1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    timeStatus,
+                                    style: TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      fontSize: 11,
-                                      color: Colors.white),
-                                  textAlign: TextAlign.center,
+                                      fontSize: 13,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            // TEAM B
+                            Expanded(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  _buildTeamLogo(logoB, size: 45),
+                                  const SizedBox(height: 4),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 4),
+                                    child: Text(
+                                      teamB,
+                                      maxLines: 1,
+                                      textAlign: TextAlign.center,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // --- DIVIDER ---
+                    Container(
+                      width: 120, // Subtle short divider
+                      height: 1,
+                      color: Colors.white.withValues(alpha: 0.1),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // --- METADATA (Channel & Commentator) ---
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Channel
+                          Row(
+                            children: [
+                              Icon(Icons.tv, size: 14, color: Colors.grey[500]),
+                              const SizedBox(width: 6),
+                              ConstrainedBox(
+                                constraints:
+                                    const BoxConstraints(maxWidth: 100),
+                                child: Text(
+                                  channel.isEmpty ? 'غير محدد' : channel,
+                                  style: TextStyle(
+                                    color: Colors.grey[400],
+                                    fontSize: 11,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
                           ),
-                          Expanded(
-                            // Team B
-                            child: Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 4.0),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  _buildTeamLogo(logoB, size: 50),
-                                  const SizedBox(height: 6),
-                                  Text(teamB,
-                                      maxLines: 2,
-                                      textAlign: TextAlign.center,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 13,
-                                          color: Colors.white)),
-                                ],
-                              ),
+
+                          // Gap between them (Wider separation as requested)
+                          if (commentator.isNotEmpty) const SizedBox(width: 70),
+
+                          // Commentator (Icon First to match "Right of Icon" request)
+                          if (commentator.isNotEmpty)
+                            Row(
+                              children: [
+                                Icon(Icons.mic,
+                                    size: 14, color: Colors.grey[500]),
+                                const SizedBox(
+                                    width: 8), // Increased internal gap
+                                ConstrainedBox(
+                                  constraints:
+                                      const BoxConstraints(maxWidth: 100),
+                                  child: Text(
+                                    commentator,
+                                    textAlign: TextAlign.start,
+                                    style: TextStyle(
+                                      color: Colors.grey[400],
+                                      fontSize: 11,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                // --- CHAMPION TRIANGLE BADGE ---
+                if (champion.isNotEmpty)
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: CustomPaint(
+                        painter: TrianglePainter(color: borderColor),
+                        child: Container(
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 2),
+                          child: Text(
+                            champion,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                        ],
+                        ),
                       ),
-                      const SizedBox(height: 8),
-                      // Channel Name
-                      Text(
-                        channel,
-                        style: TextStyle(
-                            color: Colors.grey[400],
-                            fontSize: 11,
-                            fontWeight: FontWeight.w400),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 6),
-                      // Divider Line (Centered, not full width)
-                      Container(
-                        width: 80,
-                        height: 1,
-                        color: Colors.white24,
-                      ),
-                      const SizedBox(height: 6),
-                      // Commentator & Champion Row
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          if (commentator.isNotEmpty)
-                            Flexible(
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.mic,
-                                      size: 14, color: Colors.grey[400]),
-                                  const SizedBox(width: 4),
-                                  Flexible(
-                                    child: Text(
-                                      commentator,
-                                      style: TextStyle(
-                                          color: Colors.grey[400],
-                                          fontSize: 11),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          if (champion.isNotEmpty)
-                            Flexible(
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.emoji_events,
-                                      size: 14, color: Colors.grey[400]),
-                                  const SizedBox(width: 4),
-                                  Flexible(
-                                    child: Text(
-                                      champion,
-                                      style: TextStyle(
-                                          color: Colors.grey[400],
-                                          fontSize: 11),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
+              ],
             ),
           ),
         ),
@@ -1304,6 +1147,32 @@ class _MatchBoxState extends State<MatchBox> {
             ),
     );
   }
+}
+
+class TrianglePainter extends CustomPainter {
+  final Color color;
+
+  TrianglePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final path = Path();
+    // Trapezoid shape pointing up from bottom
+    path.moveTo(0, size.height); // Bottom Left
+    path.lineTo(size.width, size.height); // Bottom Right
+    path.lineTo(size.width - 8, 0); // Top Right (inset)
+    path.lineTo(8, 0); // Top Left (inset)
+    path.close();
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class NewsSection extends StatelessWidget {
@@ -1628,7 +1497,7 @@ class _NewsBoxState extends State<NewsBox> {
             duration: const Duration(milliseconds: 200),
             curve: Curves.easeOut,
             transform: _isHovered
-                ? (Matrix4.identity()..scale(1.02))
+                ? Matrix4.diagonal3Values(1.02, 1.02, 1.0)
                 : Matrix4.identity(),
             child: Card(
               shape: RoundedRectangleBorder(
@@ -1988,7 +1857,7 @@ class _GoalBoxState extends State<GoalBox> {
             duration: const Duration(milliseconds: 200),
             curve: Curves.easeOut,
             transform: _isHovered
-                ? (Matrix4.identity()..scale(1.02))
+                ? Matrix4.diagonal3Values(1.02, 1.02, 1.0)
                 : Matrix4.identity(),
             child: Card(
               shape: RoundedRectangleBorder(

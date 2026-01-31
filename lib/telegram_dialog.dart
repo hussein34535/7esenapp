@@ -4,7 +4,6 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart'; // Import FontA
 
 void showTelegramDialog(BuildContext context, {String? userName}) {
   final theme = Theme.of(context); // Get theme data
-  final isDarkMode = theme.brightness == Brightness.dark;
 
   showDialog(
     context: context,

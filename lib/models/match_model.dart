@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+
 /// Match model for the 7esen TV API.
 /// Supports both premium and free content with nullable URLs.
 class Match {
@@ -29,10 +32,33 @@ class Match {
 
   /// Factory constructor for new API (snake_case fields).
   factory Match.fromJson(Map<String, dynamic> json) {
+    bool parseBool(dynamic value) {
+      if (value == null) return false;
+      if (value is bool) return value;
+      if (value is int) return value == 1;
+      if (value is String) {
+        final lower = value.toLowerCase();
+        return lower == 'true' || lower == '1';
+      }
+      return false;
+    }
+
     // Extract logo URL from Cloudinary object or direct string
     String? extractLogoUrl(dynamic logoData) {
       if (logoData == null) return null;
-      if (logoData is String) return logoData;
+      if (logoData is String) {
+        if (logoData.trim().startsWith('{')) {
+          try {
+            final decoded = jsonDecode(logoData);
+            if (decoded is Map && decoded.containsKey('url')) {
+              return decoded['url'] as String?;
+            }
+          } catch (e) {
+            debugPrint("Error decoding logo JSON: $e");
+          }
+        }
+        return logoData;
+      }
       if (logoData is Map<String, dynamic>) {
         return logoData['url'] as String?;
       }
@@ -66,8 +92,9 @@ class Match {
       champion: json['champion'],
       logoAUrl: extractLogoUrl(json['logo_a']),
       logoBUrl: extractLogoUrl(json['logo_b']),
-      isPremium: json['is_premium'] ?? false,
-      streamLinks: parseStreamLinks(json['stream_link']),
+      isPremium: parseBool(json['is_premium']),
+      streamLinks:
+          parseStreamLinks(json['stream_link'] ?? json['stream_links']),
     );
   }
 
@@ -97,7 +124,9 @@ class StreamLink {
   factory StreamLink.fromJson(Map<String, dynamic> json) {
     return StreamLink(
       name: json['name'] ?? '',
-      url: json['url'], // Can be null for premium content
+      url: json['url'] ??
+          json[
+              'link'], // Can be null for premium content, check 'link' fallback
       isPremium: json['is_premium'] ?? false,
       quality: json['quality'] ?? json['name'] ?? '',
     );
@@ -138,7 +167,19 @@ class Channel {
   factory Channel.fromJson(Map<String, dynamic> json) {
     String? extractLogoUrl(dynamic logoData) {
       if (logoData == null) return null;
-      if (logoData is String) return logoData;
+      if (logoData is String) {
+        if (logoData.trim().startsWith('{')) {
+          try {
+            final decoded = jsonDecode(logoData);
+            if (decoded is Map && decoded.containsKey('url')) {
+              return decoded['url'] as String?;
+            }
+          } catch (e) {
+            debugPrint("Error decoding channel logo JSON: $e");
+          }
+        }
+        return logoData;
+      }
       if (logoData is Map<String, dynamic>) {
         return logoData['url'] as String?;
       }
@@ -173,7 +214,8 @@ class Channel {
       name: json['name'] ?? '',
       logoUrl: extractLogoUrl(json['logo']),
       categories: parseCategories(json['categories']),
-      streamLinks: parseStreamLinks(json['stream_link']),
+      streamLinks:
+          parseStreamLinks(json['stream_link'] ?? json['stream_links']),
     );
   }
 

@@ -23,7 +23,8 @@ import 'package:hesen/services/web_proxy_service.dart';
 import 'package:hesen/services/auth_service.dart';
 import 'package:hesen/screens/login_screen.dart';
 
-const String _userAgent = 'VLC/3.0.18 LibVLC/3.0.18';
+const String _userAgent =
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36';
 
 enum VideoSize {
   fitWidth, // Default, fits width and maintains aspect ratio
@@ -37,15 +38,18 @@ class VideoPlayerScreen extends StatefulWidget {
   final String initialUrl;
   final List<Map<String, dynamic>> streamLinks;
   final Color progressBarColor;
-  final bool isLocked; // New flag for premium content that failed to unlock
+  final bool isLocked;
+  final int? contentId;
+  final String? category;
 
   const VideoPlayerScreen({
     Key? key,
     required this.initialUrl,
     required this.streamLinks,
     this.progressBarColor = Colors.red,
-    this.isLocked = false, // Default to false
-    // ... other initializers
+    this.isLocked = false,
+    this.contentId,
+    this.category,
   }) : super(key: key);
 
   @override
@@ -78,6 +82,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   bool _isCurrentlyInPip = false;
   late AndroidPIP _androidPIP;
   int _autoRetryAttempt = 0;
+  bool _isAutoRetrying = false; // Track if we are in a retry loop
 
   List<Map<String, dynamic>> _fetchedApiQualities = [];
   int _selectedApiQualityIndex = -1;
@@ -100,6 +105,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     ]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     WakelockPlus.enable();
+
+    if (widget.isLocked && widget.contentId != null) {
+      _isLoading = true;
+      _unlockAndPlay();
+    } else {
+      _isLoading = true;
+      _validStreamLinks = List<Map<String, dynamic>>.from(widget.streamLinks);
+      _currentStreamUrl = widget.initialUrl;
+      _initializePlayerInternal(_currentStreamUrl!);
+    }
+
     _androidPIP = AndroidPIP(
       onPipEntered: () {
         if (!mounted) return;
@@ -194,9 +210,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.amber.withOpacity(0.1),
+                color: Colors.amber.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.amber.withOpacity(0.5)),
+                border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -292,11 +308,67 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     }
   }
 
+  Future<void> _unlockAndPlay() async {
+    if (!mounted || widget.contentId == null || widget.category == null) return;
+
+    try {
+      final authService = AuthService();
+      final unlockedData = await authService.unlockPremiumContent(
+        type: widget.category!,
+        id: widget.contentId!,
+      );
+
+      if (!mounted) return;
+
+      if (unlockedData != null) {
+        List<dynamic> newLinksJson = unlockedData['stream_link'] ?? [];
+        List<Map<String, dynamic>> newStreamLinks = [];
+
+        if (unlockedData['link'] != null && unlockedData['link'] is String) {
+          newStreamLinks.add({'name': 'Watch', 'url': unlockedData['link']});
+        } else if (unlockedData['url'] != null &&
+            unlockedData['url'] is String) {
+          newStreamLinks.add({'name': 'Watch', 'url': unlockedData['url']});
+        }
+
+        for (var link in newLinksJson) {
+          if (link is Map) {
+            newStreamLinks.add(Map<String, dynamic>.from(link));
+          }
+        }
+
+        if (newStreamLinks.isNotEmpty) {
+          setState(() {
+            _validStreamLinks = newStreamLinks;
+            _currentStreamUrl = newStreamLinks[0]['url']?.toString();
+          });
+
+          if (_currentStreamUrl != null) {
+            _initializePlayerInternal(_currentStreamUrl!);
+          }
+          return;
+        }
+      }
+
+      // If we reach here, unlock failed or produced no links
+      setState(() {
+        _hasError = true; // Show error or locked UI
+      });
+    } catch (e) {
+      debugPrint("Internal Unlock Error: $e");
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+        });
+      }
+    }
+  }
+
   Future<void> _initializeScreen() async {
     await Future.delayed(const Duration(milliseconds: 100));
     if (!mounted) return;
 
-    if (widget.initialUrl == null || widget.initialUrl!.trim().isEmpty) {
+    if (widget.initialUrl.trim().isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -403,11 +475,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     }
   }
 
-  int _findUrlIndexInList(String url, List<Map<String, dynamic>> list) {
-    if (url.isEmpty) return -1;
-    return list.indexWhere((item) => item['url'] == url);
-  }
-
   Future<void> _initializePlayerInternal(String sourceUrl,
       {String? specificQualityUrl, Duration? startAt}) async {
     if (!mounted) return;
@@ -425,6 +492,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     final String urlToProcess = specificQualityUrl ?? sourceUrl;
     Map<String, String> httpHeaders = {
       'User-Agent': _userAgent,
+      'Referer': 'https://7esentv.com/',
     };
 
     try {
@@ -573,29 +641,32 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
           _mediaKitPlayer ??= Player();
           _mediaKitController ??= VideoController(_mediaKitPlayer!);
 
-          // Listen for errors to trigger failover
+          // Listen for errors to trigger failover/retry
           _mediaKitPlayer!.stream.error.listen((error) {
             debugPrint('[MEDIAKIT ERROR] $error');
-            if (mounted) _tryNextStream();
+            if (mounted && !_isAutoRetrying) {
+              _retryMediaKitPlayback(videoUrlToLoad!, httpHeaders);
+            }
           });
 
-          await _mediaKitPlayer!.open(Media(videoUrlToLoad));
-          await _mediaKitPlayer!.play();
+          // Attempt to open
+          await _mediaKitPlayer!.open(
+            Media(videoUrlToLoad, httpHeaders: httpHeaders),
+            play: true,
+          );
 
           if (mounted) {
             setState(() {
               _isLoading = false;
               _hasError = false;
+              _isAutoRetrying = false;
             });
             _showControls();
           }
         } catch (e) {
           debugPrint('[MEDIAKIT INIT ERROR] $e');
-          if (mounted) {
-            setState(() {
-              _hasError = true;
-              _isLoading = false;
-            });
+          if (mounted && !_isAutoRetrying) {
+            _retryMediaKitPlayback(videoUrlToLoad, httpHeaders);
           }
         }
         return; // Skip VideoPlayer initialization for Desktop
@@ -659,6 +730,47 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
           }
         }
       }
+    }
+  }
+
+  Future<void> _retryMediaKitPlayback(
+      String url, Map<String, String> headers) async {
+    if (!mounted || _isAutoRetrying) return;
+
+    _autoRetryAttempt++;
+    if (_autoRetryAttempt > 2) {
+      debugPrint('[HESEN PLAYER] MediaKit persistent failure after retries.');
+      _autoRetryAttempt = 0;
+      _isAutoRetrying = false;
+      if (mounted) _tryNextStream();
+      return;
+    }
+
+    _isAutoRetrying = true;
+    debugPrint(
+        '[HESEN PLAYER] MediaKit retry attempt $_autoRetryAttempt for: $url');
+
+    // Wait 1.5s before retry (Vercel cold start or network burp)
+    await Future.delayed(const Duration(milliseconds: 1500));
+
+    if (mounted && _mediaKitPlayer != null) {
+      try {
+        await _mediaKitPlayer!
+            .open(Media(url, httpHeaders: headers), play: true);
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _hasError = false;
+            _isAutoRetrying = false;
+          });
+        }
+      } catch (e) {
+        debugPrint('[HESEN PLAYER] Retry $_autoRetryAttempt failed: $e');
+        _isAutoRetrying = false;
+        _retryMediaKitPlayback(url, headers);
+      }
+    } else {
+      _isAutoRetrying = false;
     }
   }
 
@@ -934,7 +1046,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.6),
+          color: Colors.black.withValues(alpha: 0.6),
           borderRadius: BorderRadius.circular(25)),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -955,7 +1067,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                   decoration: BoxDecoration(
                       color: isActive
                           ? widget.progressBarColor
-                          : Colors.white.withOpacity(0.2),
+                          : Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(20),
                       border: isActive
                           ? Border.all(color: Colors.white, width: 2)
@@ -987,7 +1099,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
             decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.4),
+                color: Colors.black.withValues(alpha: 0.4),
                 borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(20.0),
                     topRight: Radius.circular(20.0))),
@@ -1101,7 +1213,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
               left: 10,
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.5),
+                  color: Colors.black.withValues(alpha: 0.5),
                   shape: BoxShape.circle,
                 ),
                 child: IconButton(
@@ -1163,7 +1275,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                           child: Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.4),
+                              color: Colors.black.withValues(alpha: 0.4),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
@@ -1196,7 +1308,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                             child: Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.4),
+                                color: Colors.black.withValues(alpha: 0.4),
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
@@ -1363,7 +1475,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                       activeTrackColor: widget.progressBarColor,
                       inactiveTrackColor: Colors.white30,
                       thumbColor: Colors.white,
-                      overlayColor: widget.progressBarColor.withOpacity(0.3),
+                      overlayColor:
+                          widget.progressBarColor.withValues(alpha: 0.3),
                     ),
                     child: Slider(
                       value: positionMs,
@@ -1513,7 +1626,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     // WEB/PWA: Handle Back Button to Ensure Video Closes properly
     return PopScope(
       canPop: false, // Handle manually
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
         // Logic: Just pop the navigator which will trigger dispose() and stop video
         Navigator.of(context).pop();

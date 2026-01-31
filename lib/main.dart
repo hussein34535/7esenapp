@@ -18,7 +18,7 @@ import 'package:hesen/services/api_service.dart';
 import 'package:hesen/models/match_model.dart';
 import 'package:uuid/uuid.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
-import 'package:day_night_switch/day_night_switch.dart';
+// import 'package:day_night_switch/day_night_switch.dart'; // Removed as unused
 import 'package:hesen/video_player_screen.dart';
 import 'package:hesen/widgets.dart';
 import 'dart:async';
@@ -94,7 +94,31 @@ Future<void> main() async {
       GoogleFonts.cairo(),
     ]);
 
-    // 1. START APP - PRIORITY 1
+    // 1. Initialize Firebase & Services FIRST (Required for authenticated data fetch on startup)
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      debugPrint("Firebase initialized successfully.");
+
+      // Wait for auth state to be restored (Robust version)
+      try {
+        debugPrint("Waiting for Auth state...");
+        final user = await FirebaseAuth.instance
+            .authStateChanges()
+            .where((u) => u != null)
+            .first
+            .timeout(const Duration(milliseconds: 1500));
+        debugPrint("DEBUG AUTH STATE: User restored = ${user?.email}");
+      } catch (e) {
+        debugPrint(
+            "DEBUG AUTH STATE: Proceeding as Guest (No user or timeout).");
+      }
+    } catch (e) {
+      debugPrint("Firebase Init Error: $e");
+    }
+
+    // 2. START APP
     runApp(
       ChangeNotifierProvider(
         create: (context) => ThemeProvider(),
@@ -102,69 +126,40 @@ Future<void> main() async {
       ),
     );
 
-    // 1. Remove Web Splash Immediately - PRIORITY 2
+    // 3. Remove Web Splash Immediately
     if (kIsWeb) {
       try {
         registerVidstackPlayer();
-        // Signal to JS to remove the HTML splash screen
         removeWebSplash();
       } catch (e) {
         debugPrint("Vidstack Reg/Splash Remove Error: $e");
       }
     }
 
-    // 2. Load Config & Firebase in Background
+    // 4. Background Config
     try {
       await dotenv.load(fileName: ".env");
     } catch (e) {
       debugPrint(".env warning (safely ignored).");
     }
 
-    // (Duplicate Vidstack block removed)
+    AuthService().checkSubscription();
 
-    // 3. Initialize Firebase & Services in Background
-    // 3. Initialize Firebase & Services in Background
-    try {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
-      debugPrint("Firebase initialized successfully.");
-
-      // Wait for auth state to be restored - on Windows, the first emission is usually null
-      // We wait for a non-null user OR timeout after 2 seconds
-      User? user;
+    // Initialize other services that depend on Firebase
+    // Note: Some services like Messaging might not support Windows yet
+    if (!kIsWeb && defaultTargetPlatform != TargetPlatform.windows) {
       try {
-        user = await FirebaseAuth.instance
-            .authStateChanges()
-            .where((u) => u != null) // Skip null emissions
-            .first
-            .timeout(const Duration(seconds: 2));
+        final firebaseApi = FirebaseApi();
+        firebaseApi.initNotification();
+        UnityAds.init(
+          gameId: dotenv.env['UNITY_GAME_ID'] ?? '',
+          testMode: false,
+          onComplete: () {},
+          onFailed: (error, message) {},
+        );
       } catch (e) {
-        // Timeout or no user - that's ok, user stays null
-        debugPrint("DEBUG AUTH STATE: Timeout or no user found");
+        debugPrint("Mobile Services init error: $e");
       }
-      debugPrint(
-          "DEBUG AUTH STATE: User after init = ${user?.email ?? 'NULL (Not Logged In)'}");
-      AuthService().checkSubscription();
-
-      // Initialize other services that depend on Firebase
-      // Note: Some services like Messaging might not support Windows yet
-      if (!kIsWeb && defaultTargetPlatform != TargetPlatform.windows) {
-        try {
-          final firebaseApi = FirebaseApi();
-          firebaseApi.initNotification();
-          UnityAds.init(
-            gameId: dotenv.env['UNITY_GAME_ID'] ?? '',
-            testMode: false,
-            onComplete: () {},
-            onFailed: (error, message) {},
-          );
-        } catch (e) {
-          debugPrint("Mobile Services init error: $e");
-        }
-      }
-    } catch (e) {
-      debugPrint("FIREBASE INIT FAILED: $e");
     }
   }, (error, stack) {
     debugPrint("ZONED ERROR: $error");
@@ -804,28 +799,39 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _matchesHasError = false;
     });
 
+    // Get Auth Token for premium content fetching (if logged in)
+    String? token;
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        token = await user.getIdToken();
+      }
+    } catch (e) {
+      debugPrint('Error getting ID token during _initData: $e');
+    }
+
     List<dynamic> fetchedResults = List.filled(4, null);
 
     try {
-      fetchedResults[0] = await ApiService.fetchChannels();
+      fetchedResults[0] = await ApiService.fetchChannels(authToken: token);
     } catch (e) {
       debugPrint('Error fetching channels: $e');
       if (mounted) setState(() => _channelsHasError = true);
     }
     try {
-      fetchedResults[1] = await ApiService.fetchNews();
+      fetchedResults[1] = await ApiService.fetchNews(authToken: token);
     } catch (e) {
       debugPrint('Error fetching news: $e');
       if (mounted) setState(() => _newsHasError = true);
     }
     try {
-      fetchedResults[2] = await ApiService.fetchMatches();
+      fetchedResults[2] = await ApiService.fetchMatches(authToken: token);
     } catch (e) {
       debugPrint('Error fetching matches: $e');
       if (mounted) setState(() => _matchesHasError = true);
     }
     try {
-      fetchedResults[3] = await ApiService.fetchGoals();
+      fetchedResults[3] = await ApiService.fetchGoals(authToken: token);
     } catch (e) {
       debugPrint('Error fetching goals: $e');
       if (mounted) setState(() => _goalsHasError = true);
@@ -853,7 +859,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           news = processedData['news'] ?? [];
           matches = processedData['matches'] ?? [];
           goals = processedData['goals'] ?? [];
-          _filteredChannels = channels;
           _filteredChannels = channels;
           _isLoading = false;
           // REMOVE WEB SPLASH HERE (Data Loaded)
@@ -1144,36 +1149,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
 
     // --- PREMIUM CONTENT UNLOCK LOGIC ---
-    // If it's premium, ALWAYS try to verify/unlock it, regardless of whether we have a link.
-    bool needsUnlock = isPremium;
-    debugPrint(
-        "OPEN_VIDEO: initialUrl='$initialUrl', streamCount=${streamLinks.length}, isPremium=$isPremium, contentId=$contentId");
-
-    if (needsUnlock) {
-      if (contentId == null) {
-        debugPrint(
-            "OPEN_VIDEO: Premium but ContentID is NULL. Treating as locked.");
-        // Error: Premium content but no ID to unlock with.
-        _navigateToVideoPlayer(context, '', [], isLocked: true);
-        return;
-      }
-
-      debugPrint(
-          "OPEN_VIDEO: Attempting unlock for ID: $contentId type: $sourceSection");
-
-      // Show loading dialog while unlocking using navigatorKey for reliable dismissal
-      navigatorKey.currentState?.push(
-        PageRouteBuilder(
-          opaque: false,
-          barrierDismissible: false,
-          pageBuilder: (_, __, ___) => const Center(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-            ),
-          ),
-        ),
-      );
-
+    if (isPremium ||
+        (streamLinks.isEmpty && (initialUrl == null || initialUrl.isEmpty))) {
       // Map sourceSection to API type (singular form)
       String apiType = sourceSection;
       if (sourceSection == 'channels') apiType = 'channel';
@@ -1181,68 +1158,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       if (sourceSection == 'news') apiType = 'news';
       if (sourceSection == 'matches') apiType = 'match';
 
-      final authService = AuthService();
-      final unlockedData = await authService.unlockPremiumContent(
-        type: apiType,
-        id: contentId,
+      // Navigate IMMEDIATELY to Player. Player will handle fetching/unlocking internally.
+      _navigateToVideoPlayer(
+        context,
+        initialUrl ?? '',
+        streamLinks,
+        isLocked: true,
+        contentId: contentId,
+        category: apiType,
       );
-
-      debugPrint(
-          "OPEN_VIDEO: unlockPremiumContent returned: ${unlockedData != null ? 'DATA' : 'NULL'}");
-
-      // Close loading dialog safely using navigatorKey
-      try {
-        if (navigatorKey.currentState?.canPop() == true) {
-          navigatorKey.currentState?.pop();
-        }
-      } catch (e) {
-        debugPrint("OPEN_VIDEO: Dialog dismiss error (ignored): $e");
-      }
-
-      debugPrint("OPEN_VIDEO: About to check unlockedData...");
-
-      if (unlockedData != null) {
-        debugPrint("OPEN_VIDEO: Unlocked Data Keys: ${unlockedData.keys}");
-
-        // Unlock successful! Update streams and URL.
-        // Parse the new stream links from the unlocked data
-        List<dynamic> newLinksJson = unlockedData['stream_link'] ?? [];
-        List<Map<String, dynamic>> newStreamLinks = [];
-
-        // Handle single link or list (API dependent)
-        if (unlockedData['link'] != null && unlockedData['link'] is String) {
-          newStreamLinks.add({'name': 'Watch', 'url': unlockedData['link']});
-        } else if (unlockedData['url'] != null &&
-            unlockedData['url'] is String) {
-          newStreamLinks.add({'name': 'Watch', 'url': unlockedData['url']});
-        }
-
-        // Merge/Override
-        for (var link in newLinksJson) {
-          if (link is Map) {
-            newStreamLinks.add(Map<String, dynamic>.from(link));
-          }
-        }
-
-        debugPrint("OPEN_VIDEO: Parsed ${newStreamLinks.length} stream links");
-
-        // If we found new links, use the first one as initialUrl
-        if (newStreamLinks.isNotEmpty) {
-          final firstUrl = newStreamLinks[0]['url']?.toString() ?? '';
-          debugPrint("OPEN_VIDEO: First URL = '$firstUrl'");
-          if (firstUrl.isNotEmpty) {
-            await _navigateToVideoPlayer(context, firstUrl, newStreamLinks,
-                isLocked: false);
-            // Refresh UI after returning from video player
-            if (mounted) setState(() {});
-            return;
-          }
-        }
-      }
-
-      // If unlock failed or returned no data -> Proceed as Locked
-      await _navigateToVideoPlayer(context, '', [], isLocked: true);
-      if (mounted) setState(() {});
       return;
     }
 
@@ -1320,21 +1244,26 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     bool navigationDone = false;
     Timer? loadTimer;
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        return const AlertDialog(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          content: Center(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+    final bool isDesktopOrWeb =
+        kIsWeb || defaultTargetPlatform == TargetPlatform.windows;
+
+    if (!isDesktopOrWeb) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext dialogContext) {
+          return const AlertDialog(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            content: Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
             ),
-          ),
-        );
-      },
-    );
+          );
+        },
+      );
+    }
 
     final BuildContext? capturedNavigatorContext = navigatorKey.currentContext;
 
@@ -1391,8 +1320,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     });
 
     try {
-      // Skip Ads on Web AND Windows
-      if (!kIsWeb && defaultTargetPlatform != TargetPlatform.windows) {
+      if (!isDesktopOrWeb) {
         UnityAds.load(
           placementId: placementId,
           onComplete: (loadedPlacementId) async {
@@ -1459,13 +1387,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         );
       } else {
         // Fallback for web or Windows -> Skip Ad
-        loadTimer?.cancel();
-        // BUGFIX: Close the loading dialog before navigating
-        if (Navigator.canPop(context)) {
-          Navigator.pop(context);
-        }
+        loadTimer.cancel();
+        // Since we didn't show the dialog on Desktop/Web, no need to pop
         await _navigateToVideoPlayer(context, initialUrl ?? '', streamLinks);
-        _resetAdLock(); // ✅ Fix: Reset loading state after returning from video
+        _resetAdLock(); // Reset loading state after returning from video
       }
     } catch (e) {
       loadTimer.cancel();
@@ -1481,6 +1406,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     String initialUrl,
     List<Map<String, dynamic>> streamLinks, {
     bool isLocked = false,
+    int? contentId,
+    String? category,
   }) async {
     await navigatorKey.currentState?.push(
       MaterialPageRoute(
@@ -1488,6 +1415,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           initialUrl: initialUrl,
           streamLinks: streamLinks,
           isLocked: isLocked,
+          contentId: contentId,
+          category: category,
         ),
       ),
     );
@@ -1496,6 +1425,26 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   List<Widget> _buildAppBarActions() {
     List<Widget> actions = [];
 
+    // Search Icon
+    actions.add(
+      IconButton(
+        icon: Icon(
+          _isSearchBarVisible ? Icons.search_off : Icons.search,
+          color: Colors.white,
+        ),
+        onPressed: () {
+          setState(() {
+            _isSearchBarVisible = !_isSearchBarVisible;
+            if (!_isSearchBarVisible) {
+              _searchController.clear();
+              _filterChannels('');
+            }
+          });
+        },
+      ),
+    );
+
+    // Account Icon
     actions.add(
       IconButton(
         icon: const Icon(Icons.account_circle, color: Colors.white),
@@ -1504,27 +1453,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             MaterialPageRoute(builder: (context) => const ProfileScreen()),
           );
         },
-      ),
-    );
-
-    actions.add(
-      Transform.scale(
-        scale: 0.35,
-        child: DayNightSwitch(
-          value: _isDarkMode,
-          moonImage: AssetImage('assets/moon.png'),
-          sunImage: AssetImage('assets/sun.png'),
-          onChanged: (value) {
-            setState(() {
-              _isDarkMode = value;
-            });
-            widget.onThemeChanged(value);
-          },
-          dayColor: Color(0xFFF8F8F8),
-          nightColor: Color.fromARGB(255, 10, 10, 80),
-          sunColor: Colors.amberAccent,
-          moonColor: Colors.white,
-        ),
       ),
     );
 
@@ -1769,26 +1697,55 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                               leading: Icon(
                                 Icons.person,
                                 color: Theme.of(context).colorScheme.secondary,
+                                size: 28,
                               ),
                               title: Text(
-                                _userName!,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Theme.of(
-                                    context,
-                                  ).textTheme.bodyLarge!.color,
-                                ),
+                                _userName ?? 'المستخدم',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold),
                               ),
-                              trailing: Icon(Icons.edit,
-                                  color: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
-                                      ?.color),
-                              onTap: () {
-                                Navigator.pop(context);
-                                _showEditNameDialog();
-                              },
+                              trailing: IconButton(
+                                icon: const Icon(Icons.edit, size: 20),
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                  _showEditNameDialog();
+                                },
+                              ),
                             ),
+                          const Divider(),
+                          // Theme Mode Toggle in Menu
+                          ListTile(
+                            leading: Icon(
+                              _isDarkMode ? Icons.dark_mode : Icons.light_mode,
+                              color: Colors.amber,
+                            ),
+                            title: const Text('وضع التشغيل'),
+                            trailing: Transform.scale(
+                              scale: 0.7,
+                              child: Switch(
+                                value: _isDarkMode,
+                                activeThumbColor: Colors.purple,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _isDarkMode = value;
+                                  });
+                                  widget.onThemeChanged(value);
+                                  Navigator.pop(context);
+                                },
+                              ),
+                            ),
+                          ),
+                          ListTile(
+                            leading: const Icon(
+                              Icons.notifications_active_outlined,
+                              color: Colors.blue,
+                            ),
+                            title: const Text('التنبيهات'),
+                            onTap: () {
+                              Navigator.pop(context);
+                              // Notifications logic
+                            },
+                          ),
                           FutureBuilder<Map<String, dynamic>>(
                             future: _getAdStatus(),
                             builder: (context, snapshot) {

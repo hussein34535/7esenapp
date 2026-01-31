@@ -89,7 +89,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(FontAwesomeIcons.circleUser,
-                      size: 80, color: Colors.grey.withOpacity(0.5)),
+                      size: 80, color: Colors.grey.withValues(alpha: 0.5)),
                   const SizedBox(height: 20),
                   Text(
                     'لست مسجل دخول',
@@ -141,7 +141,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           children: [
                             CircleAvatar(
                               radius: 50,
-                              backgroundColor: accentColor.withOpacity(0.2),
+                              backgroundColor:
+                                  accentColor.withValues(alpha: 0.2),
                               child: Icon(FontAwesomeIcons.user,
                                   size: 40, color: accentColor),
                             ),
@@ -160,8 +161,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
                                 color: isSubscribed
-                                    ? Colors.green.withOpacity(0.2)
-                                    : Colors.grey.withOpacity(0.2),
+                                    ? Colors.green.withValues(alpha: 0.2)
+                                    : Colors.grey.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
                                     color: isSubscribed
@@ -193,7 +194,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
+                              color: Colors.black.withValues(alpha: 0.05),
                               blurRadius: 10,
                               offset: const Offset(0, 5),
                             ),
@@ -207,7 +208,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: textColor.withOpacity(0.7),
+                                color: textColor.withValues(alpha: 0.7),
                               ),
                             ),
                             const Divider(height: 30),
@@ -263,7 +264,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           onPressed: _signOut,
                           style: OutlinedButton.styleFrom(
                             side: BorderSide(
-                                color: Colors.redAccent.withOpacity(0.5)),
+                                color: Colors.redAccent.withValues(alpha: 0.5)),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(15),
                             ),

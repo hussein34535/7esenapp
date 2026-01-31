@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hesen/services/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:hesen/services/resend_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -10,13 +11,17 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _otpController = TextEditingController();
   final _authService = AuthService();
   final _formKey = GlobalKey<FormState>();
 
   bool _isLoading = false;
   bool _isLogin = true; // Toggle between Login and Signup
+  bool _showVerification = false; // Show OTP field
+  bool _isForgotPassword = false; // Forgot Password flow
 
   void _submit() async {
     if (!_formKey.currentState!.validate()) return;
@@ -24,43 +29,94 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      if (_isLogin) {
+      if (_showVerification) {
+        // Step 2: Verify OTP
+        final success = await ResendService.verifyCode(
+          _emailController.text.trim(),
+          _otpController.text.trim(),
+        );
+
+        if (!success) {
+          throw Exception('كود التحقق غير صحيح');
+        }
+
+        if (_isForgotPassword) {
+          // TODO: Actually reset password logic or navigate to new pass screen
+          // For now, let's just trigger Firebase reset email or similar
+          await FirebaseAuth.instance
+              .sendPasswordResetEmail(email: _emailController.text.trim());
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                  content: Text('تم إرسال رابط إعادة تعيين كلمة المرور'),
+                  backgroundColor: Colors.green),
+            );
+            setState(() {
+              _showVerification = false;
+              _isForgotPassword = false;
+              _isLogin = true;
+            });
+          }
+        } else {
+          // Finish Signup
+          await _authService.signUp(
+            email: _emailController.text.trim(),
+            password: _passwordController.text.trim(),
+            displayName: _nameController.text.trim(),
+          );
+          if (mounted) Navigator.of(context).pop();
+        }
+      } else if (_isForgotPassword) {
+        // Forgot Password Step 1: Send OTP
+        final success =
+            await ResendService.sendResetCode(_emailController.text.trim());
+        if (success) {
+          setState(() {
+            _showVerification = true;
+          });
+        } else {
+          throw Exception('فشل إرسال كود التحقق');
+        }
+      } else if (_isLogin) {
+        // Standard Login
         await _authService.signIn(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
+        if (mounted) Navigator.of(context).pop();
       } else {
-        await _authService.signUp(
-          email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
-        );
+        // Signup Step 1: Send OTP
+        final success = await ResendService.sendVerificationCode(
+            _emailController.text.trim());
+        if (success) {
+          setState(() {
+            _showVerification = true;
+          });
+        } else {
+          throw Exception('فشل إرسال كود التحقق');
+        }
       }
-      // On Success
-      if (mounted) {
-        Navigator.of(context).pop(); // Return to previous screen (Video Player)
-      }
-    } on FirebaseAuthException catch (e) {
+    } catch (e) {
       String message = 'حدث خطأ ما';
-      if (e.code == 'user-not-found') {
-        message = 'المستخدم غير موجود';
-      } else if (e.code == 'wrong-password') {
-        message = 'كلمة المرور غير صحيحة';
-      } else if (e.code == 'email-already-in-use') {
-        message = 'البريد الإلكتروني مستخدم بالفعل';
-      } else if (e.code == 'weak-password') {
-        message = 'كلمة المرور ضعيفة جداً';
+      if (e is FirebaseAuthException) {
+        if (e.code == 'user-not-found') {
+          message = 'المستخدم غير موجود';
+        } else if (e.code == 'wrong-password') {
+          message = 'كلمة المرور غير صحيحة';
+        } else if (e.code == 'email-already-in-use') {
+          message = 'البريد الإلكتروني مستخدم بالفعل';
+        } else if (e.code == 'weak-password') {
+          message = 'كلمة المرور ضعيفة جداً';
+        } else {
+          message = e.message ?? message;
+        }
+      } else {
+        message = e.toString().replaceFirst('Exception: ', '');
       }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(message), backgroundColor: Colors.red),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('حدث خطأ غير متوقع: $e'),
-              backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -104,7 +160,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    _isLogin ? 'تسجيل الدخول' : 'إنشاء حساب جديد',
+                    _showVerification
+                        ? 'تأكيد الحساب'
+                        : _isForgotPassword
+                            ? 'نسيت كلمة المرور'
+                            : _isLogin
+                                ? 'تسجيل الدخول'
+                                : 'إنشاء حساب جديد',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 18,
@@ -113,76 +175,180 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 40),
 
-                  // Email Field
-                  TextFormField(
-                    controller: _emailController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      labelText: 'البريد الإلكتروني',
-                      labelStyle: const TextStyle(color: Colors.grey),
-                      prefixIcon:
-                          const Icon(Icons.email_outlined, color: Colors.grey),
-                      filled: true,
-                      fillColor: const Color(0xFF1E1E1E),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
+                  // Name Field (Only for Signup & Not verifying)
+                  if (!_isLogin &&
+                      !_showVerification &&
+                      !_isForgotPassword) ...[
+                    TextFormField(
+                      controller: _nameController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'الاسم الكامل',
+                        labelStyle: const TextStyle(color: Colors.grey),
+                        prefixIcon: const Icon(Icons.person_outline,
+                            color: Colors.grey),
+                        filled: true,
+                        fillColor: const Color(0xFF1E1E1E),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide:
+                              const BorderSide(color: Colors.purple, width: 1),
+                        ),
                       ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide:
-                            const BorderSide(color: Colors.purple, width: 1),
-                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'برجاء إدخال اسمك';
+                        }
+                        return null;
+                      },
                     ),
-                    validator: (value) {
-                      if (value == null ||
-                          value.isEmpty ||
-                          !value.contains('@')) {
-                        return 'برجاء إدخال بريد إلكتروني صحيح';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 20),
+                    const SizedBox(height: 20),
+                  ],
 
-                  // Password Field
-                  TextFormField(
-                    controller: _passwordController,
-                    style: const TextStyle(color: Colors.white),
-                    obscureText: true,
-                    decoration: InputDecoration(
-                      labelText: 'كلمة المرور',
-                      labelStyle: const TextStyle(color: Colors.grey),
-                      prefixIcon:
-                          const Icon(Icons.lock_outline, color: Colors.grey),
-                      filled: true,
-                      fillColor: const Color(0xFF1E1E1E),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
+                  // OTP Field (Only for Verification)
+                  if (_showVerification) ...[
+                    TextFormField(
+                      controller: _otpController,
+                      key: const ValueKey('otp_field'),
+                      maxLength: 6,
+                      keyboardType: TextInputType.number,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          color: Colors.white, fontSize: 24, letterSpacing: 8),
+                      decoration: InputDecoration(
+                        labelText: 'كود التحقق',
+                        labelStyle: const TextStyle(color: Colors.grey),
+                        counterText: '',
+                        filled: true,
+                        fillColor: const Color(0xFF1E1E1E),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide:
+                              const BorderSide(color: Colors.purple, width: 1),
+                        ),
                       ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide:
-                            const BorderSide(color: Colors.purple, width: 1),
-                      ),
+                      validator: (value) {
+                        if (value == null || value.length < 4) {
+                          return 'كود غير صحيح';
+                        }
+                        return null;
+                      },
                     ),
-                    validator: (value) {
-                      if (value == null || value.length < 6) {
-                        return 'كلمة المرور يجب أن تكون 6 أحرف على الأقل';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 40),
+                    const SizedBox(height: 20),
+                    Text(
+                      'تم إرسال كود التحقق إلى ${_emailController.text}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                    const SizedBox(height: 40),
+                  ],
+
+                  // Email Field (Hidden during verification)
+                  if (!_showVerification) ...[
+                    TextFormField(
+                      controller: _emailController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'البريد الإلكتروني',
+                        labelStyle: const TextStyle(color: Colors.grey),
+                        prefixIcon: const Icon(Icons.email_outlined,
+                            color: Colors.grey),
+                        filled: true,
+                        fillColor: const Color(0xFF1E1E1E),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide:
+                              const BorderSide(color: Colors.purple, width: 1),
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null ||
+                            value.isEmpty ||
+                            !value.contains('@')) {
+                          return 'برجاء إدخال بريد إلكتروني صحيح';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Password Field (Only for Login/Signup)
+                    if (!_isForgotPassword) ...[
+                      TextFormField(
+                        controller: _passwordController,
+                        style: const TextStyle(color: Colors.white),
+                        obscureText: true,
+                        decoration: InputDecoration(
+                          labelText: 'كلمة المرور',
+                          labelStyle: const TextStyle(color: Colors.grey),
+                          prefixIcon: const Icon(Icons.lock_outline,
+                              color: Colors.grey),
+                          filled: true,
+                          fillColor: const Color(0xFF1E1E1E),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                                color: Colors.purple, width: 1),
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.length < 6) {
+                            return 'كلمة المرور يجب أن تكون 6 أحرف على الأقل';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      if (_isLogin)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton(
+                            onPressed: () {
+                              setState(() {
+                                _isForgotPassword = true;
+                                _isLogin = false;
+                              });
+                            },
+                            child: const Text('نسيت كلمة المرور؟',
+                                style: TextStyle(
+                                    color: Colors.grey, fontSize: 13)),
+                          ),
+                        ),
+                      const SizedBox(height: 30),
+                    ],
+                  ],
 
                   // Action Button
                   SizedBox(
@@ -203,7 +369,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                   color: Colors.white, strokeWidth: 2),
                             )
                           : Text(
-                              _isLogin ? 'دخول' : 'تسجيل',
+                              _showVerification
+                                  ? 'تأكيد'
+                                  : _isForgotPassword
+                                      ? 'إرسال كود التحقق'
+                                      : _isLogin
+                                          ? 'دخول'
+                                          : 'تسجيل وإرسال كود',
                               style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
@@ -218,14 +390,25 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextButton(
                     onPressed: () {
                       setState(() {
-                        _isLogin = !_isLogin;
+                        if (_showVerification) {
+                          _showVerification = false;
+                        } else if (_isForgotPassword) {
+                          _isForgotPassword = false;
+                          _isLogin = true;
+                        } else {
+                          _isLogin = !_isLogin;
+                        }
                         _formKey.currentState?.reset();
                       });
                     },
                     child: Text(
-                      _isLogin
-                          ? 'ليس لديك حساب؟ سجل الآن'
-                          : 'لديك حساب بالفعل؟ سجل الدخول',
+                      _showVerification
+                          ? 'الرجوع للبريد الإلكتروني'
+                          : _isForgotPassword
+                              ? 'الرجوع لتسجيل الدخول'
+                              : _isLogin
+                                  ? 'ليس لديك حساب؟ سجل الآن'
+                                  : 'لديك حساب بالفعل؟ سجل الدخول',
                       style: const TextStyle(color: Colors.purpleAccent),
                     ),
                   ),

@@ -20,6 +20,7 @@ class AuthService {
   Future<UserCredential?> signUp({
     required String email,
     required String password,
+    required String displayName,
   }) async {
     try {
       UserCredential result = await _auth.createUserWithEmailAndPassword(
@@ -28,11 +29,14 @@ class AuthService {
       );
       // Initialize User Data in Firestore
       await _firestore.collection('users').doc(result.user!.uid).set({
+        'name': displayName,
         'email': email,
         'createdAt': FieldValue.serverTimestamp(),
         'isSubscribed': false, // Default to false
         'platform': defaultTargetPlatform.toString(),
       });
+      // Update Firebase User Display Name
+      await result.user!.updateDisplayName(displayName);
       return result;
     } catch (e) {
       debugPrint("SignUp Error: $e");

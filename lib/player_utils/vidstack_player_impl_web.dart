@@ -80,14 +80,6 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
     _overlayTimer?.cancel();
   }
 
-  void _toggleControls() {
-    if (_controlsVisible) {
-      _hideControls();
-    } else {
-      _showControls();
-    }
-  }
-
   void _startHideTimer() {
     _overlayTimer?.cancel();
     _overlayTimer = Timer(const Duration(seconds: 4), () {

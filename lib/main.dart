@@ -120,18 +120,8 @@ Future<void> main() async {
       debugPrint("Firebase initialized successfully.");
 
       // Wait for auth state to be restored (Robust version)
-      try {
-        debugPrint("Waiting for Auth state...");
-        final user = await FirebaseAuth.instance
-            .authStateChanges()
-            .where((u) => u != null)
-            .first
-            .timeout(const Duration(milliseconds: 1500));
-        debugPrint("DEBUG AUTH STATE: User restored = ${user?.email}");
-      } catch (e) {
-        debugPrint(
-            "DEBUG AUTH STATE: Proceeding as Guest (No user or timeout).");
-      }
+      // Auth check removed to prevent startup hang
+      debugPrint("Proceeding to app start...");
     } catch (e) {
       debugPrint("Firebase Init Error: $e");
     }

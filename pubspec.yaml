@@ -17,6 +17,8 @@ dependencies:
   firebase_core:
   firebase_auth:
   cloud_firestore:
+  firebase_storage: ^13.0.2 # Added for receipt uploads
+  image_picker: ^1.0.7 # Added for selecting receipts
   http: ^1.2.1
   video_player: ^2.8.6
   chewie: ^1.7.5
@@ -33,7 +35,8 @@ dependencies:
   connectivity_plus: ^6.1.5
   timezone: ^0.10.1 # Add timezone package
   flutter_dotenv: ^5.1.0 # Add dotenv for environment variables
-  unity_ads_plugin: ^0.3.25
+  crypto: ^3.0.3 # Added for Cloudinary signature generation
+
   android_pip: ^2.0.1
   provider: ^6.1.2
   flex_color_picker: ^3.7.1
@@ -47,10 +50,16 @@ dependencies:
   media_kit: ^1.2.6
   media_kit_video: ^2.0.1
   media_kit_libs_windows_video: ^1.0.11
+  media_kit_libs_android_video: ^1.0.12 # Added for Android video support
+  video_thumbnail: ^0.5.3 # Added for extracting video thumbnails on mobile
 
 
   
 dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  flutter_native_splash: ^2.4.0
   flutter_launcher_icons: "^0.14.3"
 
 flutter_launcher_icons:
@@ -59,20 +68,15 @@ flutter_launcher_icons:
   windows:
     generate: true
     image_path: "assets/icon/icon.png"
-    icon_size: 256 # Recommended size for Windows ICO
+    icon_size: 256
   web:
     generate: true
     image_path: "assets/icon/icon.png"
-    background_color: "#hex_code" # Optional, if you want a background color
-    theme_color: "#hex_code"      # Optional
+    background_color: "#hex_code"
+    theme_color: "#hex_code"
   image_path: "assets/icon/icon.png"
   min_sdk_android: 24
-  remove_alpha_ios: true # As suggested by the flutter_launcher_icons output
-
-  flutter_test:
-    sdk: flutter
-  flutter_lints: ^3.0.0
-  flutter_native_splash: ^2.4.0
+  remove_alpha_ios: true
 
 flutter:
   uses-material-design: true

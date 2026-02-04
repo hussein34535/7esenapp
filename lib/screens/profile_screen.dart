@@ -3,6 +3,10 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:hesen/services/auth_service.dart';
 import 'package:hesen/screens/login_screen.dart';
 import 'package:intl/intl.dart';
+import 'package:hesen/screens/subscription_screen.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:hesen/services/cloudinary_service.dart';
+import 'dart:io';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -42,6 +46,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  bool _isUploadingProfile = false;
+
+  Future<void> _pickAndUploadImage() async {
+    final ImagePicker picker = ImagePicker();
+    try {
+      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+      if (image == null) return;
+
+      setState(() => _isUploadingProfile = true);
+
+      // 1. Upload to Cloudinary
+      final String imageUrl =
+          await CloudinaryService.uploadImage(File(image.path));
+
+      // 2. Update Auth & Firestore
+      await _authService.updateProfilePicture(imageUrl);
+
+      // 3. Refresh UI
+      await _fetchUserData();
+      await _authService.currentUser
+          ?.reload(); // Reload Firebase User to get new photoURL
+
+      if (mounted) {
+        setState(() => _isUploadingProfile = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم تحديث الصورة الشخصية بنجاح'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isUploadingProfile = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('فشل تحديث الصورة: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Theme colors
@@ -54,20 +102,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final user = _authService.currentUser;
     final email = user?.email ?? 'No User Data';
     final isSubscribed = _userData?['isSubscribed'] == true;
-    final plan = _userData?['subscriptionPlan'] ?? 'Free';
+    String plan = _userData?['subscriptionPlan'] ??
+        (_userData?['planId'] != null
+            ? 'Premium (Plan ${_userData!['planId']})'
+            : (isSubscribed ? 'Premium' : 'باقة مجانية'));
 
-    String expiryDate = 'N/A';
-    if (_userData?['subscriptionExpiry'] != null) {
-      // Handle Timestamp or String
+    final photoUrl =
+        user?.photoURL ?? _userData?['image_url'] ?? _userData?['photoUrl'];
+
+    String expiryDate = 'غير محدد';
+    String daysRemaining = '';
+    String subscriptionDuration = _userData?['subscriptionDuration'] ?? '';
+
+    // Handle multiple formats: subscriptionEnd (API), subscriptionExpiry/expiryDate (Old Firestore)
+    if (_userData?['subscriptionEnd'] != null ||
+        _userData?['subscriptionExpiry'] != null ||
+        _userData?['expiryDate'] != null) {
       try {
-        final timestamp = _userData!['subscriptionExpiry'];
+        final dynamic timestamp = _userData?['subscriptionEnd'] ??
+            _userData?['subscriptionExpiry'] ??
+            _userData?['expiryDate'];
+        DateTime? expiryDateTime;
+
         if (timestamp is DateTime) {
-          expiryDate = DateFormat('yyyy-MM-dd').format(timestamp);
+          expiryDateTime = timestamp;
+        } else if (timestamp is String) {
+          expiryDateTime = DateTime.tryParse(timestamp);
         } else if (timestamp != null &&
             timestamp.runtimeType.toString().contains('Timestamp')) {
-          // Firestore Timestamp (dynamic check to avoid import issues if not explicit)
-          expiryDate =
-              DateFormat('yyyy-MM-dd').format((timestamp as dynamic).toDate());
+          expiryDateTime = (timestamp as dynamic).toDate();
+        }
+
+        if (expiryDateTime != null) {
+          expiryDate = DateFormat('yyyy-MM-dd').format(expiryDateTime);
+          final now = DateTime.now();
+          final today = DateTime(now.year, now.month, now.day);
+          final expiryDateOnly = DateTime(
+              expiryDateTime.year, expiryDateTime.month, expiryDateTime.day);
+          final difference = expiryDateOnly.difference(today).inDays;
+
+          if (difference > 0) {
+            daysRemaining = '$difference يوم متبقي';
+          } else if (difference == 0) {
+            daysRemaining = 'ينتهي اليوم';
+          } else {
+            daysRemaining = 'منتهي';
+          }
         }
       } catch (e) {
         expiryDate = 'Invalid Date';
@@ -88,6 +168,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
+                  // ... (Login Prompt - unchanged)
                   Icon(FontAwesomeIcons.circleUser,
                       size: 80, color: Colors.grey.withValues(alpha: 0.5)),
                   const SizedBox(height: 20),
@@ -139,12 +220,66 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Center(
                         child: Column(
                           children: [
-                            CircleAvatar(
-                              radius: 50,
-                              backgroundColor:
-                                  accentColor.withValues(alpha: 0.2),
-                              child: Icon(FontAwesomeIcons.user,
-                                  size: 40, color: accentColor),
+                            Stack(
+                              children: [
+                                Container(
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color:
+                                            accentColor.withValues(alpha: 0.5),
+                                        width: 2),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color:
+                                            accentColor.withValues(alpha: 0.2),
+                                        blurRadius: 15,
+                                        spreadRadius: 2,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Hero(
+                                    tag: 'profile_avatar',
+                                    child: CircleAvatar(
+                                      radius: 50,
+                                      backgroundColor: const Color(0xFF2A2A2A),
+                                      backgroundImage: photoUrl != null
+                                          ? NetworkImage(photoUrl)
+                                          : null,
+                                      child: _isUploadingProfile
+                                          ? const CircularProgressIndicator(
+                                              color: Colors.white)
+                                          : (photoUrl == null
+                                              ? Icon(FontAwesomeIcons.user,
+                                                  size: 40, color: accentColor)
+                                              : null),
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  bottom: 0,
+                                  right: 0,
+                                  child: GestureDetector(
+                                    onTap: _isUploadingProfile
+                                        ? null
+                                        : _pickAndUploadImage,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: accentColor,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                            color: bgColor, width: 2),
+                                      ),
+                                      child: const Icon(
+                                        Icons.camera_alt,
+                                        size: 16,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 16),
                             Text(
@@ -170,7 +305,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         : Colors.grey),
                               ),
                               child: Text(
-                                isSubscribed ? 'Premium Active' : 'Free Plan',
+                                isSubscribed ? 'اشتراك نشط' : 'باقة مجانية',
                                 style: TextStyle(
                                   color:
                                       isSubscribed ? Colors.green : Colors.grey,
@@ -213,8 +348,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                             const Divider(height: 30),
                             _buildRow('الخطة الحالية', plan, textColor),
+                            if (subscriptionDuration.isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              _buildRow('مدة الاشتراك', subscriptionDuration,
+                                  textColor),
+                            ],
                             const SizedBox(height: 16),
                             _buildRow('تاريخ الانتهاء', expiryDate, textColor),
+                            if (daysRemaining.isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              _buildRow(
+                                  'الوقت المتبقي', daysRemaining, Colors.amber),
+                            ],
                             const SizedBox(height: 16),
                             _buildRow(
                                 'الحالة',
@@ -232,11 +377,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         height: 50,
                         child: ElevatedButton(
                           onPressed: () {
-                            // TODO: Implement Renewal Logic / Webview
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content:
-                                      Text('سيتم إضافة بوابة الدفع قريباً')),
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const SubscriptionScreen(),
+                              ),
                             );
                           },
                           style: ElevatedButton.styleFrom(

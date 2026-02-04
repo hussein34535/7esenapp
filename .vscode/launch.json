@@ -4,8 +4,28 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+        // ===== ANDROID =====
         {
-            "name": "hesen (Chrome)",
+            "name": "Android (Debug)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "debug"
+        },
+        {
+            "name": "Android (Profile)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile"
+        },
+        {
+            "name": "Android (Release)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release"
+        },
+        // ===== WEB (Chrome) =====
+        {
+            "name": "Chrome (Debug)",
             "request": "launch",
             "type": "dart",
             "flutterMode": "debug",
@@ -17,13 +37,114 @@
             ]
         },
         {
-            "name": "hesen (Windows)",
+            "name": "Chrome (Profile)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile",
+            "args": [
+                "-d",
+                "chrome",
+                "--web-renderer",
+                "html"
+            ]
+        },
+        {
+            "name": "Chrome (Release)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release",
+            "args": [
+                "-d",
+                "chrome",
+                "--web-renderer",
+                "html"
+            ]
+        },
+        // ===== WEB (Edge) =====
+        {
+            "name": "Edge (Debug)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "debug",
+            "args": [
+                "-d",
+                "edge",
+                "--web-renderer",
+                "html"
+            ]
+        },
+        // ===== WINDOWS =====
+        {
+            "name": "Windows (Debug)",
             "request": "launch",
             "type": "dart",
             "flutterMode": "debug",
             "args": [
                 "-d",
                 "windows"
+            ]
+        },
+        {
+            "name": "Windows (Profile)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile",
+            "args": [
+                "-d",
+                "windows"
+            ]
+        },
+        {
+            "name": "Windows (Release)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release",
+            "args": [
+                "-d",
+                "windows"
+            ]
+        },
+        // ===== iOS (Mac Only) =====
+        {
+            "name": "iOS Simulator (Debug)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "debug",
+            "args": [
+                "-d",
+                "iphone"
+            ]
+        },
+        {
+            "name": "iOS Device (Debug)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "debug",
+            "args": [
+                "-d",
+                "ios"
+            ]
+        },
+        // ===== macOS (Mac Only) =====
+        {
+            "name": "macOS (Debug)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "debug",
+            "args": [
+                "-d",
+                "macos"
+            ]
+        },
+        // ===== Linux =====
+        {
+            "name": "Linux (Debug)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "debug",
+            "args": [
+                "-d",
+                "linux"
             ]
         }
     ]

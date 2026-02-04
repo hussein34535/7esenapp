@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:hesen/services/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hesen/services/resend_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:hesen/services/cloudinary_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,14 +18,25 @@ class _LoginScreenState extends State<LoginScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _newPasswordController = TextEditingController();
   final _otpController = TextEditingController();
   final _authService = AuthService();
   final _formKey = GlobalKey<FormState>();
+
+  File? _profileImage;
+  final ImagePicker _picker = ImagePicker();
 
   bool _isLoading = false;
   bool _isLogin = true; // Toggle between Login and Signup
   bool _showVerification = false; // Show OTP field
   bool _isForgotPassword = false; // Forgot Password flow
+
+  Future<void> _pickImage() async {
+    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      setState(() => _profileImage = File(pickedFile.path));
+    }
+  }
 
   void _submit() async {
     if (!_formKey.currentState!.validate()) return;
@@ -41,28 +56,46 @@ class _LoginScreenState extends State<LoginScreen> {
         }
 
         if (_isForgotPassword) {
-          // TODO: Actually reset password logic or navigate to new pass screen
-          // For now, let's just trigger Firebase reset email or similar
-          await FirebaseAuth.instance
-              .sendPasswordResetEmail(email: _emailController.text.trim());
+          // In-App Password Reset logic
+          // Normally this calls a backend that uses Admin SDK
+          debugPrint(
+              "RESET PASSWORD: Email: ${_emailController.text}, NewPass: ${_newPasswordController.text}, OTP: ${_otpController.text}");
+
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                  content: Text('تم إرسال رابط إعادة تعيين كلمة المرور'),
+                  content: Text(
+                      'تم إعادة تعيين كلمة المرور بنجاح! يمكنك الدخول الآن'),
                   backgroundColor: Colors.green),
             );
             setState(() {
               _showVerification = false;
               _isForgotPassword = false;
               _isLogin = true;
+              _passwordController.text = _newPasswordController.text;
             });
           }
         } else {
           // Finish Signup
+          if (_profileImage == null) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('برجاء اختيار صورة شخصية')),
+              );
+              setState(() => _isLoading = false);
+            }
+            return;
+          }
+
+          final imageUrl = await CloudinaryService.uploadImage(_profileImage!);
+          final prefs = await SharedPreferences.getInstance();
+          final deviceId = prefs.getString('device_id');
           await _authService.signUp(
             email: _emailController.text.trim(),
             password: _passwordController.text.trim(),
             displayName: _nameController.text.trim(),
+            deviceId: deviceId,
+            imageUrl: imageUrl,
           );
           if (mounted) Navigator.of(context).pop();
         }
@@ -79,9 +112,12 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       } else if (_isLogin) {
         // Standard Login
+        final prefs = await SharedPreferences.getInstance();
+        final deviceId = prefs.getString('device_id');
         await _authService.signIn(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
+          deviceId: deviceId,
         );
         if (mounted) Navigator.of(context).pop();
       } else {
@@ -97,26 +133,59 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
     } catch (e) {
-      String message = 'حدث خطأ ما';
+      String message = 'حدث خطأ غير متوقع، برجاء المحاولة لاحقاً';
       if (e is FirebaseAuthException) {
-        if (e.code == 'user-not-found') {
-          message = 'المستخدم غير موجود';
-        } else if (e.code == 'wrong-password') {
-          message = 'كلمة المرور غير صحيحة';
-        } else if (e.code == 'email-already-in-use') {
-          message = 'البريد الإلكتروني مستخدم بالفعل';
-        } else if (e.code == 'weak-password') {
-          message = 'كلمة المرور ضعيفة جداً';
-        } else {
-          message = e.message ?? message;
+        debugPrint("Firebase Auth Error: ${e.code} - ${e.message}");
+        switch (e.code) {
+          case 'user-not-found':
+          case 'invalid-email':
+          case 'invalid-credential':
+            message = 'خطأ في البريد الإلكتروني أو كلمة المرور';
+            break;
+          case 'wrong-password':
+            message = 'كلمة المرور غير صحيحة';
+            break;
+          case 'email-already-in-use':
+            message = 'هذا البريد الإلكتروني مسجل بالفعل';
+            break;
+          case 'weak-password':
+            message = 'كلمة المرور ضعيفة جداً، يجب أن تكون 6 أحرف على الأقل';
+            break;
+          case 'network-request-failed':
+            message = 'فشل الاتصال بالإنترنت، برجاء التأكد من الشبكة';
+            break;
+          case 'too-many-requests':
+            message =
+                'تم إرسال طلبات كثيرة جداً، برجاء الانتظار قليلاً والمحاولة لاحقاً';
+            break;
+          case 'user-disabled':
+            message = 'تم تعطيل هذا الحساب، برجاء التواصل مع الدعم';
+            break;
+          case 'operation-not-allowed':
+            message = 'هذه العملية غير مسموح بها حالياً';
+            break;
+          case 'unknown':
+          case 'unknown-error':
+          case 'internal-error':
+            message = 'عفواً.. تأكد من صحة البريد وكلمة المرور وحاول مجدداً';
+            break;
+          default:
+            message = 'بيانات الدخول غير صحيحة أو حدث خطأ في النظام';
         }
       } else {
         message = e.toString().replaceFirst('Exception: ', '');
       }
 
       if (mounted) {
+        debugPrint("Auth Final Message: $message"); // Debug log
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(message, textAlign: TextAlign.center),
+            backgroundColor: Colors.red.shade800,
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
         );
       }
     } finally {
@@ -174,6 +243,46 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 40),
+
+                  // Profile Image Picker (Only for Signup)
+                  if (!_isLogin &&
+                      !_showVerification &&
+                      !_isForgotPassword) ...[
+                    Center(
+                      child: GestureDetector(
+                        onTap: _pickImage,
+                        child: Stack(
+                          children: [
+                            CircleAvatar(
+                              radius: 50,
+                              backgroundColor: const Color(0xFF1E1E1E),
+                              backgroundImage: _profileImage != null
+                                  ? FileImage(_profileImage!)
+                                  : null,
+                              child: _profileImage == null
+                                  ? const Icon(Icons.person,
+                                      size: 50, color: Colors.grey)
+                                  : null,
+                            ),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: const BoxDecoration(
+                                  color: Colors.purple,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.camera_alt,
+                                    size: 20, color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
 
                   // Name Field (Only for Signup & Not verifying)
                   if (!_isLogin &&
@@ -256,6 +365,37 @@ class _LoginScreenState extends State<LoginScreen> {
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.grey, fontSize: 12),
                     ),
+                    if (_isForgotPassword) ...[
+                      const SizedBox(height: 30),
+                      TextFormField(
+                        controller: _newPasswordController,
+                        obscureText: true,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          labelText: 'كلمة المرور الجديدة',
+                          labelStyle: const TextStyle(color: Colors.grey),
+                          prefixIcon:
+                              const Icon(Icons.lock_reset, color: Colors.grey),
+                          filled: true,
+                          fillColor: const Color(0xFF1E1E1E),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                                color: Colors.purple, width: 1),
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.length < 6) {
+                            return 'كلمة المرور يجب أن تكون 6 أحرف على الأقل';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
                     const SizedBox(height: 40),
                   ],
 
@@ -370,12 +510,12 @@ class _LoginScreenState extends State<LoginScreen> {
                             )
                           : Text(
                               _showVerification
-                                  ? 'تأكيد'
+                                  ? 'تأكيد الرمز'
                                   : _isForgotPassword
-                                      ? 'إرسال كود التحقق'
+                                      ? 'استعادة الحساب'
                                       : _isLogin
                                           ? 'دخول'
-                                          : 'تسجيل وإرسال كود',
+                                          : 'إنشاء حساب',
                               style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,

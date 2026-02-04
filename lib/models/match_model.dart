@@ -65,7 +65,6 @@ class Match {
       return null;
     }
 
-    // Parse stream links array
     List<StreamLink> parseStreamLinks(dynamic streamLinkData) {
       if (streamLinkData == null) return [];
       if (streamLinkData is! List) return [];

@@ -118,12 +118,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
     _androidPIP = AndroidPIP(
       onPipEntered: () {
-        if (!mounted) return;
+        if (!mounted) { return; }
         setState(() => _isCurrentlyInPip = true);
         _hideControls(animate: false);
       },
       onPipExited: () {
-        if (!mounted) return;
+        if (!mounted) { return; }
         setState(() => _isCurrentlyInPip = false);
         if (_videoPlayerController != null &&
             !_videoPlayerController!.value.isPlaying) {
@@ -131,11 +131,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         }
       },
       onPipAction: (action) {
-        if (!mounted || _videoPlayerController == null) return;
+        if (!mounted || _videoPlayerController == null) { return; }
         final actionStr = action.toString();
-        if (actionStr.contains('play'))
+        if (actionStr.contains('play')) {
           _videoPlayerController!.play();
-        else if (actionStr.contains('pause')) _videoPlayerController!.pause();
+        } else if (actionStr.contains('pause')) {
+          _videoPlayerController!.pause();
+        }
       },
     );
     _animationController = AnimationController(
@@ -144,37 +146,45 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         Tween<double>(begin: 0.0, end: 1.0).animate(_animationController);
 
     // Check access immediately
+    _fetchUserDataAndCheckAccess();
+  }
+
+  Map<String, dynamic>? _userData;
+
+  Future<void> _fetchUserDataAndCheckAccess() async {
+    final authService = AuthService();
+    _userData = await authService.getUserData();
     _checkAccess();
   }
 
   Future<void> _checkAccess() async {
-    // If passed externally as locked, trust it.
+    final authService = AuthService();
+    final isSubscribed = await authService.checkSubscription();
+
+    // If passed externally as locked
     if (widget.isLocked) {
-      if (!mounted) return;
-      _showPremiumDialog();
+      if (!mounted) { return; }
+
+      if (isSubscribed) {
+        // User is subscribed, attempt to unlock via API
+        _unlockAndPlay();
+      } else {
+        // Not subscribed, show Block/Trial dialog
+        _showPremiumDialog();
+      }
       return;
     }
 
-    // Otherwise, check local subscription status (just in case)
-    final authService = AuthService();
-    bool isSubscribed = await authService.checkSubscription();
-
-    // If streamLinks are empty (and we are here), it likely means it's premium content that wasn't unlocked.
-    // However, widget.isLocked should handle the explicit failure case.
-    // We will keep a check here: if not subscribed and no streams -> Lock it.
-
-    // Actually, if we have a URL, we play it. The API is the source of truth for URLs.
-    // If isLocked is false, we assume we have a URL or it's free.
-
-    // BUT, let's keep the existing check for safety, but simplify it.
-    // Only block if we truly have NO playable links AND user is not subscribed.
+    // --- Legacy Check (Backwards compatibility) ---
+    // If not explicitly "locked" by parent, but we might want to check for empty links
 
     bool hasPlayableLinks = widget.streamLinks.any(
         (link) => link['url'] != null && link['url'].toString().isNotEmpty);
 
-    if (!isSubscribed && !hasPlayableLinks) {
-      if (!mounted) return;
-      _showPremiumDialog();
+    if (!hasPlayableLinks) {
+      if (!mounted) { return; }
+      // Not premium (isLocked checked above), just broken/empty.
+      _showError('عفواً، لا توجد روابط تشغيل متاحة لهذا المحتوى حالياً.');
     } else {
       // User is subscribed OR has free links, proceed
       _initializeScreen();
@@ -182,101 +192,145 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   }
 
   Future<void> _showPremiumDialog() async {
+    final bool trialUsed = _userData?['trialUsed'] == true;
+    final user = AuthService().currentUser;
+
     // Show Dialog
-    final result = await showDialog<bool>(
+    final result = await showDialog<int>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E1E1E),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            const Icon(Icons.star, color: Colors.amber, size: 28),
-            const SizedBox(width: 10),
-            const Text('محتوى مميز',
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.workspace_premium,
+                  color: Colors.amber, size: 24),
+            ),
+            const SizedBox(width: 12),
+            const Text('محتوى بريميوم',
                 style: TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold)),
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18)),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text(
-              'هذه القناة تتطلب اشتراكاً للمشاهدة بجودة عالية (HD).',
-              style: TextStyle(color: Colors.white70, fontSize: 16),
+              'هذا المحتوى متاح فقط للمشتركين في الباقات المميزة.',
+              style: TextStyle(color: Colors.white70, fontSize: 14),
             ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.amber.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+            const SizedBox(height: 20),
+            // Option 1: Trial (If available)
+            if (user != null)
+              ElevatedButton.icon(
+                icon: const Icon(Icons.timer_outlined, size: 18),
+                label: Text(trialUsed
+                    ? 'تم استخدام التجربة المجانية'
+                    : 'بدء تجربة 24 ساعة مجاناً'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.amber.shade700,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.grey.shade800,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: trialUsed ? null : () => Navigator.pop(ctx, 1),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  Text('سعر الاشتراك:',
-                      style: TextStyle(color: Colors.amber, fontSize: 14)),
-                  Text('50 ج.م / شهرياً',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14)),
-                ],
+            const SizedBox(height: 12),
+            // Option 2: Subscribe
+            ElevatedButton.icon(
+              icon: const Icon(Icons.star, size: 18),
+              label: const Text('اشترك الآن لتفعيل البريميوم'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF673ab7),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
+              onPressed: () => Navigator.pop(ctx, 2),
             ),
-            const SizedBox(height: 16),
-            const Text(
-              'يمكنك المشاهدة بجودة منخفضة مجاناً (إذا توفرت).',
-              style: TextStyle(color: Colors.grey, fontSize: 12),
+            const SizedBox(height: 12),
+            // Option 3: Free Quality (SD)
+            OutlinedButton.icon(
+              icon: const Icon(Icons.tv, size: 18),
+              label: const Text('مشاهدة الجودات المجانية (SD)'),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: Colors.grey.shade700),
+                foregroundColor: Colors.grey,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () => Navigator.pop(ctx, 3),
             ),
           ],
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.pop(ctx, false);
-              // Demo logic: Show msg that free quality is not available for this stream
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text(
-                        'عذراً، الجودة المجانية غير متاحة لهذا الحدث حالياً.')),
-              );
-            },
-            child: const Text('مشاهدة مجانية (SD)',
-                style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF673ab7),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () {
-              Navigator.pop(ctx, true); // Go to Profile/Login
-            },
-            child: const Text('اشتراك الآن',
-                style: TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold)),
+            onPressed: () => Navigator.pop(ctx, 0),
+            child: const Text('إغلاق', style: TextStyle(color: Colors.grey)),
           ),
         ],
       ),
     );
 
-    if (result == true) {
-      if (!mounted) return;
-      // Navigate to Login Screen
+    if (result == 1) {
+      // Start Trial
+      final success = await AuthService().startTrial();
+      if (success) {
+        if (!mounted) { return; }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('تم تفعيل التجربة المجانية لمدة 24 ساعة!')),
+        );
+        _unlockAndPlay();
+      } else {
+        if (!mounted) { return; }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('عذراً، لا يمكن تفعيل التجربة حالياً.')),
+        );
+        _showPremiumDialog(); // Re-show to allow other options
+      }
+    } else if (result == 2) {
+      // Subscribe (Navigate to Login/Profile)
+      if (!mounted) { return; }
       await Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const LoginScreen()),
       );
-      // Re-check after return
-      _checkAccess();
+      _fetchUserDataAndCheckAccess();
+    } else if (result == 3) {
+      // Free Quality
+      if (!mounted) { return; }
+      // For now, if no free quality is found in streamLinks, show msg
+      bool hasFree = widget.streamLinks.any((l) =>
+          l['name']?.toString().toLowerCase().contains('free') == true ||
+          l['name']?.toString().toLowerCase().contains('sd') == true);
+      if (hasFree) {
+        _initializeScreen();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content:
+                  Text('عذراً، الجودة المجانية غير متاحة لهذا الحدث حالياً.')),
+        );
+        _showPremiumDialog();
+      }
     } else {
-      if (!mounted) return;
-      Navigator.of(context).pop(); // Close Video Screen
+      // Close
+      if (!mounted) { return; }
+      Navigator.of(context).pop();
     }
   }
 
@@ -298,18 +352,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final controller = _videoPlayerController;
-    if (controller == null || !controller.value.isInitialized) return;
+    if (controller == null || !controller.value.isInitialized) { return; }
 
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
-      if (controller.value.isPlaying && !_isCurrentlyInPip) controller.pause();
+      if (controller.value.isPlaying && !_isCurrentlyInPip) { controller.pause(); }
     } else if (state == AppLifecycleState.resumed) {
-      if (!controller.value.isPlaying) controller.play();
+      if (!controller.value.isPlaying) { controller.play(); }
     }
   }
 
   Future<void> _unlockAndPlay() async {
-    if (!mounted || widget.contentId == null || widget.category == null) return;
+    if (!mounted || widget.contentId == null || widget.category == null) { return; }
 
     try {
       final authService = AuthService();
@@ -318,7 +372,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         id: widget.contentId!,
       );
 
-      if (!mounted) return;
+      if (!mounted) { return; }
 
       if (unlockedData != null) {
         List<dynamic> newLinksJson = unlockedData['stream_link'] ?? [];
@@ -366,7 +420,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
   Future<void> _initializeScreen() async {
     await Future.delayed(const Duration(milliseconds: 100));
-    if (!mounted) return;
+    if (!mounted) { return; }
 
     if (widget.initialUrl.trim().isEmpty) {
       if (mounted) {
@@ -439,7 +493,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     _selectedStreamIndex = -1;
 
     if (_validStreamLinks.isEmpty) {
-      if (widget.initialUrl.isNotEmpty) urlToPlay = widget.initialUrl;
+      if (widget.initialUrl.isNotEmpty) { urlToPlay = widget.initialUrl; }
     } else {
       // 🆕 ALWAYS choose the first link as default if available
       _selectedStreamIndex = 0;
@@ -447,11 +501,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     }
 
     if (urlToPlay == null || urlToPlay.isEmpty) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _isLoading = false;
           _hasError = true;
         });
+      }
       return;
     }
 
@@ -477,7 +532,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
   Future<void> _initializePlayerInternal(String sourceUrl,
       {String? specificQualityUrl, Duration? startAt}) async {
-    if (!mounted) return;
+    if (!mounted) { return; }
 
     // Enable WakeLock to keep screen on during playback (Mobile & Web)
     WakelockPlus.enable();
@@ -485,8 +540,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     debugPrint('[HESEN PLAYER] Initializing player with sourceUrl: $sourceUrl');
     await _releaseControllers();
     await Future.delayed(const Duration(milliseconds: 250));
-    if (!mounted) return;
-    if (!_isLoading) setState(() => _isLoading = true);
+    if (!mounted) { return; }
+    if (!_isLoading) { setState(() { _isLoading = true; }); }
 
     String? videoUrlToLoad;
     final String urlToProcess = specificQualityUrl ?? sourceUrl;
@@ -553,11 +608,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
             '[MOBILE] URL identified as YouTube. Processing in background...');
         final streamDetails = await compute(handleYoutubeStream, urlToProcess);
         videoUrlToLoad = streamDetails.videoUrlToLoad;
-        if (mounted)
+        if (mounted) {
           setState(() {
             _fetchedApiQualities = streamDetails.fetchedQualities;
             _selectedApiQualityIndex = streamDetails.selectedQualityIndex;
           });
+        }
       } else if (urlToProcess.contains('ok.ru/')) {
         String? videoId;
         if (urlToProcess.contains('/video/')) {
@@ -572,11 +628,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
             videoUrlToLoad = streamUrl;
             if (videoUrlToLoad.toLowerCase().contains('.m3u8')) {
               final qualities = await parseOkruQualities(videoUrlToLoad);
-              if (mounted && qualities.isNotEmpty)
+              if (mounted && qualities.isNotEmpty) {
                 setState(() {
                   _fetchedApiQualities = qualities;
                   _selectedApiQualityIndex = 0;
                 });
+              }
             }
           } else {
             throw Exception('Could not extract a playable URL from ok.ru');
@@ -589,19 +646,21 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
           urlToProcess.toLowerCase().contains('.m3u8')) {
         videoUrlToLoad = urlToProcess;
         final qualities = await parseOkruQualities(videoUrlToLoad);
-        if (mounted && qualities.isNotEmpty)
+        if (mounted && qualities.isNotEmpty) {
           setState(() {
             _fetchedApiQualities = qualities;
             _selectedApiQualityIndex = 0;
           });
+        }
       } else if (urlToProcess.startsWith('https://7esentv-match.vercel.app')) {
         final streamDetails = await handleHesenTvStream(urlToProcess);
         videoUrlToLoad = streamDetails.videoUrlToLoad;
-        if (mounted)
+        if (mounted) {
           setState(() {
             _fetchedApiQualities = streamDetails.fetchedQualities;
             _selectedApiQualityIndex = streamDetails.selectedQualityIndex;
           });
+        }
       } else {
         debugPrint(
             '[HESEN PLAYER] URL did not match any handler. Playing raw URL.');
@@ -623,14 +682,16 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         }
       }
 
-      if (videoUrlToLoad == null || videoUrlToLoad.isEmpty)
+      if (videoUrlToLoad == null || videoUrlToLoad.isEmpty) {
         throw Exception('videoUrlToLoad could not be determined.');
+      }
 
       VideoFormat? formatHint;
-      if (videoUrlToLoad.startsWith('data:application/dash+xml'))
+      if (videoUrlToLoad.startsWith('data:application/dash+xml')) {
         formatHint = VideoFormat.dash;
-      else if (videoUrlToLoad.toLowerCase().contains('.m3u8'))
+      } else if (videoUrlToLoad.toLowerCase().contains('.m3u8')) {
         formatHint = VideoFormat.hls;
+      }
 
       // ====== DESKTOP: Use MediaKit (MPV Backend) ======
       if (!kIsWeb &&
@@ -735,14 +796,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
   Future<void> _retryMediaKitPlayback(
       String url, Map<String, String> headers) async {
-    if (!mounted || _isAutoRetrying) return;
+    if (!mounted || _isAutoRetrying) { return; }
 
     _autoRetryAttempt++;
     if (_autoRetryAttempt > 2) {
       debugPrint('[HESEN PLAYER] MediaKit persistent failure after retries.');
       _autoRetryAttempt = 0;
       _isAutoRetrying = false;
-      if (mounted) _tryNextStream();
+      if (mounted) { _tryNextStream(); }
       return;
     }
 
@@ -825,12 +886,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     }
 
     if (isBuffering != _isLoading && !_hasError) {
-      if (mounted) setState(() => _isLoading = isBuffering);
+      if (mounted) { setState(() { _isLoading = isBuffering; }); }
     }
   }
 
   void _handleBufferingTimeout() {
-    if (!mounted || _currentStreamUrl == null) return;
+    if (!mounted || _currentStreamUrl == null) { return; }
 
     // Check if the player is still buffering and not playing
     final isStuck = _videoPlayerController?.value.isBuffering == true &&
@@ -850,7 +911,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   }
 
   Future<void> _tryNextStream() async {
-    if (!mounted || _validStreamLinks.length <= 1) return;
+    if (!mounted || _validStreamLinks.length <= 1) { return; }
     _autoRetryAttempt = 0; // Reset for the new stream
     final int nextIndex = (_selectedStreamIndex + 1) % _validStreamLinks.length;
     // Shortened delay
@@ -858,7 +919,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     if (mounted) {
       // _showError('البث الحالي لا يعمل، جاري محاولة البث التالي...'); // MODIFIED: Removed the toast message
       await Future.delayed(const Duration(milliseconds: 500));
-      if (mounted) _changeStream(nextIndex, isAutoRetry: true);
+      if (mounted) { _changeStream(nextIndex, isAutoRetry: true); }
     }
   }
 
@@ -903,7 +964,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     });
 
     await Future.delayed(const Duration(milliseconds: 50));
-    if (!mounted) return;
+    if (!mounted) { return; }
 
     // ✅ على الويب: تحديث الرابط مباشرة بدون إعادة تهيئة كاملة
     if (kIsWeb) {
@@ -962,7 +1023,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       _playerKey = UniqueKey();
     });
     await Future.delayed(const Duration(milliseconds: 50));
-    if (!mounted) return;
+    if (!mounted) { return; }
     await _initializePlayerInternal(_currentStreamUrl!,
         specificQualityUrl: specificQualityUrl, startAt: startAt);
   }
@@ -974,7 +1035,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   }
 
   void _hideControls({required bool animate}) {
-    if (!mounted || !_isControlsVisible) return;
+    if (!mounted || !_isControlsVisible) { return; }
     if (animate)
       _animationController.reverse();
     else
@@ -990,7 +1051,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   }
 
   void _showControls() {
-    if (!mounted || _isControlsVisible) return;
+    if (!mounted || _isControlsVisible) { return; }
     _animationController.forward();
     _setControlsVisibility(true);
     _startHideControlsTimer();
@@ -998,11 +1059,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
   void _setControlsVisibility(bool isVisible) {
     // MODIFIED: Don't check _isControlsVisible here to allow forcing a state update
-    if (mounted) setState(() => _isControlsVisible = isVisible);
+    if (mounted) { setState(() { _isControlsVisible = isVisible; }); }
   }
 
   String _formatDuration(Duration? duration) {
-    if (duration == null) return "00:00";
+    if (duration == null) { return "00:00"; }
     String twoDigits(int n) => n.toString().padLeft(2, '0');
     if (duration.inHours > 0)
       return "${twoDigits(duration.inHours)}:${twoDigits(duration.inMinutes.remainder(60))}:${twoDigits(duration.inSeconds.remainder(60))}";
@@ -1042,7 +1103,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
   Widget _buildStreamSelector() {
     // MODIFIED: Show even if there is only one link, as long as the list is not empty.
-    if (_validStreamLinks.isEmpty) return const SizedBox.shrink();
+    if (_validStreamLinks.isEmpty) { return const SizedBox.shrink(); }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
@@ -1088,7 +1149,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   }
 
   void _showQualitySelectionDialog(BuildContext context) {
-    if (!_isCurrentStreamApi || _fetchedApiQualities.isEmpty) return;
+    if (!_isCurrentStreamApi || _fetchedApiQualities.isEmpty) { return; }
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -1138,7 +1199,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                             : null,
                         onTap: () {
                           Navigator.of(context).pop();
-                          if (!isSelected) _changeApiQuality(qualityKey);
+                          if (!isSelected) { _changeApiQuality(qualityKey); }
                         },
                       );
                     }).toList(),
@@ -1229,7 +1290,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                         _isFullScreen = false;
                       }
                     }
-                    if (mounted) Navigator.of(context).pop();
+                    if (mounted) { Navigator.of(context).pop(); }
                   },
                 ),
               ),
@@ -1402,7 +1463,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
             onPressed: !isInitialized
                 ? null
                 : () async {
-                    if (!mounted) return;
+                    if (!mounted) { return; }
                     try {
                       final asp = controller!.value.aspectRatio;
                       int n = 16, d = 9;
@@ -1412,7 +1473,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                       }
                       await _androidPIP.enterPipMode(aspectRatio: [n, d]);
                     } catch (e) {
-                      if (mounted) _showError("Error: $e");
+                      if (mounted) { _showError("Error: $e"); }
                     }
                   },
           );
@@ -1505,7 +1566,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
               IconButton(
                 icon: const Icon(Icons.aspect_ratio, color: Colors.white),
                 onPressed: () {
-                  if (!mounted) return;
+                  if (!mounted) { return; }
                   setState(() {
                     _currentVideoSize = VideoSize.values[
                         (_currentVideoSize.index + 1) %
@@ -1627,7 +1688,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     return PopScope(
       canPop: false, // Handle manually
       onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
+        if (didPop) { return; }
         // Logic: Just pop the navigator which will trigger dispose() and stop video
         Navigator.of(context).pop();
       },
@@ -1660,8 +1721,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
 extension DurationClamp on Duration {
   Duration clamp(Duration lowerLimit, Duration upperLimit) {
-    if (this < lowerLimit) return lowerLimit;
-    if (this > upperLimit) return upperLimit;
+    if (this < lowerLimit) { return lowerLimit; }
+    if (this > upperLimit) { return upperLimit; }
     return this;
   }
 }

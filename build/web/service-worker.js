@@ -7,12 +7,14 @@ const STATIC_FILES = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/flutter.js',
+  '/favicon.png',
+  '/apple-touch-icon.png',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
+  '/icons/Icon-maskable-192.png',
+  '/icons/Icon-maskable-512.png',
   '/main.dart.js',
   '/assets/icon/icon.png',
-  '/assets/sun.png',
-  '/assets/moon.png',
-  '/assets/no-image.png',
 ];
 
 // استراتيجية Cache First للملفات الثابتة

@@ -2359,16 +2359,8 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     onRefresh: () => _refreshSection(_selectedIndex),
                     child: Padding(
                       padding: const EdgeInsets.only(top: 10.0),
-                      child: PageView(
-                        controller: _pageController ??
-                            PageController(initialPage: _selectedIndex),
-                        physics:
-                            const NeverScrollableScrollPhysics(), // Disable swipe to keep navigation controlled
-                        onPageChanged: (index) {
-                          setState(() {
-                            _selectedIndex = index;
-                          });
-                        },
+                      child: IndexedStack(
+                        index: _selectedIndex,
                         children: [
                           _buildSectionContent(0), // Channels
                           _buildSectionContent(1), // News

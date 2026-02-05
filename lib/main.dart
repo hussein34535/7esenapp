@@ -2026,11 +2026,11 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (kIsWeb && _isLoading) {
       return const Scaffold(
         backgroundColor: Colors.black,
-        // Double Loading Fix:
-        // Do NOT show a Flutter loader. Keep the HTML splash screen visible
-        // until we manually remove it in _initData() when data is ready.
-        // We render an empty black box behind the HTML splash.
-        body: SizedBox.shrink(),
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Color(0xFF7C52D8),
+          ),
+        ),
       );
     }
 

@@ -591,12 +591,10 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
   StreamSubscription? _userSubscription;
   Timer? _windowsStatusTimer;
   bool _initialStatusLoaded = false;
-  PageController? _pageController;
 
   @override
   void initState() {
     super.initState();
-    _pageController = PageController(initialPage: _selectedIndex);
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     _isDarkMode = themeProvider.themeMode == ThemeMode.dark;
     _startInitializationSequence();
@@ -619,7 +617,6 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   void dispose() {
     _searchController.dispose();
-    _pageController?.dispose();
     _userSubscription?.cancel();
     _windowsStatusTimer?.cancel();
     super.dispose();
@@ -2395,11 +2392,9 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
         index: _selectedIndex,
         onTap: (index) {
           if (!mounted) return;
-          _pageController?.animateToPage(
-            index,
-            duration: const Duration(milliseconds: 400),
-            curve: Curves.easeInOutCubic,
-          );
+          setState(() {
+            _selectedIndex = index;
+          });
         },
         height: 60,
       ),

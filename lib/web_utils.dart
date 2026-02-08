@@ -1,8 +1,11 @@
-import 'dart:js' as js;
+import 'dart:js_interop';
+
+@JS('removeSplashFromWeb')
+external void _removeSplash();
 
 void removeWebSplash() {
   try {
-    js.context.callMethod('removeSplashFromWeb');
+    _removeSplash();
   } catch (e) {
     // Ignore error if function is missing or not on web
   }

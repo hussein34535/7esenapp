@@ -1,18 +1,18 @@
 # Building Hesen TV PWA for iOS
 
-To ensure the best performance and smoothest scrolling experience on iOS devices, we must use the **CanvasKit** renderer.
+To ensure the best performance and smoothest scrolling experience on iOS devices, we must use the **WASM** renderer (which provides performance equivalent to or better than the old CanvasKit).
 
 ## Optimized Build Command
 
 Use this command to build the web version for production deployment:
 
 ```bash
-flutter build web --web-renderer canvaskit --release --pwa-strategy=offline-first
+flutter build web --wasm --release --pwa-strategy=offline-first
 ```
 
 ### Breakdown of Flags:
--   `--web-renderer canvaskit`: Forces the use of CanvasKit (bundled Skia Wasm) instead of HTML. This provides better performance and consistency across devices, crucial for iOS.
--   `--release`: Builds in release mode with minification and tree-shaking.
+-   `--wasm`: Compiles the application to WebAssembly. This uses the Skwasm renderer for high-performance graphics and smoother animations/scrolling on supported browsers (including modern Safari).
+-   `--release`: Builds in release mode with optimizations.
 -   `--pwa-strategy=offline-first`: Ensures the service worker caches core assets for offline capability and faster subsequent loads.
 
 ## Verification

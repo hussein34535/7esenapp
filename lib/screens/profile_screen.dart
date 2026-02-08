@@ -6,7 +6,6 @@ import 'package:intl/intl.dart';
 import 'package:hesen/screens/subscription_screen.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:hesen/services/cloudinary_service.dart';
-import 'dart:io';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -57,8 +56,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() => _isUploadingProfile = true);
 
       // 1. Upload to Cloudinary
-      final String imageUrl =
-          await CloudinaryService.uploadImage(File(image.path));
+      // Pass XFile directly (CloudinaryService now accepts XFile)
+      final String imageUrl = await CloudinaryService.uploadImage(image);
 
       // 2. Update Auth & Firestore
       await _authService.updateProfilePicture(imageUrl);

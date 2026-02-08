@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hesen/main.dart';
@@ -10,6 +10,9 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hesen/services/cloudinary_service.dart';
 import 'package:hesen/services/resend_service.dart';
+import 'dart:io'
+    show
+        Platform; // Only for Platform check if absolutely needed, but better use kIsWeb
 
 class PaymentScreen extends StatefulWidget {
   final Map<String, dynamic> package;
@@ -34,7 +37,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
   dynamic _selectedMethodId;
 
   // Image Upload State
-  File? _receiptImage;
+  XFile? _receiptImage;
+  Uint8List? _receiptImageBytes;
   bool _isUploading = false;
   final ImagePicker _picker = ImagePicker();
 
@@ -107,8 +111,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
       final XFile? pickedFile =
           await _picker.pickImage(source: ImageSource.gallery);
       if (pickedFile != null) {
+        final bytes = await pickedFile.readAsBytes();
         setState(() {
-          _receiptImage = File(pickedFile.path);
+          _receiptImage = pickedFile;
+          _receiptImageBytes = bytes;
         });
       }
     } catch (e) {
@@ -395,10 +401,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: Colors.white24, style: BorderStyle.solid),
         ),
-        child: _receiptImage != null
+        child: _receiptImageBytes != null
             ? ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: Image.file(_receiptImage!,
+                child: Image.memory(_receiptImageBytes!,
                     fit: BoxFit.cover, width: double.infinity),
               )
             : Column(

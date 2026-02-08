@@ -3,7 +3,7 @@ import 'package:hesen/services/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hesen/services/resend_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 import 'package:hesen/services/cloudinary_service.dart';
 
@@ -23,7 +23,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final _authService = AuthService();
   final _formKey = GlobalKey<FormState>();
 
-  File? _profileImage;
+  XFile? _profileImage;
+  Uint8List? _profileImageBytes;
   final ImagePicker _picker = ImagePicker();
 
   bool _isLoading = false;
@@ -32,9 +33,14 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isForgotPassword = false; // Forgot Password flow
 
   Future<void> _pickImage() async {
-    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    final XFile? pickedFile =
+        await _picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
-      setState(() => _profileImage = File(pickedFile.path));
+      final bytes = await pickedFile.readAsBytes();
+      setState(() {
+        _profileImage = pickedFile;
+        _profileImageBytes = bytes;
+      });
     }
   }
 
@@ -256,10 +262,10 @@ class _LoginScreenState extends State<LoginScreen> {
                             CircleAvatar(
                               radius: 50,
                               backgroundColor: const Color(0xFF1E1E1E),
-                              backgroundImage: _profileImage != null
-                                  ? FileImage(_profileImage!)
+                              backgroundImage: _profileImageBytes != null
+                                  ? MemoryImage(_profileImageBytes!)
                                   : null,
-                              child: _profileImage == null
+                              child: _profileImageBytes == null
                                   ? const Icon(Icons.person,
                                       size: 50, color: Colors.grey)
                                   : null,

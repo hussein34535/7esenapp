@@ -38,7 +38,7 @@ import 'package:hesen/screens/profile_screen.dart'; // Added
 import 'package:hesen/theme_customization_screen.dart'; // Added, contains ThemeProvider
 import 'package:hesen/telegram_dialog.dart'; // Added
 import 'package:provider/provider.dart'; // Added
-import 'dart:io'; // Added
+// import 'dart:io'; // Removed for web compatibility
 import 'package:flutter/foundation.dart'; // Added
 import 'package:hesen/services/resend_service.dart'; // Added
 
@@ -56,9 +56,20 @@ Future<void> main() async {
     WidgetsFlutterBinding.ensureInitialized();
     MediaKit.ensureInitialized(); // Initialize MediaKit
 
+    if (!kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS)) {
+      await flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.requestNotificationsPermission();
+    }
+
     // WINDOW MANAGER INIT (Desktop)
     if (!kIsWeb &&
-        (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+        (defaultTargetPlatform == TargetPlatform.windows ||
+            defaultTargetPlatform == TargetPlatform.linux ||
+            defaultTargetPlatform == TargetPlatform.macOS)) {
       try {
         await windowManager.ensureInitialized();
         WindowOptions windowOptions = const WindowOptions(
@@ -112,7 +123,7 @@ Future<void> main() async {
       }
 
       // Windows Platform Threading Error Fix: Disable persistence which can unstabilize the bridge
-      if (!kIsWeb && Platform.isWindows) {
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
         FirebaseFirestore.instance.settings =
             const Settings(persistenceEnabled: false);
       }
@@ -605,7 +616,7 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
     await _initNotifications();
 
     // DELAY monitor status on Windows to avoid threading bridge issues during startup
-    if (!kIsWeb && Platform.isWindows) {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
       debugPrint("Windows: Small delay before stream setup...");
       await Future.delayed(const Duration(milliseconds: 1000));
     }
@@ -839,7 +850,7 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
     // On Windows, real-time streams often cause platform channel threading issues.
     // We will use a periodic timer as a safe alternative, but we will make it adaptive.
-    if (!kIsWeb && Platform.isWindows) {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
       // FORCE INITIAL FETCH execution
       debugPrint("Windows: Performing initial status check...");
       final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -1120,7 +1131,7 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
         token = await user.getIdToken();
 
         // Windows Firestore bridge protection delay (reduced for speed)
-        if (!kIsWeb && Platform.isWindows) {
+        if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
           debugPrint("Windows: Small delay for Firestore safety...");
           await Future.delayed(const Duration(milliseconds: 600));
         }
@@ -1503,7 +1514,8 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
         showTelegramDialog(context, userName: _userName);
       }
     } catch (e) {
-      if (e is http.ClientException || e is SocketException) {
+      if (e is http.ClientException ||
+          e.toString().contains('SocketException')) {
         // Prevent SnackBar from appearing over the Splash Screen
         if (mounted && !_isLoading) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1710,8 +1722,12 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
     actions.add(
       Padding(
         padding: EdgeInsets.only(
-          left: (!kIsWeb && Platform.isWindows) ? 10.0 : 8.0,
-          right: (!kIsWeb && Platform.isWindows) ? 10.0 : 8.0,
+          left: (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows)
+              ? 10.0
+              : 8.0,
+          right: (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows)
+              ? 10.0
+              : 8.0,
           bottom: 12.0, // Comfortable space below the icon
         ),
         child: InkWell(
@@ -1755,15 +1771,22 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                       ? packageColor
                                       : Colors.white,
                                   fontWeight: FontWeight.bold,
-                                  fontSize:
-                                      (!kIsWeb && Platform.isWindows) ? 18 : 12,
+                                  fontSize: (!kIsWeb &&
+                                          defaultTargetPlatform ==
+                                              TargetPlatform.windows)
+                                      ? 18
+                                      : 12,
                                 ),
                               )
                             : Icon(
                                 Icons.person,
                                 color:
                                     _isSubscribed ? packageColor : Colors.white,
-                                size: (!kIsWeb && Platform.isWindows) ? 24 : 16,
+                                size: (!kIsWeb &&
+                                        defaultTargetPlatform ==
+                                            TargetPlatform.windows)
+                                    ? 24
+                                    : 16,
                               )),
                   ),
                 ),
@@ -2525,7 +2548,7 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
           );
         }
       case 3: // Matches
-        if (_matchesHasError) {
+        if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
           return _buildSectionErrorWidget(
             'فشل تحميل المباريات. الرجاء المحاولة مرة أخرى.',
             _retryMatches,

@@ -6,7 +6,7 @@ import 'dart:convert';
 
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
-import 'package:video_thumbnail/video_thumbnail.dart' as vt;
+import 'package:hesen/utils/video_thumbnail_helper.dart';
 
 class GoalsSection extends StatefulWidget {
   final Future<List<dynamic>> goalsArticles;
@@ -689,12 +689,8 @@ class _VideoThumbnailState extends State<VideoThumbnail> {
 
       if (defaultTargetPlatform == TargetPlatform.android ||
           defaultTargetPlatform == TargetPlatform.iOS) {
-        final Uint8List? thumbnail = await vt.VideoThumbnail.thumbnailData(
-          video: widget.url,
-          imageFormat: vt.ImageFormat.JPEG,
-          maxWidth: 640,
-          quality: 75,
-        ).timeout(const Duration(seconds: 10), onTimeout: () => null);
+        final Uint8List? thumbnail =
+            await VideoThumbnailHelper.getThumbnail(widget.url);
 
         if (thumbnail != null && thumbnail.isNotEmpty) {
           ThumbnailCache.set(widget.url, thumbnail);

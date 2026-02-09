@@ -10,9 +10,6 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hesen/services/cloudinary_service.dart';
 import 'package:hesen/services/resend_service.dart';
-import 'dart:io'
-    show
-        Platform; // Only for Platform check if absolutely needed, but better use kIsWeb
 
 class PaymentScreen extends StatefulWidget {
   final Map<String, dynamic> package;
@@ -160,7 +157,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       );
 
       // Trigger fast polling on Windows to catch activation
-      if (!kIsWeb && Platform.isWindows) {
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
         homeKey.currentState?.startFastPolling();
       }
 

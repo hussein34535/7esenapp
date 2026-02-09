@@ -1,5 +1,5 @@
 import 'dart:ui';
-import 'dart:io'; // Platform check
+// import 'dart:io'; // Removed for web compatibility
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
@@ -8,7 +8,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:android_pip/android_pip.dart';
+import 'package:hesen/utils/pip_helper.dart'; // Replaces android_pip
 import 'package:hesen/okru_stream_extractor.dart';
 import 'dart:convert'; // Added for jsonDecode
 import 'package:media_kit/media_kit.dart'; // MediaKit Player
@@ -80,7 +80,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   int _selectedStreamIndex = 0;
   bool _isCurrentStreamApi = false;
   bool _isCurrentlyInPip = false;
-  late AndroidPIP _androidPIP;
+  late PipHelper _pipHelper;
   int _autoRetryAttempt = 0;
   bool _isAutoRetrying = false; // Track if we are in a retry loop
 
@@ -116,14 +116,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       _initializePlayerInternal(_currentStreamUrl!);
     }
 
-    _androidPIP = AndroidPIP(
+    _pipHelper = PipHelper(
       onPipEntered: () {
-        if (!mounted) { return; }
+        if (!mounted) {
+          return;
+        }
         setState(() => _isCurrentlyInPip = true);
         _hideControls(animate: false);
       },
       onPipExited: () {
-        if (!mounted) { return; }
+        if (!mounted) {
+          return;
+        }
         setState(() => _isCurrentlyInPip = false);
         if (_videoPlayerController != null &&
             !_videoPlayerController!.value.isPlaying) {
@@ -131,7 +135,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         }
       },
       onPipAction: (action) {
-        if (!mounted || _videoPlayerController == null) { return; }
+        if (!mounted || _videoPlayerController == null) {
+          return;
+        }
         final actionStr = action.toString();
         if (actionStr.contains('play')) {
           _videoPlayerController!.play();
@@ -163,7 +169,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
     // If passed externally as locked
     if (widget.isLocked) {
-      if (!mounted) { return; }
+      if (!mounted) {
+        return;
+      }
 
       if (isSubscribed) {
         // User is subscribed, attempt to unlock via API
@@ -182,7 +190,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         (link) => link['url'] != null && link['url'].toString().isNotEmpty);
 
     if (!hasPlayableLinks) {
-      if (!mounted) { return; }
+      if (!mounted) {
+        return;
+      }
       // Not premium (isLocked checked above), just broken/empty.
       _showError('عفواً، لا توجد روابط تشغيل متاحة لهذا المحتوى حالياً.');
     } else {
@@ -290,14 +300,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       // Start Trial
       final success = await AuthService().startTrial();
       if (success) {
-        if (!mounted) { return; }
+        if (!mounted) {
+          return;
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
               content: Text('تم تفعيل التجربة المجانية لمدة 24 ساعة!')),
         );
         _unlockAndPlay();
       } else {
-        if (!mounted) { return; }
+        if (!mounted) {
+          return;
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('عذراً، لا يمكن تفعيل التجربة حالياً.')),
         );
@@ -305,14 +319,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       }
     } else if (result == 2) {
       // Subscribe (Navigate to Login/Profile)
-      if (!mounted) { return; }
+      if (!mounted) {
+        return;
+      }
       await Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const LoginScreen()),
       );
       _fetchUserDataAndCheckAccess();
     } else if (result == 3) {
       // Free Quality
-      if (!mounted) { return; }
+      if (!mounted) {
+        return;
+      }
       // For now, if no free quality is found in streamLinks, show msg
       bool hasFree = widget.streamLinks.any((l) =>
           l['name']?.toString().toLowerCase().contains('free') == true ||
@@ -329,7 +347,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       }
     } else {
       // Close
-      if (!mounted) { return; }
+      if (!mounted) {
+        return;
+      }
       Navigator.of(context).pop();
     }
   }
@@ -352,18 +372,26 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final controller = _videoPlayerController;
-    if (controller == null || !controller.value.isInitialized) { return; }
+    if (controller == null || !controller.value.isInitialized) {
+      return;
+    }
 
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
-      if (controller.value.isPlaying && !_isCurrentlyInPip) { controller.pause(); }
+      if (controller.value.isPlaying && !_isCurrentlyInPip) {
+        controller.pause();
+      }
     } else if (state == AppLifecycleState.resumed) {
-      if (!controller.value.isPlaying) { controller.play(); }
+      if (!controller.value.isPlaying) {
+        controller.play();
+      }
     }
   }
 
   Future<void> _unlockAndPlay() async {
-    if (!mounted || widget.contentId == null || widget.category == null) { return; }
+    if (!mounted || widget.contentId == null || widget.category == null) {
+      return;
+    }
 
     try {
       final authService = AuthService();
@@ -372,7 +400,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         id: widget.contentId!,
       );
 
-      if (!mounted) { return; }
+      if (!mounted) {
+        return;
+      }
 
       if (unlockedData != null) {
         List<dynamic> newLinksJson = unlockedData['stream_link'] ?? [];
@@ -420,7 +450,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
   Future<void> _initializeScreen() async {
     await Future.delayed(const Duration(milliseconds: 100));
-    if (!mounted) { return; }
+    if (!mounted) {
+      return;
+    }
 
     if (widget.initialUrl.trim().isEmpty) {
       if (mounted) {
@@ -493,7 +525,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     _selectedStreamIndex = -1;
 
     if (_validStreamLinks.isEmpty) {
-      if (widget.initialUrl.isNotEmpty) { urlToPlay = widget.initialUrl; }
+      if (widget.initialUrl.isNotEmpty) {
+        urlToPlay = widget.initialUrl;
+      }
     } else {
       // 🆕 ALWAYS choose the first link as default if available
       _selectedStreamIndex = 0;
@@ -532,7 +566,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
   Future<void> _initializePlayerInternal(String sourceUrl,
       {String? specificQualityUrl, Duration? startAt}) async {
-    if (!mounted) { return; }
+    if (!mounted) {
+      return;
+    }
 
     // Enable WakeLock to keep screen on during playback (Mobile & Web)
     WakelockPlus.enable();
@@ -540,8 +576,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     debugPrint('[HESEN PLAYER] Initializing player with sourceUrl: $sourceUrl');
     await _releaseControllers();
     await Future.delayed(const Duration(milliseconds: 250));
-    if (!mounted) { return; }
-    if (!_isLoading) { setState(() { _isLoading = true; }); }
+    if (!mounted) {
+      return;
+    }
+    if (!_isLoading) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
     String? videoUrlToLoad;
     final String urlToProcess = specificQualityUrl ?? sourceUrl;
@@ -695,7 +737,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
       // ====== DESKTOP: Use MediaKit (MPV Backend) ======
       if (!kIsWeb &&
-          (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+          ((!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) ||
+              (!kIsWeb && defaultTargetPlatform == TargetPlatform.linux) ||
+              (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS))) {
         debugPrint('[HESEN PLAYER] Desktop detected - Using MediaKit');
         try {
           // Create Player if needed
@@ -796,14 +840,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
   Future<void> _retryMediaKitPlayback(
       String url, Map<String, String> headers) async {
-    if (!mounted || _isAutoRetrying) { return; }
+    if (!mounted || _isAutoRetrying) {
+      return;
+    }
 
     _autoRetryAttempt++;
     if (_autoRetryAttempt > 2) {
       debugPrint('[HESEN PLAYER] MediaKit persistent failure after retries.');
       _autoRetryAttempt = 0;
       _isAutoRetrying = false;
-      if (mounted) { _tryNextStream(); }
+      if (mounted) {
+        _tryNextStream();
+      }
       return;
     }
 
@@ -886,12 +934,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     }
 
     if (isBuffering != _isLoading && !_hasError) {
-      if (mounted) { setState(() { _isLoading = isBuffering; }); }
+      if (mounted) {
+        setState(() {
+          _isLoading = isBuffering;
+        });
+      }
     }
   }
 
   void _handleBufferingTimeout() {
-    if (!mounted || _currentStreamUrl == null) { return; }
+    if (!mounted || _currentStreamUrl == null) {
+      return;
+    }
 
     // Check if the player is still buffering and not playing
     final isStuck = _videoPlayerController?.value.isBuffering == true &&
@@ -911,7 +965,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   }
 
   Future<void> _tryNextStream() async {
-    if (!mounted || _validStreamLinks.length <= 1) { return; }
+    if (!mounted || _validStreamLinks.length <= 1) {
+      return;
+    }
     _autoRetryAttempt = 0; // Reset for the new stream
     final int nextIndex = (_selectedStreamIndex + 1) % _validStreamLinks.length;
     // Shortened delay
@@ -919,7 +975,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     if (mounted) {
       // _showError('البث الحالي لا يعمل، جاري محاولة البث التالي...'); // MODIFIED: Removed the toast message
       await Future.delayed(const Duration(milliseconds: 500));
-      if (mounted) { _changeStream(nextIndex, isAutoRetry: true); }
+      if (mounted) {
+        _changeStream(nextIndex, isAutoRetry: true);
+      }
     }
   }
 
@@ -964,7 +1022,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     });
 
     await Future.delayed(const Duration(milliseconds: 50));
-    if (!mounted) { return; }
+    if (!mounted) {
+      return;
+    }
 
     // ✅ على الويب: تحديث الرابط مباشرة بدون إعادة تهيئة كاملة
     if (kIsWeb) {
@@ -1023,7 +1083,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       _playerKey = UniqueKey();
     });
     await Future.delayed(const Duration(milliseconds: 50));
-    if (!mounted) { return; }
+    if (!mounted) {
+      return;
+    }
     await _initializePlayerInternal(_currentStreamUrl!,
         specificQualityUrl: specificQualityUrl, startAt: startAt);
   }
@@ -1035,7 +1097,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   }
 
   void _hideControls({required bool animate}) {
-    if (!mounted || !_isControlsVisible) { return; }
+    if (!mounted || !_isControlsVisible) {
+      return;
+    }
     if (animate)
       _animationController.reverse();
     else
@@ -1051,7 +1115,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   }
 
   void _showControls() {
-    if (!mounted || _isControlsVisible) { return; }
+    if (!mounted || _isControlsVisible) {
+      return;
+    }
     _animationController.forward();
     _setControlsVisibility(true);
     _startHideControlsTimer();
@@ -1059,11 +1125,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
   void _setControlsVisibility(bool isVisible) {
     // MODIFIED: Don't check _isControlsVisible here to allow forcing a state update
-    if (mounted) { setState(() { _isControlsVisible = isVisible; }); }
+    if (mounted) {
+      setState(() {
+        _isControlsVisible = isVisible;
+      });
+    }
   }
 
   String _formatDuration(Duration? duration) {
-    if (duration == null) { return "00:00"; }
+    if (duration == null) {
+      return "00:00";
+    }
     String twoDigits(int n) => n.toString().padLeft(2, '0');
     if (duration.inHours > 0)
       return "${twoDigits(duration.inHours)}:${twoDigits(duration.inMinutes.remainder(60))}:${twoDigits(duration.inSeconds.remainder(60))}";
@@ -1103,7 +1175,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
   Widget _buildStreamSelector() {
     // MODIFIED: Show even if there is only one link, as long as the list is not empty.
-    if (_validStreamLinks.isEmpty) { return const SizedBox.shrink(); }
+    if (_validStreamLinks.isEmpty) {
+      return const SizedBox.shrink();
+    }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
@@ -1149,7 +1223,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   }
 
   void _showQualitySelectionDialog(BuildContext context) {
-    if (!_isCurrentStreamApi || _fetchedApiQualities.isEmpty) { return; }
+    if (!_isCurrentStreamApi || _fetchedApiQualities.isEmpty) {
+      return;
+    }
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -1199,7 +1275,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                             : null,
                         onTap: () {
                           Navigator.of(context).pop();
-                          if (!isSelected) { _changeApiQuality(qualityKey); }
+                          if (!isSelected) {
+                            _changeApiQuality(qualityKey);
+                          }
                         },
                       );
                     }).toList(),
@@ -1282,15 +1360,23 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                   onPressed: () async {
                     // Desktop: Exit fullscreen first if active
                     if (!kIsWeb &&
-                        (Platform.isWindows ||
-                            Platform.isLinux ||
-                            Platform.isMacOS)) {
+                        ((!kIsWeb &&
+                                defaultTargetPlatform ==
+                                    TargetPlatform.windows) ||
+                            (!kIsWeb &&
+                                defaultTargetPlatform ==
+                                    TargetPlatform.linux) ||
+                            (!kIsWeb &&
+                                defaultTargetPlatform ==
+                                    TargetPlatform.macOS))) {
                       if (_isFullScreen) {
                         await windowManager.setFullScreen(false);
                         _isFullScreen = false;
                       }
                     }
-                    if (mounted) { Navigator.of(context).pop(); }
+                    if (mounted) {
+                      Navigator.of(context).pop();
+                    }
                   },
                 ),
               ),
@@ -1315,9 +1401,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                   : Builder(builder: (context) {
                       // Desktop: MediaKit
                       final bool isDesktop = !kIsWeb &&
-                          (Platform.isWindows ||
-                              Platform.isLinux ||
-                              Platform.isMacOS);
+                          ((!kIsWeb &&
+                                  defaultTargetPlatform ==
+                                      TargetPlatform.windows) ||
+                              (!kIsWeb &&
+                                  defaultTargetPlatform ==
+                                      TargetPlatform.linux) ||
+                              (!kIsWeb &&
+                                  defaultTargetPlatform ==
+                                      TargetPlatform.macOS));
                       if (isDesktop) {
                         if (_mediaKitController == null)
                           return const SizedBox.shrink();
@@ -1404,8 +1496,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
     // Desktop: MediaKit doesn't expose position/duration the same way,
     // so we detect live streams by URL pattern and show simplified controls.
-    final bool isDesktop =
-        !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+    final bool isDesktop = !kIsWeb &&
+        ((!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) ||
+            (!kIsWeb && defaultTargetPlatform == TargetPlatform.linux) ||
+            (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS));
 
     return AnimatedBuilder(
       animation: controller ?? kAlwaysCompleteAnimation,
@@ -1457,13 +1551,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         }
 
         Widget pipButton = const SizedBox.shrink();
-        if (defaultTargetPlatform == TargetPlatform.android) {
+        if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
           pipButton = IconButton(
             icon: const Icon(Icons.picture_in_picture_alt, color: Colors.white),
             onPressed: !isInitialized
                 ? null
                 : () async {
-                    if (!mounted) { return; }
+                    if (!mounted) {
+                      return;
+                    }
                     try {
                       final asp = controller!.value.aspectRatio;
                       int n = 16, d = 9;
@@ -1471,9 +1567,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                         n = (asp * 100).round();
                         d = 100;
                       }
-                      await _androidPIP.enterPipMode(aspectRatio: [n, d]);
+                      await _pipHelper.enterPipMode(n, d);
                     } catch (e) {
-                      if (mounted) { _showError("Error: $e"); }
+                      if (mounted) {
+                        _showError("Error: $e");
+                      }
                     }
                   },
           );
@@ -1566,7 +1664,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
               IconButton(
                 icon: const Icon(Icons.aspect_ratio, color: Colors.white),
                 onPressed: () {
-                  if (!mounted) { return; }
+                  if (!mounted) {
+                    return;
+                  }
                   setState(() {
                     _currentVideoSize = VideoSize.values[
                         (_currentVideoSize.index + 1) %
@@ -1611,7 +1711,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
     // DESKTOP: Use MediaKit Video widget
     if (!kIsWeb &&
-        (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+        ((!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) ||
+            (!kIsWeb && defaultTargetPlatform == TargetPlatform.linux) ||
+            (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS))) {
       if (_mediaKitController != null) {
         // Cover mode: Fill entire screen (may crop video edges)
         if (_currentVideoSize == VideoSize.cover) {
@@ -1688,7 +1790,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     return PopScope(
       canPop: false, // Handle manually
       onPopInvokedWithResult: (didPop, result) {
-        if (didPop) { return; }
+        if (didPop) {
+          return;
+        }
         // Logic: Just pop the navigator which will trigger dispose() and stop video
         Navigator.of(context).pop();
       },
@@ -1721,8 +1825,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
 extension DurationClamp on Duration {
   Duration clamp(Duration lowerLimit, Duration upperLimit) {
-    if (this < lowerLimit) { return lowerLimit; }
-    if (this > upperLimit) { return upperLimit; }
+    if (this < lowerLimit) {
+      return lowerLimit;
+    }
+    if (this > upperLimit) {
+      return upperLimit;
+    }
     return this;
   }
 }

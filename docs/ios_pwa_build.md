@@ -20,3 +20,4 @@ flutter build web --wasm --release --pwa-strategy=offline-first
 2.  Open on an iPhone (Safari).
 3.  Add to Home Screen.
 4.  Launch and verify smooth 60fps scrolling.
+ش

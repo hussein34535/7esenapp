@@ -173,32 +173,45 @@ Future<void> _initializeDeviceId() async {
 
 // --- Top-level function for background processing ---
 Future<Map<String, dynamic>> _processFetchedData(List<dynamic> results) async {
-  // 1. Safe Channel Casting (List<dynamic>)
+  final uuid = Uuid();
+
+  // 1. استقبال القنوات
   final List<dynamic> fetchedChannels = (results[0] as List<dynamic>?) ?? [];
 
-  // 2. Safe News Casting (List<dynamic>)
+  // 2. استقبال الأخبار
   final List<dynamic> fetchedNews = (results[1] as List<dynamic>?) ?? [];
 
-  // 3. Safe Match Casting (CRITICAL FIX: Use .cast<Match>())
-  final List<Match> fetchedMatches =
-      (results[2] as List<dynamic>?)?.cast<Match>().toList() ?? [];
+  // 3. استقبال المباريات (هنا كان سبب الكراش) 🚨
+  // التعديل: بنفحص كل عنصر، لو هو Match ناخده، ولو Map نحوله
+  final List<dynamic> rawMatches = (results[2] as List<dynamic>?) ?? [];
+  final List<Match> fetchedMatches = rawMatches.map<Match>((item) {
+    if (item is Match) return item;
+    if (item is Map) {
+      return Match.fromJson(Map<String, dynamic>.from(item));
+    }
+    return Match.fromJson({}); // Fallback أمان
+  }).toList();
 
-  // 4. Safe Goals Casting (List<dynamic>)
+  // 4. استقبال الأهداف
   final List<dynamic> fetchedGoals = (results[3] as List<dynamic>?) ?? [];
 
-  // 5. Safe Highlights Casting (Use .cast<Highlight>())
+  // 5. استقبال الملخصات (Highlights) - نفس الحماية
+  final List<dynamic> rawHighlights = (results[4] as List<dynamic>?) ?? [];
   final List<Highlight> fetchedHighlights =
-      (results[4] as List<dynamic>?)?.cast<Highlight>().toList() ?? [];
+      rawHighlights.map<Highlight>((item) {
+    if (item is Highlight) return item;
+    if (item is Map) {
+      return Highlight.fromJson(Map<String, dynamic>.from(item));
+    }
+    return Highlight.fromJson({}); // Fallback أمان
+  }).toList();
 
   final List<dynamic> fetchedCategories = (results[5] as List<dynamic>?) ?? [];
 
-  const uuid = Uuid();
-
-  // New API returns channels directly, each channel has categories as nested array.
-  // We need to group channels by category for the existing UI.
+  // --- باقي الكود الخاص بالقنوات زي ما هو ---
   Map<String, Map<String, dynamic>> categoryMap = {};
 
-  // Pre-populate categoryMap with data from fetchedCategories (includes images!)
+  // (نفس كود القنوات والفئات بالظبط بدون تغيير...)
   for (var catData in fetchedCategories) {
     if (catData is! Map) continue;
     final cat = Map<String, dynamic>.from(catData);
@@ -209,19 +222,16 @@ Future<Map<String, dynamic>> _processFetchedData(List<dynamic> results) async {
       'is_premium': cat['is_premium'] ?? false,
       'sort_order': cat['sort_order'] ?? 0,
       'image': cat['image'],
-      'channels': <Map<String, dynamic>>[],
+      'channels': <Map<String, dynamic>>[]
     };
   }
 
   for (var channelData in fetchedChannels) {
     if (channelData is! Map) continue;
     final channel = Map<String, dynamic>.from(channelData);
-
-    // Get categories for this channel
     final categories = channel['categories'] as List<dynamic>? ?? [];
 
     if (categories.isEmpty) {
-      // No category, add to "Uncategorized"
       const unCatId = 'uncategorized';
       categoryMap.putIfAbsent(
           unCatId,
@@ -229,17 +239,14 @@ Future<Map<String, dynamic>> _processFetchedData(List<dynamic> results) async {
                 'id': unCatId,
                 'name': 'قنوات أخرى',
                 'sort_order': 9999,
-                'channels': <Map<String, dynamic>>[],
+                'channels': <Map<String, dynamic>>[]
               });
       (categoryMap[unCatId]!['channels'] as List).add(channel);
     } else {
-      // Add channel to each of its categories
       for (var cat in categories) {
         if (cat is! Map) continue;
         final catId = cat['id']?.toString() ?? uuid.v4();
-
-        // If category wasn't in fetchCategories, add it now (might lack image)
-        final Map<String, dynamic> entry = categoryMap.putIfAbsent(
+        final entry = categoryMap.putIfAbsent(
             catId,
             () => {
                   'id': catId,
@@ -247,52 +254,30 @@ Future<Map<String, dynamic>> _processFetchedData(List<dynamic> results) async {
                   'is_premium': cat['is_premium'] ?? false,
                   'sort_order': cat['sort_order'] ?? 0,
                   'image': cat['image'],
-                  'channels': <Map<String, dynamic>>[],
+                  'channels': <Map<String, dynamic>>[]
                 });
-
         (entry['channels'] as List).add(channel);
       }
     }
   }
 
-  // Convert to list and sort by sort_order
   List<Map<String, dynamic>> processedChannels = categoryMap.values.toList();
-  processedChannels.sort((a, b) {
-    final orderA = a['sort_order'] as int? ?? 0;
-    final orderB = b['sort_order'] as int? ?? 0;
-    return orderA.compareTo(orderB);
-  });
+  processedChannels.sort((a, b) =>
+      (a['sort_order'] as int? ?? 0).compareTo(b['sort_order'] as int? ?? 0));
 
-  debugPrint(
-      "DEBUG PROCESS: Final Processed Channels Count in Map: ${processedChannels.length}"); // ADDED
-
-  // Sort news by date (descending)
+  // ترتيب الأخبار والأهداف
   fetchedNews.sort((a, b) {
-    final bool aHasDate = a is Map && a['date'] != null;
-    final bool bHasDate = b is Map && b['date'] != null;
-    if (!aHasDate && !bHasDate) return 0;
-    if (!aHasDate) return 1;
-    if (!bHasDate) return -1;
     try {
-      final dateA = DateTime.parse(a['date'].toString());
-      final dateB = DateTime.parse(b['date'].toString());
-      return dateB.compareTo(dateA);
+      return DateTime.parse(b['date'].toString())
+          .compareTo(DateTime.parse(a['date'].toString()));
     } catch (e) {
       return 0;
     }
   });
-
-  // Sort goals by createdAt (descending)
   fetchedGoals.sort((a, b) {
-    final bool aHasDate = a is Map && a['createdAt'] != null;
-    final bool bHasDate = b is Map && b['createdAt'] != null;
-    if (!aHasDate && !bHasDate) return 0;
-    if (!aHasDate) return 1;
-    if (!bHasDate) return -1;
     try {
-      final dateA = DateTime.parse(a['createdAt'].toString());
-      final dateB = DateTime.parse(b['createdAt'].toString());
-      return dateB.compareTo(dateA);
+      return DateTime.parse(b['createdAt'].toString())
+          .compareTo(DateTime.parse(a['createdAt'].toString()));
     } catch (e) {
       return 0;
     }
@@ -1223,23 +1208,18 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
           return;
         }
 
-        // HIGHLIGHTS: Extract directly because custom objects don't serialize through compute()
-        final List<Highlight> fetchedHighlightsDirectly =
-            (fetchedResults[4] as List<Highlight>?) ?? [];
-
         try {
-          // RESTORED COMPUTE FOR PERFORMANCE (excludes highlights)
-          final processedData =
-              await compute(_processFetchedData, fetchedResults);
+          // 🛑 OPTIMIZATION: Process directly on Main Thread to avoid Web Isolate Serialization Crash
+          debugPrint('Processing data on Main Thread (Authenticated)...');
+          final processedData = await _processFetchedData(fetchedResults);
+
           if (mounted) {
             setState(() {
               channels = processedData['channels'] ?? [];
               news = processedData['news'] ?? [];
               matches = processedData['matches'] ?? [];
               goals = processedData['goals'] ?? [];
-              highlights =
-                  fetchedHighlightsDirectly; // Use directly from main thread
-              // Use fallback assignment in case search query is empty
+              highlights = processedData['highlights'] ?? [];
               _filteredChannels = channels;
 
               _isLoading = false;
@@ -1247,19 +1227,11 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
             });
           }
         } catch (e) {
-          debugPrint('Compute failed, falling back to main thread: $e');
-          // Fallback to non-compute if it fails serialization
-          final processedData = await _processFetchedData(fetchedResults);
+          debugPrint('Error processing data: $e');
           if (mounted) {
             setState(() {
-              channels = processedData['channels'] ?? [];
-              news = processedData['news'] ?? [];
-              matches = processedData['matches'] ?? [];
-              goals = processedData['goals'] ?? [];
-              highlights =
-                  fetchedHighlightsDirectly; // Use directly - already extracted
-              _filteredChannels = channels;
               _isLoading = false;
+              _hasError = true;
               if (kIsWeb) removeWebSplash();
             });
           }
@@ -1323,36 +1295,29 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
       return;
     }
 
-    // Extract highlights directly (custom objects don't serialize through compute)
-    final List<Highlight> guestHighlights =
-        (fetchedResults[4] as List<Highlight>?) ?? [];
-
     try {
-      final processedData = await compute(_processFetchedData, fetchedResults);
+      // 🛑 OPTIMIZATION: Process directly on Main Thread to avoid Web Isolate Serialization Crash
+      debugPrint('Processing data on Main Thread...');
+      final processedData = await _processFetchedData(fetchedResults);
+
       if (mounted) {
         setState(() {
           channels = processedData['channels'] ?? [];
           news = processedData['news'] ?? [];
           matches = processedData['matches'] ?? [];
           goals = processedData['goals'] ?? [];
-          highlights = guestHighlights; // ADD MISSING ASSIGNMENT
-          _filteredChannels = channels; // FIX MISSING ASSIGNMENT
+          highlights = processedData['highlights'] ?? [];
+          _filteredChannels = channels;
           _isLoading = false;
           if (kIsWeb) removeWebSplash();
         });
       }
     } catch (e) {
-      debugPrint('Error processing data with compute: $e');
-      final processedData = await _processFetchedData(fetchedResults);
+      debugPrint('Error processing data: $e');
       if (mounted) {
         setState(() {
-          channels = processedData['channels'] ?? [];
-          news = processedData['news'] ?? [];
-          matches = processedData['matches'] ?? [];
-          goals = processedData['goals'] ?? [];
-          highlights = guestHighlights; // ADD MISSING ASSIGNMENT
-          _filteredChannels = channels; // FIX MISSING ASSIGNMENT
           _isLoading = false;
+          _hasError = true;
           if (kIsWeb) removeWebSplash();
         });
       }
@@ -1913,8 +1878,8 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
             final fetchedChannels = results[0];
             final fetchedCategories = results[1];
 
-            final processedChannels = await compute(
-                _processRefreshedChannelsData,
+            // 🛑 OPTIMIZATION: Process directly on Main Thread
+            final processedChannels = await _processRefreshedChannelsData(
                 [fetchedChannels, fetchedCategories]);
 
             if (mounted) {
@@ -1937,8 +1902,8 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
         case 1:
           try {
             final fetchedNews = await ApiService.fetchNews();
-            final processedNews =
-                await compute(_processRefreshedNewsData, fetchedNews);
+            // 🛑 OPTIMIZATION: Process directly on Main Thread
+            final processedNews = await _processRefreshedNewsData(fetchedNews);
 
             if (mounted) {
               setState(() {
@@ -1958,8 +1923,9 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
         case 2:
           try {
             final fetchedGoals = await ApiService.fetchGoals();
+            // 🛑 OPTIMIZATION: Process directly on Main Thread
             final processedGoals =
-                await compute(_processRefreshedGoalsData, fetchedGoals);
+                await _processRefreshedGoalsData(fetchedGoals);
 
             if (mounted) {
               setState(() {

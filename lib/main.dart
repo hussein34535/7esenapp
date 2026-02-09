@@ -175,43 +175,58 @@ Future<void> _initializeDeviceId() async {
 Future<Map<String, dynamic>> _processFetchedData(List<dynamic> results) async {
   final uuid = Uuid();
 
-  // 1. استقبال القنوات
+  // 1. القنوات
   final List<dynamic> fetchedChannels = (results[0] as List<dynamic>?) ?? [];
 
-  // 2. استقبال الأخبار
+  // 2. الأخبار
   final List<dynamic> fetchedNews = (results[1] as List<dynamic>?) ?? [];
 
-  // 3. استقبال المباريات (هنا كان سبب الكراش) 🚨
-  // التعديل: بنفحص كل عنصر، لو هو Match ناخده، ولو Map نحوله
+  // 3. المباريات (التعديل النهائي للويب) 🛡️
   final List<dynamic> rawMatches = (results[2] as List<dynamic>?) ?? [];
-  final List<Match> fetchedMatches = rawMatches.map<Match>((item) {
-    if (item is Match) return item;
-    if (item is Map) {
-      return Match.fromJson(Map<String, dynamic>.from(item));
-    }
-    return Match.fromJson({}); // Fallback أمان
-  }).toList();
+  final List<Match> fetchedMatches = [];
 
-  // 4. استقبال الأهداف
+  for (var item in rawMatches) {
+    try {
+      if (item is Match) {
+        fetchedMatches.add(item);
+      } else if (item is Map) {
+        fetchedMatches.add(Match.fromJson(Map<String, dynamic>.from(item)));
+      } else {
+        // Fallback for weird web objects
+        fetchedMatches.add(Match.fromJson({}));
+      }
+    } catch (e) {
+      debugPrint("Error parsing match: $e");
+    }
+  }
+
+  // 4. الأهداف
   final List<dynamic> fetchedGoals = (results[3] as List<dynamic>?) ?? [];
 
-  // 5. استقبال الملخصات (Highlights) - نفس الحماية
+  // 5. الملخصات (التعديل النهائي للويب) 🛡️
   final List<dynamic> rawHighlights = (results[4] as List<dynamic>?) ?? [];
-  final List<Highlight> fetchedHighlights =
-      rawHighlights.map<Highlight>((item) {
-    if (item is Highlight) return item;
-    if (item is Map) {
-      return Highlight.fromJson(Map<String, dynamic>.from(item));
+  final List<Highlight> fetchedHighlights = [];
+
+  for (var item in rawHighlights) {
+    try {
+      if (item is Highlight) {
+        fetchedHighlights.add(item);
+      } else if (item is Map) {
+        fetchedHighlights
+            .add(Highlight.fromJson(Map<String, dynamic>.from(item)));
+      } else {
+        fetchedHighlights.add(Highlight.fromJson({}));
+      }
+    } catch (e) {
+      debugPrint("Error parsing highlight: $e");
     }
-    return Highlight.fromJson({}); // Fallback أمان
-  }).toList();
+  }
 
   final List<dynamic> fetchedCategories = (results[5] as List<dynamic>?) ?? [];
 
-  // --- باقي الكود الخاص بالقنوات زي ما هو ---
+  // --- باقي الكود (معالجة القنوات) زي ما هو بالظبط ---
   Map<String, Map<String, dynamic>> categoryMap = {};
 
-  // (نفس كود القنوات والفئات بالظبط بدون تغيير...)
   for (var catData in fetchedCategories) {
     if (catData is! Map) continue;
     final cat = Map<String, dynamic>.from(catData);
@@ -265,7 +280,6 @@ Future<Map<String, dynamic>> _processFetchedData(List<dynamic> results) async {
   processedChannels.sort((a, b) =>
       (a['sort_order'] as int? ?? 0).compareTo(b['sort_order'] as int? ?? 0));
 
-  // ترتيب الأخبار والأهداف
   fetchedNews.sort((a, b) {
     try {
       return DateTime.parse(b['date'].toString())

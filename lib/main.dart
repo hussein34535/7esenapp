@@ -61,8 +61,7 @@ Future<void> main() async {
           defaultTargetPlatform == TargetPlatform.iOS)) {
     await flutterLocalNotificationsPlugin
         .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >()
+            AndroidFlutterLocalNotificationsPlugin>()
         ?.requestNotificationsPermission();
   }
 
@@ -137,31 +136,47 @@ Future<void> main() async {
   }
 
   // 2. Initialize Sentry and Run App
-  await SentryFlutter.init(
-    (options) {
-      options.dsn =
-          'https://497e74778a74137c33499f17b57c3efa@o4510853875826688.ingest.de.sentry.io/4510853923012688';
-      options.tracesSampleRate = 1.0;
-    },
-    appRunner: () {
-      runApp(
-        ChangeNotifierProvider(
-          create: (_) => ThemeProvider(),
-          child: MyApp(initFuture: initFuture),
-        ),
-      );
+  // 2. Initialize Sentry and Run App Safe
+  try {
+    await SentryFlutter.init(
+      (options) {
+        options.dsn =
+            'https://497e74778a74137c33499f17b57c3efa@o4510853875826688.ingest.de.sentry.io/4510853923012688';
+        options.tracesSampleRate = 1.0;
+      },
+      appRunner: () {
+        runApp(
+          ChangeNotifierProvider(
+            create: (_) => ThemeProvider(),
+            child: MyApp(initFuture: initFuture),
+          ),
+        );
 
-      // 3. Remove Web Splash Immediately (Moved inside appRunner to ensure UI is ready)
-      if (kIsWeb) {
-        try {
-          registerVidstackPlayer();
-          removeWebSplash();
-        } catch (e) {
-          debugPrint("Vidstack Reg/Splash Remove Error: $e");
+        // 3. Remove Web Splash Immediately
+        if (kIsWeb) {
+          try {
+            registerVidstackPlayer();
+            removeWebSplash();
+          } catch (e) {
+            debugPrint("Vidstack Reg/Splash Remove Error: $e");
+          }
         }
-      }
-    },
-  );
+      },
+    );
+  } catch (e) {
+    debugPrint("Sentry Init Failed (Running App Anyway): $e");
+    // Fallback if Sentry fails
+    runApp(
+      ChangeNotifierProvider(
+        create: (_) => ThemeProvider(),
+        child: MyApp(initFuture: initFuture),
+      ),
+    );
+    if (kIsWeb) {
+      registerVidstackPlayer();
+      removeWebSplash();
+    }
+  }
 }
 
 Future<void> _initializeDeviceId() async {
@@ -459,8 +474,8 @@ class MyApp extends StatelessWidget {
               theme: ThemeData(
                 brightness: Brightness.light,
                 primaryColor: themeProvider.getPrimaryColor(false),
-                scaffoldBackgroundColor: themeProvider
-                    .getScaffoldBackgroundColor(false),
+                scaffoldBackgroundColor:
+                    themeProvider.getScaffoldBackgroundColor(false),
                 cardColor: themeProvider.getCardColor(false),
                 colorScheme: ColorScheme.light(
                   primary: themeProvider.getPrimaryColor(false),
@@ -496,8 +511,8 @@ class MyApp extends StatelessWidget {
               darkTheme: ThemeData(
                 brightness: Brightness.dark,
                 primaryColor: themeProvider.getPrimaryColor(true),
-                scaffoldBackgroundColor: themeProvider
-                    .getScaffoldBackgroundColor(true),
+                scaffoldBackgroundColor:
+                    themeProvider.getScaffoldBackgroundColor(true),
                 cardColor: themeProvider.getCardColor(true),
                 colorScheme: ColorScheme.dark(
                   primary: themeProvider.getPrimaryColor(true),
@@ -527,13 +542,13 @@ class MyApp extends StatelessWidget {
               routes: {
                 '/pwa_install': (context) => const PwaInstallScreen(),
                 '/home': (context) => HomePage(
-                  key: homeKey,
-                  onThemeChanged: (isDarkMode) {
-                    themeProvider.setThemeMode(
-                      isDarkMode ? ThemeMode.dark : ThemeMode.light,
-                    );
-                  },
-                ),
+                      key: homeKey,
+                      onThemeChanged: (isDarkMode) {
+                        themeProvider.setThemeMode(
+                          isDarkMode ? ThemeMode.dark : ThemeMode.light,
+                        );
+                      },
+                    ),
                 '/Notification_screen': (context) => const NotificationPage(),
               },
               navigatorKey: navigatorKey,
@@ -967,8 +982,7 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
     DateTime? expiryDateTime;
 
     // Handle multiple formats: subscriptionEnd (API), subscriptionExpiry/expiryDate (Old Firestore)
-    final dynamic timestamp =
-        data['subscriptionEnd'] ??
+    final dynamic timestamp = data['subscriptionEnd'] ??
         data['subscriptionExpiry'] ??
         data['expiryDate'];
 
@@ -1182,8 +1196,7 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
           final isSub = userData['isSubscribed'] == true;
           DateTime? expiryDateTime;
           // Handle multiple formats: subscriptionEnd (API), subscriptionExpiry/expiryDate (Old Firestore)
-          final dynamic timestamp =
-              userData['subscriptionEnd'] ??
+          final dynamic timestamp = userData['subscriptionEnd'] ??
               userData['subscriptionExpiry'] ??
               userData['expiryDate'];
 
@@ -1525,98 +1538,99 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
       barrierDismissible: false,
       barrierColor: Colors.black.withAlpha((0.8 * 255).round()),
       transitionDuration: const Duration(milliseconds: 200),
-      pageBuilder:
-          (
-            BuildContext buildContext,
-            Animation<double> animation,
-            Animation<double> secondaryAnimation,
-          ) {
-            return PopScope(
-              canPop: false,
-              child: Scaffold(
-                backgroundColor: Theme.of(
-                  context,
-                ).scaffoldBackgroundColor.withAlpha((255 * 0.9).round()),
-                body: Center(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(20.0),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: <Widget>[
-                            Text(
-                              "⚠️ تحديث إجباري",
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.headlineSmall
-                                  ?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 20),
-                            Text(
-                              "هناك تحديث جديد إلزامي للتطبيق. الرجاء التحديث للاستمرار في استخدام التطبيق.",
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                            const SizedBox(height: 30),
-                            ElevatedButton(
-                              onPressed: () async {
-                                final Uri uri = Uri.parse(updateUrl);
-                                try {
-                                  if (await canLaunchUrl(uri)) {
-                                    await launchUrl(
-                                      uri,
-                                      mode: LaunchMode.externalApplication,
-                                    );
-                                  } else {
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'لا يمكن فتح رابط التحديث.',
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  }
-                                } catch (e) {
-                                  if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'حدث خطأ عند فتح الرابط.',
-                                        ),
+      pageBuilder: (
+        BuildContext buildContext,
+        Animation<double> animation,
+        Animation<double> secondaryAnimation,
+      ) {
+        return PopScope(
+          canPop: false,
+          child: Scaffold(
+            backgroundColor: Theme.of(
+              context,
+            ).scaffoldBackgroundColor.withAlpha((255 * 0.9).round()),
+            body: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24.0),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: <Widget>[
+                        Text(
+                          "⚠️ تحديث إجباري",
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineSmall
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 20),
+                        Text(
+                          "هناك تحديث جديد إلزامي للتطبيق. الرجاء التحديث للاستمرار في استخدام التطبيق.",
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 30),
+                        ElevatedButton(
+                          onPressed: () async {
+                            final Uri uri = Uri.parse(updateUrl);
+                            try {
+                              if (await canLaunchUrl(uri)) {
+                                await launchUrl(
+                                  uri,
+                                  mode: LaunchMode.externalApplication,
+                                );
+                              } else {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(
+                                    context,
+                                  ).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'لا يمكن فتح رابط التحديث.',
                                       ),
-                                    );
-                                  }
+                                    ),
+                                  );
                                 }
-                              },
-                              child: const Padding(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 25,
-                                  vertical: 12,
-                                ),
-                                child: Text(
-                                  "تحديث الآن",
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 18,
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'حدث خطأ عند فتح الرابط.',
+                                    ),
                                   ),
-                                ),
+                                );
+                              }
+                            }
+                          },
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 25,
+                              vertical: 12,
+                            ),
+                            child: Text(
+                              "تحديث الآن",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
                               ),
                             ),
-                          ],
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ),
               ),
-            );
-          },
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -1750,33 +1764,30 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     child: _userProfileImage != null
                         ? null
                         : (_userName != null && _userName!.isNotEmpty
-                              ? Text(
-                                  _userName![0].toUpperCase(),
-                                  style: TextStyle(
-                                    color: _isSubscribed
-                                        ? packageColor
-                                        : Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize:
-                                        (!kIsWeb &&
-                                            defaultTargetPlatform ==
-                                                TargetPlatform.windows)
-                                        ? 18
-                                        : 12,
-                                  ),
-                                )
-                              : Icon(
-                                  Icons.person,
+                            ? Text(
+                                _userName![0].toUpperCase(),
+                                style: TextStyle(
                                   color: _isSubscribed
                                       ? packageColor
                                       : Colors.white,
-                                  size:
-                                      (!kIsWeb &&
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: (!kIsWeb &&
                                           defaultTargetPlatform ==
                                               TargetPlatform.windows)
-                                      ? 24
-                                      : 16,
-                                )),
+                                      ? 18
+                                      : 12,
+                                ),
+                              )
+                            : Icon(
+                                Icons.person,
+                                color:
+                                    _isSubscribed ? packageColor : Colors.white,
+                                size: (!kIsWeb &&
+                                        defaultTargetPlatform ==
+                                            TargetPlatform.windows)
+                                    ? 24
+                                    : 16,
+                              )),
                   ),
                 ),
                 if (_isSubscribed && _subscriptionExpiryDays != null)
@@ -2308,8 +2319,8 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         ? RichText(
                             textAlign:
                                 Directionality.of(context) == TextDirection.rtl
-                                ? TextAlign.right
-                                : TextAlign.left,
+                                    ? TextAlign.right
+                                    : TextAlign.left,
                             text: TextSpan(
                               style: const TextStyle(
                                 fontSize: 22,
@@ -2326,23 +2337,22 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                     fontWeight: FontWeight.bold,
                                     foreground: _isDarkMode
                                         ? (Paint()
-                                            ..shader =
-                                                LinearGradient(
-                                                  colors: <Color>[
-                                                    Colors.blue.shade800,
-                                                    Colors.deepPurple.shade700,
-                                                    Colors.blue.shade500,
-                                                  ],
-                                                  begin: Alignment.centerLeft,
-                                                  end: Alignment.centerRight,
-                                                ).createShader(
-                                                  const Rect.fromLTWH(
-                                                    0.0,
-                                                    0.0,
-                                                    200.0,
-                                                    70.0,
-                                                  ),
-                                                ))
+                                          ..shader = LinearGradient(
+                                            colors: <Color>[
+                                              Colors.blue.shade800,
+                                              Colors.deepPurple.shade700,
+                                              Colors.blue.shade500,
+                                            ],
+                                            begin: Alignment.centerLeft,
+                                            end: Alignment.centerRight,
+                                          ).createShader(
+                                            const Rect.fromLTWH(
+                                              0.0,
+                                              0.0,
+                                              200.0,
+                                              70.0,
+                                            ),
+                                          ))
                                         : null,
                                     color: _isDarkMode
                                         ? null

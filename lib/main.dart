@@ -54,7 +54,13 @@ SharedPreferences? prefs;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  MediaKit.ensureInitialized(); // Initialize MediaKit
+
+  // Initialize MediaKit safely
+  try {
+    MediaKit.ensureInitialized();
+  } catch (e) {
+    debugPrint("MediaKit Init Error: $e");
+  }
 
   if (!kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.android ||
@@ -92,8 +98,12 @@ Future<void> main() async {
   // Initialize Currency Service
   CurrencyService.init();
 
-  // 0. LOAD FONTS FIRST - Prevents "Squares" glitch
-  await GoogleFonts.pendingFonts([GoogleFonts.cairo()]);
+  // 0. LOAD FONTS FIRST
+  try {
+    await GoogleFonts.pendingFonts([GoogleFonts.cairo()]);
+  } catch (e) {
+    debugPrint("Font Loading Error: $e");
+  }
 
   // 1. Initialize Firebase & Services FIRST (Required for authenticated data fetch on startup)
   try {

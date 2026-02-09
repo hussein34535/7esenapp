@@ -52,6 +52,7 @@ dependencies:
   media_kit_libs_windows_video: ^1.0.11
   media_kit_libs_android_video: ^1.0.12 # Added for Android video support
   video_thumbnail: ^0.5.3 # Added for extracting video thumbnails on mobile
+  sentry_flutter: ^9.12.0
 
 
   

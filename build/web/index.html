@@ -44,7 +44,7 @@
   <script>
     // The value below is injected by flutter build, do not touch.
     // The value below is injected by flutter build, do not touch.
-    var serviceWorkerVersion = '"3402048180"';
+    var serviceWorkerVersion = '"3349597722"';
   </script>
 
   <!-- Removed legacy flutter.js -->
@@ -192,6 +192,23 @@
       return window.matchMedia('(display-mode: standalone)').matches ||
         window.navigator.standalone === true;
     };
+  </script>
+
+  <!-- ✅ Firebase Compat (iOS Fix) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+  <script>
+    var firebaseConfig = {
+      apiKey: "AIzaSyC01PEs2nFUXrwxKLvjOKkdFHM18DBO_CA",
+      authDomain: "esen-notifications.firebaseapp.com",
+      projectId: "esen-notifications",
+      storageBucket: "esen-notifications.firebasestorage.app",
+      messagingSenderId: "555639744428",
+      appId: "1:555639744428:web:27822969de854b937d3c09",
+      measurementId: "G-Y80JLHBVRB"
+    };
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
   </script>
 
   <!-- ✅ Flutter Initialization -->

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:hesen/services/auth_service.dart';
 import 'package:hesen/screens/login_screen.dart';
@@ -22,16 +23,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchUserData();
+    // Prevent UI freeze on Web by delaying data fetch slightly
+    Future.delayed(Duration.zero, () {
+      _fetchUserData();
+    });
   }
 
   Future<void> _fetchUserData() async {
-    final data = await _authService.getUserData();
-    if (mounted) {
-      setState(() {
-        _userData = data;
-        _isLoading = false;
-      });
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        try {
+          await user.reload(); // Force refresh auth token
+        } catch (e) {
+          debugPrint("Web Auth Warning: $e");
+        }
+      }
+
+      final data = await _authService.getUserData();
+      if (mounted) {
+        setState(() {
+          _userData = data;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching user data: $e");
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 

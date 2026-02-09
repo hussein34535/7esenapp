@@ -1,3 +1,4 @@
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:media_kit/media_kit.dart'; // MediaKit
 import 'package:flutter/material.dart';
@@ -52,147 +53,115 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 SharedPreferences? prefs;
 
 Future<void> main() async {
-  runZonedGuarded<Future<void>>(() async {
-    WidgetsFlutterBinding.ensureInitialized();
-    MediaKit.ensureInitialized(); // Initialize MediaKit
+  WidgetsFlutterBinding.ensureInitialized();
+  MediaKit.ensureInitialized(); // Initialize MediaKit
 
-    if (!kIsWeb &&
-        (defaultTargetPlatform == TargetPlatform.android ||
-            defaultTargetPlatform == TargetPlatform.iOS)) {
-      await flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
-          ?.requestNotificationsPermission();
-    }
-
-    // WINDOW MANAGER INIT (Desktop)
-    if (!kIsWeb &&
-        (defaultTargetPlatform == TargetPlatform.windows ||
-            defaultTargetPlatform == TargetPlatform.linux ||
-            defaultTargetPlatform == TargetPlatform.macOS)) {
-      try {
-        await windowManager.ensureInitialized();
-        WindowOptions windowOptions = const WindowOptions(
-          size: Size(1280, 720),
-          center: true,
-          backgroundColor: Colors.black,
-          skipTaskbar: false,
-          titleBarStyle: TitleBarStyle.normal,
-        );
-        windowManager.waitUntilReadyToShow(windowOptions, () async {
-          await windowManager.maximize(); // Force maximize on start
-          await windowManager.show();
-          await windowManager.focus();
-        });
-      } catch (e) {
-        debugPrint("WindowManager Init Failed (Native mixin missing?): $e");
-      }
-    }
-
-    // Initialize Currency Service
-    CurrencyService.init();
-
-    // REDIRECT LOGS TO CONSOLE OVERLAY REMOVED
-    FlutterError.onError = (FlutterErrorDetails details) {
-      FlutterError.presentError(details);
-      // Only display critical UI error if it's NOT a Firebase init error that we can ignore
-      if (details.exception.toString().contains("Firebase") ||
-          details.exception.toString().contains("Null check")) {
-        debugPrint("Ignored Firebase/Null Warning: ${details.exception}");
-      } else {
-        debugPrint("FLUTTER ERROR: ${details.exception}");
-        _displayError(details.exception, details.stack);
-      }
-    };
-
-    // Override print removed
-    // void log(String msg) => LogConsole.log(msg);
-    // debugPrint = ... removed
-
-    // 0. LOAD FONTS FIRST - Prevents "Squares" glitch
-    await GoogleFonts.pendingFonts([
-      GoogleFonts.cairo(),
-    ]);
-
-    // 1. Initialize Firebase & Services FIRST (Required for authenticated data fetch on startup)
-    try {
-      if (Firebase.apps.isEmpty) {
-        await Firebase.initializeApp(
-          options: DefaultFirebaseOptions.currentPlatform,
-        );
-      }
-
-      // Windows Platform Threading Error Fix: Disable persistence which can unstabilize the bridge
-      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
-        FirebaseFirestore.instance.settings =
-            const Settings(persistenceEnabled: false);
-      }
-
-      debugPrint("Firebase initialized successfully.");
-
-      // Wait for auth state to be restored (Robust version)
-      // Auth check removed to prevent startup hang
-      debugPrint("Proceeding to app start...");
-    } catch (e) {
-      debugPrint("Firebase Init Error: $e");
-    }
-
-    // 2. START APP
-    final initFuture = _initializeDeviceId();
-    runApp(
-      ChangeNotifierProvider(
-        create: (_) => ThemeProvider(),
-        child: MyApp(initFuture: initFuture),
-      ),
-    );
-
-    // 3. Remove Web Splash Immediately
-    if (kIsWeb) {
-      try {
-        registerVidstackPlayer();
-        removeWebSplash();
-      } catch (e) {
-        debugPrint("Vidstack Reg/Splash Remove Error: $e");
-      }
-    }
-
-    // 4. Background Config
-    try {
-      await dotenv.load(fileName: ".env");
-    } catch (e) {
-      debugPrint(".env warning (safely ignored).");
-    }
-
-    // Initialize other services that depend on Firebase
-    // Note: Some services like Messaging might not support Windows yet
-    if (!kIsWeb && defaultTargetPlatform != TargetPlatform.windows) {
-      try {
-        final firebaseApi = FirebaseApi();
-        firebaseApi.initNotification();
-      } catch (e) {
-        debugPrint("Notification Init Error: $e");
-      }
-    }
-  }, (error, stack) {
-    debugPrint("ZONED ERROR: $error");
-    if (!error.toString().contains("Firebase") &&
-        !error.toString().contains("Null check")) {
-      _displayError(error, stack);
-    }
-  });
-}
-
-// Fallback error UI - DO NOT call runApp here to avoid Zone mismatch!
-void _displayError(dynamic error, StackTrace? stack) {
-  // Just log the error - cannot call runApp from inside runZonedGuarded
-  debugPrint("CRITICAL ERROR: $error");
-  if (stack != null) {
-    debugPrint("STACK: $stack");
+  if (!kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS)) {
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.requestNotificationsPermission();
   }
-  // On web, also print to console
-  if (kIsWeb) {
-    debugPrint("CRITICAL WRAPPER ERROR: $error\n$stack");
+
+  // WINDOW MANAGER INIT (Desktop)
+  if (!kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.windows ||
+          defaultTargetPlatform == TargetPlatform.linux ||
+          defaultTargetPlatform == TargetPlatform.macOS)) {
+    try {
+      await windowManager.ensureInitialized();
+      WindowOptions windowOptions = const WindowOptions(
+        size: Size(1280, 720),
+        center: true,
+        backgroundColor: Colors.black,
+        skipTaskbar: false,
+        titleBarStyle: TitleBarStyle.normal,
+      );
+      windowManager.waitUntilReadyToShow(windowOptions, () async {
+        await windowManager.maximize(); // Force maximize on start
+        await windowManager.show();
+        await windowManager.focus();
+      });
+    } catch (e) {
+      debugPrint("WindowManager Init Failed (Native mixin missing?): $e");
+    }
   }
+
+  // Initialize Currency Service
+  CurrencyService.init();
+
+  // 0. LOAD FONTS FIRST - Prevents "Squares" glitch
+  await GoogleFonts.pendingFonts([
+    GoogleFonts.cairo(),
+  ]);
+
+  // 1. Initialize Firebase & Services FIRST (Required for authenticated data fetch on startup)
+  try {
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    }
+
+    // Windows Platform Threading Error Fix: Disable persistence which can unstabilize the bridge
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
+      FirebaseFirestore.instance.settings =
+          const Settings(persistenceEnabled: false);
+    }
+
+    debugPrint("Firebase initialized successfully.");
+  } catch (e) {
+    debugPrint("Firebase Init Error: $e");
+  }
+
+  // Dashboard / Telemetry
+  final initFuture = _initializeDeviceId();
+
+  // 4. Background Config
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint(".env warning (safely ignored).");
+  }
+
+  // Initialize other services that depend on Firebase
+  if (!kIsWeb && defaultTargetPlatform != TargetPlatform.windows) {
+    try {
+      final firebaseApi = FirebaseApi();
+      firebaseApi.initNotification();
+    } catch (e) {
+      debugPrint("Notification Init Error: $e");
+    }
+  }
+
+  // 2. Initialize Sentry and Run App
+  await SentryFlutter.init(
+    (options) {
+      options.dsn =
+          'https://497e74778a74137c33499f17b57c3efa@o4510853875826688.ingest.de.sentry.io/4510853923012688';
+      options.tracesSampleRate = 1.0;
+    },
+    appRunner: () {
+      runApp(
+        ChangeNotifierProvider(
+          create: (_) => ThemeProvider(),
+          child: MyApp(initFuture: initFuture),
+        ),
+      );
+
+      // 3. Remove Web Splash Immediately (Moved inside appRunner to ensure UI is ready)
+      if (kIsWeb) {
+        try {
+          registerVidstackPlayer();
+          removeWebSplash();
+        } catch (e) {
+          debugPrint("Vidstack Reg/Splash Remove Error: $e");
+        }
+      }
+    },
+  );
 }
 
 Future<void> _initializeDeviceId() async {
@@ -204,12 +173,23 @@ Future<void> _initializeDeviceId() async {
 
 // --- Top-level function for background processing ---
 Future<Map<String, dynamic>> _processFetchedData(List<dynamic> results) async {
+  // 1. Safe Channel Casting (List<dynamic>)
   final List<dynamic> fetchedChannels = (results[0] as List<dynamic>?) ?? [];
+
+  // 2. Safe News Casting (List<dynamic>)
   final List<dynamic> fetchedNews = (results[1] as List<dynamic>?) ?? [];
-  final List<Match> fetchedMatches = (results[2] as List<Match>?) ?? [];
+
+  // 3. Safe Match Casting (CRITICAL FIX: Use .cast<Match>())
+  final List<Match> fetchedMatches =
+      (results[2] as List<dynamic>?)?.cast<Match>().toList() ?? [];
+
+  // 4. Safe Goals Casting (List<dynamic>)
   final List<dynamic> fetchedGoals = (results[3] as List<dynamic>?) ?? [];
+
+  // 5. Safe Highlights Casting (Use .cast<Highlight>())
   final List<Highlight> fetchedHighlights =
-      (results[4] as List<Highlight>?) ?? [];
+      (results[4] as List<dynamic>?)?.cast<Highlight>().toList() ?? [];
+
   final List<dynamic> fetchedCategories = (results[5] as List<dynamic>?) ?? [];
 
   const uuid = Uuid();

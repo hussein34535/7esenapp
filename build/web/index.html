@@ -9,6 +9,19 @@
   <meta name="description" content="Watch Live TV and News">
   <meta name="referrer" content="no-referrer">
 
+  <!-- 🔴 FORCE UNREGISTER SERVICE WORKERS IMMEDIATELY -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function (registrations) {
+        for (let registration of registrations) {
+          registration.unregister().then(function (boolean) {
+            console.log('Service Worker Force Unregistered (HEAD): ', boolean);
+          });
+        }
+      });
+    }
+  </script>
+
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -43,8 +56,8 @@
 
   <script>
     // The value below is injected by flutter build, do not touch.
-    // The value below is injected by flutter build, do not touch.
-    var serviceWorkerVersion = '"2656283736"';
+    // var serviceWorkerVersion = '"4236985580"';
+    const serviceWorkerVersion = "4236985580"; // 🔴 DISABLED SW for iOS Stability
   </script>
 
   <!-- Removed legacy flutter.js -->
@@ -171,15 +184,7 @@
     */
 
     // 🔴 FORCE UNREGISTER ALL SERVICE WORKERS (To fix 'TypeError: Response' crash)
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(function (registrations) {
-        for (let registration of registrations) {
-          registration.unregister().then(function (boolean) {
-            console.log('Service Worker Force Unregistered: ', boolean);
-          });
-        }
-      });
-    }
+    // Script moved to head for earlier execution.
 
     // ✅ PWA Install Prompt
     window.deferredPrompt = null;

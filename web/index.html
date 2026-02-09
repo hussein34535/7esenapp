@@ -158,7 +158,8 @@
       }
     };
 
-    // ✅ Service Worker Registration
+    // ✅ Service Worker Registration (DISABLED for iOS stability)
+    /*
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/service-worker.js')
@@ -166,6 +167,7 @@
           .catch(err => console.error('[SW] Failed:', err));
       });
     }
+    */
 
     // ✅ PWA Install Prompt
     window.deferredPrompt = null;
@@ -209,6 +211,14 @@
     };
     // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
+  </script>
+
+  <!-- ✅ vConsole for Mobile Debugging -->
+  <script src="https://unpkg.com/vconsole@latest/dist/vconsole.min.js"></script>
+  <script>
+    // تشغيل الكونسول فقط لو إحنا مش في وضع الـ Debug العادي
+    var vConsole = new VConsole();
+    console.log('vConsole is loaded');
   </script>
 
   <!-- ✅ Flutter Initialization -->

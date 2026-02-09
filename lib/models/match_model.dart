@@ -92,9 +92,26 @@ class Match {
       logoAUrl: extractLogoUrl(json['logo_a']),
       logoBUrl: extractLogoUrl(json['logo_b']),
       isPremium: parseBool(json['is_premium']),
-      streamLinks:
-          parseStreamLinks(json['stream_link'] ?? json['stream_links']),
+      streamLinks: parseStreamLinks(
+        json['stream_link'] ?? json['stream_links'],
+      ),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'team_a': teamA,
+      'team_b': teamB,
+      'match_time': matchTime,
+      'commentator': commentator,
+      'channel': channel,
+      'champion': champion,
+      'logo_a': logoAUrl,
+      'logo_b': logoBUrl,
+      'is_premium': isPremium,
+      'stream_links': streamLinks.map((e) => e.toJson()).toList(),
+    };
   }
 
   /// Check if match has any playable (non-null URL) stream links.
@@ -123,9 +140,9 @@ class StreamLink {
   factory StreamLink.fromJson(Map<String, dynamic> json) {
     return StreamLink(
       name: json['name'] ?? '',
-      url: json['url'] ??
-          json[
-              'link'], // Can be null for premium content, check 'link' fallback
+      url:
+          json['url'] ??
+          json['link'], // Can be null for premium content, check 'link' fallback
       isPremium: json['is_premium'] ?? false,
       quality: json['quality'] ?? json['name'] ?? '',
     );
@@ -213,8 +230,9 @@ class Channel {
       name: json['name'] ?? '',
       logoUrl: extractLogoUrl(json['logo']),
       categories: parseCategories(json['categories']),
-      streamLinks:
-          parseStreamLinks(json['stream_link'] ?? json['stream_links']),
+      streamLinks: parseStreamLinks(
+        json['stream_link'] ?? json['stream_links'],
+      ),
     );
   }
 

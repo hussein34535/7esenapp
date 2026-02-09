@@ -61,7 +61,8 @@ Future<void> main() async {
           defaultTargetPlatform == TargetPlatform.iOS)) {
     await flutterLocalNotificationsPlugin
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.requestNotificationsPermission();
   }
 
@@ -93,9 +94,7 @@ Future<void> main() async {
   CurrencyService.init();
 
   // 0. LOAD FONTS FIRST - Prevents "Squares" glitch
-  await GoogleFonts.pendingFonts([
-    GoogleFonts.cairo(),
-  ]);
+  await GoogleFonts.pendingFonts([GoogleFonts.cairo()]);
 
   // 1. Initialize Firebase & Services FIRST (Required for authenticated data fetch on startup)
   try {
@@ -107,8 +106,9 @@ Future<void> main() async {
 
     // Windows Platform Threading Error Fix: Disable persistence which can unstabilize the bridge
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
-      FirebaseFirestore.instance.settings =
-          const Settings(persistenceEnabled: false);
+      FirebaseFirestore.instance.settings = const Settings(
+        persistenceEnabled: false,
+      );
     }
 
     debugPrint("Firebase initialized successfully.");
@@ -175,50 +175,41 @@ Future<void> _initializeDeviceId() async {
 Future<Map<String, dynamic>> _processFetchedData(List<dynamic> results) async {
   final uuid = Uuid();
 
-  // 1. القنوات
-  final List<dynamic> fetchedChannels = (results[0] as List<dynamic>?) ?? [];
+  // 1 & 2: القنوات والأخبار
+  final fetchedChannels = results[0] ?? [];
+  final fetchedNews = results[1] ?? [];
 
-  // 2. الأخبار
-  final List<dynamic> fetchedNews = (results[1] as List<dynamic>?) ?? [];
-
-  // 3. المباريات (التعديل النهائي للويب) 🛡️
-  final List<dynamic> rawMatches = (results[2] as List<dynamic>?) ?? [];
+  // 3. المباريات - تعديل "أمان الأمان" 🛡️
   final List<Match> fetchedMatches = [];
-
-  for (var item in rawMatches) {
-    try {
-      if (item is Match) {
-        fetchedMatches.add(item);
-      } else if (item is Map) {
-        fetchedMatches.add(Match.fromJson(Map<String, dynamic>.from(item)));
-      } else {
-        // Fallback for weird web objects
-        fetchedMatches.add(Match.fromJson({}));
+  if (results[2] != null && results[2] is List) {
+    for (var item in (results[2] as List)) {
+      try {
+        // بنحول لـ Map بشكل صريح قبل ما نبعت للـ fromJson
+        final Map<String, dynamic> data = Map<String, dynamic>.from(
+          item is Match ? item.toJson() : item,
+        );
+        fetchedMatches.add(Match.fromJson(data));
+      } catch (e) {
+        debugPrint("Match error: $e");
       }
-    } catch (e) {
-      debugPrint("Error parsing match: $e");
     }
   }
 
   // 4. الأهداف
   final List<dynamic> fetchedGoals = (results[3] as List<dynamic>?) ?? [];
 
-  // 5. الملخصات (التعديل النهائي للويب) 🛡️
-  final List<dynamic> rawHighlights = (results[4] as List<dynamic>?) ?? [];
+  // 5. الملخصات - تعديل "أمان الأمان" 🛡️
   final List<Highlight> fetchedHighlights = [];
-
-  for (var item in rawHighlights) {
-    try {
-      if (item is Highlight) {
-        fetchedHighlights.add(item);
-      } else if (item is Map) {
-        fetchedHighlights
-            .add(Highlight.fromJson(Map<String, dynamic>.from(item)));
-      } else {
-        fetchedHighlights.add(Highlight.fromJson({}));
+  if (results[4] != null && results[4] is List) {
+    for (var item in (results[4] as List)) {
+      try {
+        final Map<String, dynamic> data = Map<String, dynamic>.from(
+          item is Highlight ? item.toJson() : item,
+        );
+        fetchedHighlights.add(Highlight.fromJson(data));
+      } catch (e) {
+        debugPrint("Highlight error: $e");
       }
-    } catch (e) {
-      debugPrint("Error parsing highlight: $e");
     }
   }
 
@@ -237,7 +228,7 @@ Future<Map<String, dynamic>> _processFetchedData(List<dynamic> results) async {
       'is_premium': cat['is_premium'] ?? false,
       'sort_order': cat['sort_order'] ?? 0,
       'image': cat['image'],
-      'channels': <Map<String, dynamic>>[]
+      'channels': <Map<String, dynamic>>[],
     };
   }
 
@@ -249,49 +240,55 @@ Future<Map<String, dynamic>> _processFetchedData(List<dynamic> results) async {
     if (categories.isEmpty) {
       const unCatId = 'uncategorized';
       categoryMap.putIfAbsent(
-          unCatId,
-          () => {
-                'id': unCatId,
-                'name': 'قنوات أخرى',
-                'sort_order': 9999,
-                'channels': <Map<String, dynamic>>[]
-              });
+        unCatId,
+        () => {
+          'id': unCatId,
+          'name': 'قنوات أخرى',
+          'sort_order': 9999,
+          'channels': <Map<String, dynamic>>[],
+        },
+      );
       (categoryMap[unCatId]!['channels'] as List).add(channel);
     } else {
       for (var cat in categories) {
         if (cat is! Map) continue;
         final catId = cat['id']?.toString() ?? uuid.v4();
         final entry = categoryMap.putIfAbsent(
-            catId,
-            () => {
-                  'id': catId,
-                  'name': cat['name'] ?? 'Unknown',
-                  'is_premium': cat['is_premium'] ?? false,
-                  'sort_order': cat['sort_order'] ?? 0,
-                  'image': cat['image'],
-                  'channels': <Map<String, dynamic>>[]
-                });
+          catId,
+          () => {
+            'id': catId,
+            'name': cat['name'] ?? 'Unknown',
+            'is_premium': cat['is_premium'] ?? false,
+            'sort_order': cat['sort_order'] ?? 0,
+            'image': cat['image'],
+            'channels': <Map<String, dynamic>>[],
+          },
+        );
         (entry['channels'] as List).add(channel);
       }
     }
   }
 
   List<Map<String, dynamic>> processedChannels = categoryMap.values.toList();
-  processedChannels.sort((a, b) =>
-      (a['sort_order'] as int? ?? 0).compareTo(b['sort_order'] as int? ?? 0));
+  processedChannels.sort(
+    (a, b) =>
+        (a['sort_order'] as int? ?? 0).compareTo(b['sort_order'] as int? ?? 0),
+  );
 
   fetchedNews.sort((a, b) {
     try {
-      return DateTime.parse(b['date'].toString())
-          .compareTo(DateTime.parse(a['date'].toString()));
+      return DateTime.parse(
+        b['date'].toString(),
+      ).compareTo(DateTime.parse(a['date'].toString()));
     } catch (e) {
       return 0;
     }
   });
   fetchedGoals.sort((a, b) {
     try {
-      return DateTime.parse(b['createdAt'].toString())
-          .compareTo(DateTime.parse(a['createdAt'].toString()));
+      return DateTime.parse(
+        b['createdAt'].toString(),
+      ).compareTo(DateTime.parse(a['createdAt'].toString()));
     } catch (e) {
       return 0;
     }
@@ -308,7 +305,8 @@ Future<Map<String, dynamic>> _processFetchedData(List<dynamic> results) async {
 
 // --- New top-level functions for background processing during refresh ---
 Future<List<Map<String, dynamic>>> _processRefreshedChannelsData(
-    List<dynamic> args) async {
+  List<dynamic> args,
+) async {
   final List<dynamic> fetchedChannels = args[0] as List<dynamic>;
   final List<dynamic> fetchedCategories = args[1] as List<dynamic>;
   const uuid = Uuid();
@@ -348,13 +346,14 @@ Future<List<Map<String, dynamic>>> _processRefreshedChannelsData(
       // No category, add to "Uncategorized"
       const unCatId = 'uncategorized';
       categoryMap.putIfAbsent(
-          unCatId,
-          () => {
-                'id': unCatId,
-                'name': 'قنوات أخرى',
-                'sort_order': 9999,
-                'channels': <Map<String, dynamic>>[],
-              });
+        unCatId,
+        () => {
+          'id': unCatId,
+          'name': 'قنوات أخرى',
+          'sort_order': 9999,
+          'channels': <Map<String, dynamic>>[],
+        },
+      );
       (categoryMap[unCatId]!['channels'] as List).add(channel);
     } else {
       // Add channel to each of its categories
@@ -362,15 +361,16 @@ Future<List<Map<String, dynamic>>> _processRefreshedChannelsData(
         if (cat is! Map) continue;
         final catId = cat['id']?.toString() ?? uuid.v4();
         final Map<String, dynamic> entry = categoryMap.putIfAbsent(
-            catId,
-            () => {
-                  'id': catId,
-                  'name': cat['name'] ?? 'Unknown',
-                  'is_premium': cat['is_premium'] ?? false,
-                  'sort_order': cat['sort_order'] ?? 0,
-                  'image': cat['image'],
-                  'channels': <Map<String, dynamic>>[],
-                });
+          catId,
+          () => {
+            'id': catId,
+            'name': cat['name'] ?? 'Unknown',
+            'is_premium': cat['is_premium'] ?? false,
+            'sort_order': cat['sort_order'] ?? 0,
+            'image': cat['image'],
+            'channels': <Map<String, dynamic>>[],
+          },
+        );
         (entry['channels'] as List).add(channel);
       }
     }
@@ -388,7 +388,8 @@ Future<List<Map<String, dynamic>>> _processRefreshedChannelsData(
 }
 
 Future<List<dynamic>> _processRefreshedNewsData(
-    List<dynamic> fetchedNews) async {
+  List<dynamic> fetchedNews,
+) async {
   fetchedNews.sort((a, b) {
     final bool aHasDate = a is Map && a['date'] != null;
     final bool bHasDate = b is Map && b['date'] != null;
@@ -410,7 +411,8 @@ Future<List<dynamic>> _processRefreshedNewsData(
 }
 
 Future<List<dynamic>> _processRefreshedGoalsData(
-    List<dynamic> fetchedGoals) async {
+  List<dynamic> fetchedGoals,
+) async {
   fetchedGoals.sort((a, b) {
     final bool aHasDate = a is Map && a['createdAt'] != null;
     final bool bHasDate = b is Map && b['createdAt'] != null;
@@ -457,8 +459,8 @@ class MyApp extends StatelessWidget {
               theme: ThemeData(
                 brightness: Brightness.light,
                 primaryColor: themeProvider.getPrimaryColor(false),
-                scaffoldBackgroundColor:
-                    themeProvider.getScaffoldBackgroundColor(false),
+                scaffoldBackgroundColor: themeProvider
+                    .getScaffoldBackgroundColor(false),
                 cardColor: themeProvider.getCardColor(false),
                 colorScheme: ColorScheme.light(
                   primary: themeProvider.getPrimaryColor(false),
@@ -472,8 +474,9 @@ class MyApp extends StatelessWidget {
                   brightness: Brightness.light,
                 ),
                 appBarTheme: AppBarTheme(
-                  backgroundColor:
-                      themeProvider.getAppBarBackgroundColor(false),
+                  backgroundColor: themeProvider.getAppBarBackgroundColor(
+                    false,
+                  ),
                   foregroundColor: Colors.white,
                   iconTheme: const IconThemeData(color: Colors.white),
                   titleTextStyle: const TextStyle(
@@ -493,8 +496,8 @@ class MyApp extends StatelessWidget {
               darkTheme: ThemeData(
                 brightness: Brightness.dark,
                 primaryColor: themeProvider.getPrimaryColor(true),
-                scaffoldBackgroundColor:
-                    themeProvider.getScaffoldBackgroundColor(true),
+                scaffoldBackgroundColor: themeProvider
+                    .getScaffoldBackgroundColor(true),
                 cardColor: themeProvider.getCardColor(true),
                 colorScheme: ColorScheme.dark(
                   primary: themeProvider.getPrimaryColor(true),
@@ -524,13 +527,13 @@ class MyApp extends StatelessWidget {
               routes: {
                 '/pwa_install': (context) => const PwaInstallScreen(),
                 '/home': (context) => HomePage(
-                      key: homeKey,
-                      onThemeChanged: (isDarkMode) {
-                        themeProvider.setThemeMode(
-                          isDarkMode ? ThemeMode.dark : ThemeMode.light,
-                        );
-                      },
-                    ),
+                  key: homeKey,
+                  onThemeChanged: (isDarkMode) {
+                    themeProvider.setThemeMode(
+                      isDarkMode ? ThemeMode.dark : ThemeMode.light,
+                    );
+                  },
+                ),
                 '/Notification_screen': (context) => const NotificationPage(),
               },
               navigatorKey: navigatorKey,
@@ -773,15 +776,18 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         await FirebaseAuth.instance.signOut();
                         navigatorKey.currentState?.pushAndRemoveUntil(
                           MaterialPageRoute(
-                              builder: (context) => const LoginScreen()),
+                            builder: (context) => const LoginScreen(),
+                          ),
                           (route) => false,
                         );
                         if (navigatorKey.currentContext != null) {
-                          ScaffoldMessenger.of(navigatorKey.currentContext!)
-                              .showSnackBar(
+                          ScaffoldMessenger.of(
+                            navigatorKey.currentContext!,
+                          ).showSnackBar(
                             const SnackBar(
-                              content:
-                                  Text('تم حظر حسابك. يرجى التواصل مع الدعم.'),
+                              content: Text(
+                                'تم حظر حسابك. يرجى التواصل مع الدعم.',
+                              ),
                               backgroundColor: Colors.red,
                               duration: Duration(seconds: 5),
                             ),
@@ -804,8 +810,9 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       Navigator.of(context).pop();
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                            content: Text('تم تحديث الاسم بنجاح'),
-                            backgroundColor: Colors.green),
+                          content: Text('تم تحديث الاسم بنجاح'),
+                          backgroundColor: Colors.green,
+                        ),
                       );
                     }
                   }
@@ -860,7 +867,9 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _userSubscription = stream.listen((snapshot) {
         if (snapshot.exists && snapshot.data() != null) {
           _updateAppStateWithUserData(
-              snapshot.data() as Map<String, dynamic>, currentDeviceId);
+            snapshot.data() as Map<String, dynamic>,
+            currentDeviceId,
+          );
         }
       });
     }
@@ -907,7 +916,8 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
     const duration = Duration(seconds: 30);
 
     debugPrint(
-        "Windows: Status polling scheduled in ${duration.inSeconds}s (FastMode: Active)");
+      "Windows: Status polling scheduled in ${duration.inSeconds}s (FastMode: Active)",
+    );
 
     _windowsStatusTimer = Timer(duration, () async {
       if (!mounted) return;
@@ -923,7 +933,8 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
           // If we became subscribed, stop fast polling immediately
           if (statusData['isSubscribed'] == true) {
             debugPrint(
-                "Windows: Subscription detected! Stopping fast polling.");
+              "Windows: Subscription detected! Stopping fast polling.",
+            );
             _isFastPollingMode = false;
           }
           _updateAppStateWithUserData(statusData, currentDeviceId);
@@ -937,7 +948,9 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   void _updateAppStateWithUserData(
-      Map<String, dynamic> data, String? currentDeviceId) {
+    Map<String, dynamic> data,
+    String? currentDeviceId,
+  ) {
     if (data['status'] == 'banned') {
       _handleBannedUser();
     }
@@ -954,7 +967,8 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
     DateTime? expiryDateTime;
 
     // Handle multiple formats: subscriptionEnd (API), subscriptionExpiry/expiryDate (Old Firestore)
-    final dynamic timestamp = data['subscriptionEnd'] ??
+    final dynamic timestamp =
+        data['subscriptionEnd'] ??
         data['subscriptionExpiry'] ??
         data['expiryDate'];
 
@@ -972,7 +986,10 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
       final expiryDateOnly = DateTime(
-          expiryDateTime.year, expiryDateTime.month, expiryDateTime.day);
+        expiryDateTime.year,
+        expiryDateTime.month,
+        expiryDateTime.day,
+      );
       final difference = expiryDateOnly.difference(today).inDays;
 
       if (difference > 0) {
@@ -1037,10 +1054,13 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
         context: context,
         barrierDismissible: false,
         builder: (context) => AlertDialog(
-          title: const Text('تم تسجيل الخروج',
-              style: TextStyle(color: Colors.orangeAccent)),
+          title: const Text(
+            'تم تسجيل الخروج',
+            style: TextStyle(color: Colors.orangeAccent),
+          ),
           content: const Text(
-              'تم تسجيل الدخول من جهاز آخر. لا يسمح بفتح الحساب من أكثر من جهاز في نفس الوقت.'),
+            'تم تسجيل الدخول من جهاز آخر. لا يسمح بفتح الحساب من أكثر من جهاز في نفس الوقت.',
+          ),
           actions: [
             TextButton(
               onPressed: () {
@@ -1069,10 +1089,13 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
         context: context,
         barrierDismissible: false,
         builder: (context) => AlertDialog(
-          title:
-              const Text('تم حظر الحساب', style: TextStyle(color: Colors.red)),
+          title: const Text(
+            'تم حظر الحساب',
+            style: TextStyle(color: Colors.red),
+          ),
           content: const Text(
-              'تم حظر حسابك بسبب مخافة الشروط. يرجى التواصل مع الدعم الفني.'),
+            'تم حظر حسابك بسبب مخافة الشروط. يرجى التواصل مع الدعم الفني.',
+          ),
           actions: [
             TextButton(
               onPressed: () {
@@ -1159,7 +1182,8 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
           final isSub = userData['isSubscribed'] == true;
           DateTime? expiryDateTime;
           // Handle multiple formats: subscriptionEnd (API), subscriptionExpiry/expiryDate (Old Firestore)
-          final dynamic timestamp = userData['subscriptionEnd'] ??
+          final dynamic timestamp =
+              userData['subscriptionEnd'] ??
               userData['subscriptionExpiry'] ??
               userData['expiryDate'];
 
@@ -1177,7 +1201,10 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
             final now = DateTime.now();
             final today = DateTime(now.year, now.month, now.day);
             final expiryDateOnly = DateTime(
-                expiryDateTime.year, expiryDateTime.month, expiryDateTime.day);
+              expiryDateTime.year,
+              expiryDateTime.month,
+              expiryDateTime.day,
+            );
             final difference = expiryDateOnly.difference(today).inDays;
 
             if (difference > 0) {
@@ -1480,7 +1507,8 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
-                  'فشل التحقق من التحديث. يرجى التحقق من اتصالك بالإنترنت.'),
+                'فشل التحقق من التحديث. يرجى التحقق من اتصالك بالإنترنت.',
+              ),
               backgroundColor: Colors.red,
             ),
           );
@@ -1497,99 +1525,98 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
       barrierDismissible: false,
       barrierColor: Colors.black.withAlpha((0.8 * 255).round()),
       transitionDuration: const Duration(milliseconds: 200),
-      pageBuilder: (
-        BuildContext buildContext,
-        Animation<double> animation,
-        Animation<double> secondaryAnimation,
-      ) {
-        return PopScope(
-          canPop: false,
-          child: Scaffold(
-            backgroundColor: Theme.of(
-              context,
-            ).scaffoldBackgroundColor.withAlpha((255 * 0.9).round()),
-            body: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24.0),
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: <Widget>[
-                        Text(
-                          "⚠️ تحديث إجباري",
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineSmall
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 20),
-                        Text(
-                          "هناك تحديث جديد إلزامي للتطبيق. الرجاء التحديث للاستمرار في استخدام التطبيق.",
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                        const SizedBox(height: 30),
-                        ElevatedButton(
-                          onPressed: () async {
-                            final Uri uri = Uri.parse(updateUrl);
-                            try {
-                              if (await canLaunchUrl(uri)) {
-                                await launchUrl(
-                                  uri,
-                                  mode: LaunchMode.externalApplication,
-                                );
-                              } else {
-                                if (mounted) {
-                                  ScaffoldMessenger.of(
-                                    context,
-                                  ).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'لا يمكن فتح رابط التحديث.',
-                                      ),
-                                    ),
-                                  );
-                                }
-                              }
-                            } catch (e) {
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'حدث خطأ عند فتح الرابط.',
-                                    ),
-                                  ),
-                                );
-                              }
-                            }
-                          },
-                          child: const Padding(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 25,
-                              vertical: 12,
+      pageBuilder:
+          (
+            BuildContext buildContext,
+            Animation<double> animation,
+            Animation<double> secondaryAnimation,
+          ) {
+            return PopScope(
+              canPop: false,
+              child: Scaffold(
+                backgroundColor: Theme.of(
+                  context,
+                ).scaffoldBackgroundColor.withAlpha((255 * 0.9).round()),
+                body: Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20.0),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: <Widget>[
+                            Text(
+                              "⚠️ تحديث إجباري",
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.headlineSmall
+                                  ?.copyWith(fontWeight: FontWeight.bold),
                             ),
-                            child: Text(
-                              "تحديث الآن",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
+                            const SizedBox(height: 20),
+                            Text(
+                              "هناك تحديث جديد إلزامي للتطبيق. الرجاء التحديث للاستمرار في استخدام التطبيق.",
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                            const SizedBox(height: 30),
+                            ElevatedButton(
+                              onPressed: () async {
+                                final Uri uri = Uri.parse(updateUrl);
+                                try {
+                                  if (await canLaunchUrl(uri)) {
+                                    await launchUrl(
+                                      uri,
+                                      mode: LaunchMode.externalApplication,
+                                    );
+                                  } else {
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'لا يمكن فتح رابط التحديث.',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                } catch (e) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'حدث خطأ عند فتح الرابط.',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 25,
+                                  vertical: 12,
+                                ),
+                                child: Text(
+                                  "تحديث الآن",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ),
-        );
-      },
+            );
+          },
     );
   }
 
@@ -1723,30 +1750,33 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     child: _userProfileImage != null
                         ? null
                         : (_userName != null && _userName!.isNotEmpty
-                            ? Text(
-                                _userName![0].toUpperCase(),
-                                style: TextStyle(
+                              ? Text(
+                                  _userName![0].toUpperCase(),
+                                  style: TextStyle(
+                                    color: _isSubscribed
+                                        ? packageColor
+                                        : Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize:
+                                        (!kIsWeb &&
+                                            defaultTargetPlatform ==
+                                                TargetPlatform.windows)
+                                        ? 18
+                                        : 12,
+                                  ),
+                                )
+                              : Icon(
+                                  Icons.person,
                                   color: _isSubscribed
                                       ? packageColor
                                       : Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: (!kIsWeb &&
+                                  size:
+                                      (!kIsWeb &&
                                           defaultTargetPlatform ==
                                               TargetPlatform.windows)
-                                      ? 18
-                                      : 12,
-                                ),
-                              )
-                            : Icon(
-                                Icons.person,
-                                color:
-                                    _isSubscribed ? packageColor : Colors.white,
-                                size: (!kIsWeb &&
-                                        defaultTargetPlatform ==
-                                            TargetPlatform.windows)
-                                    ? 24
-                                    : 16,
-                              )),
+                                      ? 24
+                                      : 16,
+                                )),
                   ),
                 ),
                 if (_isSubscribed && _subscriptionExpiryDays != null)
@@ -1755,7 +1785,9 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     left: -2,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFF00C853), // Vivid Green (A700)
                         borderRadius: BorderRadius.circular(12),
@@ -1893,8 +1925,10 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
             final fetchedCategories = results[1];
 
             // 🛑 OPTIMIZATION: Process directly on Main Thread
-            final processedChannels = await _processRefreshedChannelsData(
-                [fetchedChannels, fetchedCategories]);
+            final processedChannels = await _processRefreshedChannelsData([
+              fetchedChannels,
+              fetchedCategories,
+            ]);
 
             if (mounted) {
               setState(() {
@@ -1938,8 +1972,9 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
           try {
             final fetchedGoals = await ApiService.fetchGoals();
             // 🛑 OPTIMIZATION: Process directly on Main Thread
-            final processedGoals =
-                await _processRefreshedGoalsData(fetchedGoals);
+            final processedGoals = await _processRefreshedGoalsData(
+              fetchedGoals,
+            );
 
             if (mounted) {
               setState(() {
@@ -2007,9 +2042,7 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
       return const Scaffold(
         backgroundColor: Colors.black,
         body: Center(
-          child: CircularProgressIndicator(
-            color: Color(0xFF7C52D8),
-          ),
+          child: CircularProgressIndicator(color: Color(0xFF7C52D8)),
         ),
       );
     }
@@ -2033,8 +2066,11 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
           child: AppBar(
             elevation: 0,
             leading: IconButton(
-              icon:
-                  const Icon(Icons.menu_rounded, color: Colors.white, size: 28),
+              icon: const Icon(
+                Icons.menu_rounded,
+                color: Colors.white,
+                size: 28,
+              ),
               onPressed: () {
                 showModalBottomSheet(
                   context: context,
@@ -2055,14 +2091,16 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
                               ListTile(
                                 leading: Icon(
                                   Icons.person,
-                                  color:
-                                      Theme.of(context).colorScheme.secondary,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.secondary,
                                   size: 28,
                                 ),
                                 title: Text(
                                   _userName ?? 'المستخدم',
                                   style: const TextStyle(
-                                      fontWeight: FontWeight.bold),
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                                 trailing: IconButton(
                                   icon: const Icon(Icons.edit, size: 20),
@@ -2109,13 +2147,16 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
                               },
                             ),
                             ListTile(
-                              leading: const Icon(Icons.diamond,
-                                  color: Colors.amber),
+                              leading: const Icon(
+                                Icons.diamond,
+                                color: Colors.amber,
+                              ),
                               title: const Text(
                                 'الاشتراك المميز',
                                 style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.amber),
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.amber,
+                                ),
                               ),
                               onTap: () {
                                 Navigator.pop(context);
@@ -2130,9 +2171,10 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             ),
 
                             ListTile(
-                              leading: Icon(Icons.color_lens,
-                                  color:
-                                      Theme.of(context).colorScheme.secondary),
+                              leading: Icon(
+                                Icons.color_lens,
+                                color: Theme.of(context).colorScheme.secondary,
+                              ),
                               title: Text(
                                 'تخصيص الألوان',
                                 style: TextStyle(
@@ -2180,8 +2222,9 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                     );
                                   } else {
                                     if (context.mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
                                         const SnackBar(
                                           content: Text(
                                             'لا يمكن فتح رابط التحديث.',
@@ -2265,8 +2308,8 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         ? RichText(
                             textAlign:
                                 Directionality.of(context) == TextDirection.rtl
-                                    ? TextAlign.right
-                                    : TextAlign.left,
+                                ? TextAlign.right
+                                : TextAlign.left,
                             text: TextSpan(
                               style: const TextStyle(
                                 fontSize: 22,
@@ -2283,16 +2326,23 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                     fontWeight: FontWeight.bold,
                                     foreground: _isDarkMode
                                         ? (Paint()
-                                          ..shader = LinearGradient(
-                                            colors: <Color>[
-                                              Colors.blue.shade800,
-                                              Colors.deepPurple.shade700,
-                                              Colors.blue.shade500,
-                                            ],
-                                            begin: Alignment.centerLeft,
-                                            end: Alignment.centerRight,
-                                          ).createShader(const Rect.fromLTWH(
-                                              0.0, 0.0, 200.0, 70.0)))
+                                            ..shader =
+                                                LinearGradient(
+                                                  colors: <Color>[
+                                                    Colors.blue.shade800,
+                                                    Colors.deepPurple.shade700,
+                                                    Colors.blue.shade500,
+                                                  ],
+                                                  begin: Alignment.centerLeft,
+                                                  end: Alignment.centerRight,
+                                                ).createShader(
+                                                  const Rect.fromLTWH(
+                                                    0.0,
+                                                    0.0,
+                                                    200.0,
+                                                    70.0,
+                                                  ),
+                                                ))
                                         : null,
                                     color: _isDarkMode
                                         ? null
@@ -2369,8 +2419,11 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
             height: 30,
             color: Colors.white,
           ),
-          const Icon(Icons.video_library_rounded,
-              size: 30, color: Colors.white),
+          const Icon(
+            Icons.video_library_rounded,
+            size: 30,
+            color: Colors.white,
+          ),
         ],
         index: _selectedIndex,
         onTap: (index) {
@@ -2389,11 +2442,7 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
-            Icons.error_outline,
-            color: Colors.red,
-            size: 60,
-          ),
+          const Icon(Icons.error_outline, color: Colors.red, size: 60),
           const SizedBox(height: 20),
           Text(
             'حدث خطأ أثناء تحميل البيانات.',
@@ -2433,11 +2482,7 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
-            Icons.error_outline,
-            color: Colors.red,
-            size: 50,
-          ),
+          const Icon(Icons.error_outline, color: Colors.red, size: 50),
           const SizedBox(height: 15),
           Text(
             message,
@@ -2474,9 +2519,11 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
           );
         } else {
           debugPrint(
-              "DEBUG UI: ChannelsSection receiving (Filtered: ${_filteredChannels.length} / Total: ${channels.length})");
+            "DEBUG UI: ChannelsSection receiving (Filtered: ${_filteredChannels.length} / Total: ${channels.length})",
+          );
           debugPrint(
-              "DEBUG UI: Current Search Query: '${_searchController.text}'");
+            "DEBUG UI: Current Search Query: '${_searchController.text}'",
+          );
           return ChannelsSection(
             channelCategories: _filteredChannels,
             openVideo: openVideo,

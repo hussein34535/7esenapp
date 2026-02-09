@@ -19,8 +19,9 @@ class Highlight {
 
   factory Highlight.fromJson(Map<String, dynamic> json) {
     var sourceList = json['sources'] as List? ?? [];
-    List<SourceServer> servers =
-        sourceList.map((i) => SourceServer.fromJson(i)).toList();
+    List<SourceServer> servers = sourceList
+        .map((i) => SourceServer.fromJson(i))
+        .toList();
 
     String? extractLogoUrl(dynamic logoData) {
       if (logoData == null) return null;
@@ -62,6 +63,17 @@ class Highlight {
       isPremium: json['is_premium'] ?? false,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'image': imageUrl,
+      'url': primaryUrl,
+      'sources': sources.map((e) => e.toJson()).toList(),
+      'is_premium': isPremium,
+    };
+  }
 }
 
 class SourceServer {
@@ -71,9 +83,10 @@ class SourceServer {
   SourceServer({required this.name, required this.url});
 
   factory SourceServer.fromJson(Map<String, dynamic> json) {
-    return SourceServer(
-      name: json['name'] ?? '',
-      url: json['url'] ?? '',
-    );
+    return SourceServer(name: json['name'] ?? '', url: json['url'] ?? '');
+  }
+
+  Map<String, dynamic> toJson() {
+    return {'name': name, 'url': url};
   }
 }

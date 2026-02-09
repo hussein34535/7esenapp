@@ -138,7 +138,11 @@ class AuthService {
 
     // Merge with Firestore data
     try {
-      final doc = await _firestore.collection('users').doc(user.uid).get();
+      final doc = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .get()
+          .timeout(const Duration(seconds: 10));
       if (doc.exists && doc.data() != null) {
         final firestoreData = doc.data()!;
         final merged = <String, dynamic>{};

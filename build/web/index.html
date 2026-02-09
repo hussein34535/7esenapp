@@ -34,7 +34,7 @@
   <link rel="icon" type="image/png" href="favicon.png">
 
   <title>Hesen TV</title>
-  <link rel="manifest" href="manifest.json">
+  <!-- <link rel="manifest" href="manifest.json"> -->
 
   <!-- Preload Fonts to prevent text flashing/glitch -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -56,8 +56,8 @@
 
   <script>
     // The value below is injected by flutter build, do not touch.
-    // var serviceWorkerVersion = 'null';
-    var serviceWorkerVersion = null; // 🔴 DISABLED SW for iOS Stability
+    // var serviceWorkerVersion = '"2821802181"';
+    const serviceWorkerVersion = "2821802181"; // 🔴 DISABLED SW for iOS Stability
   </script>
 
   <!-- Removed legacy flutter.js -->
@@ -70,8 +70,8 @@
   <!-- <script src="xhr_interceptor.js"></script> -->
   <!-- Security Measures -->
   <!-- <script src="anti_debug.js"></script> -->
-  <!-- PWA Install Prompt (ENABLED) -->
-  <script src="install_prompt.js"></script>
+  <!-- PWA Install Prompt (DISABLED) -->
+  <!-- <script src="install_prompt.js"></script> -->
 
   <style>
     body {

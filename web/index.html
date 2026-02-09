@@ -169,6 +169,17 @@
     }
     */
 
+    // 🔴 FORCE UNREGISTER ALL SERVICE WORKERS (To fix 'TypeError: Response' crash)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function (registrations) {
+        for (let registration of registrations) {
+          registration.unregister().then(function (boolean) {
+            console.log('Service Worker Force Unregistered: ', boolean);
+          });
+        }
+      });
+    }
+
     // ✅ PWA Install Prompt
     window.deferredPrompt = null;
     window.addEventListener('beforeinstallprompt', (e) => {

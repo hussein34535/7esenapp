@@ -56,8 +56,8 @@
 
   <script>
     // The value below is injected by flutter build, do not touch.
-    // var serviceWorkerVersion = '"4236985580"';
-    const serviceWorkerVersion = "4236985580"; // 🔴 DISABLED SW for iOS Stability
+    // var serviceWorkerVersion = '"1268555457"';
+    const serviceWorkerVersion = "1268555457"; // 🔴 DISABLED SW for iOS Stability
   </script>
 
   <!-- Removed legacy flutter.js -->
@@ -163,7 +163,7 @@
   <div id="flutter-app"></div>
 
   <script>
-    // ✅ Remove Splash when Flutter is ready
+    // ✅ Remove Splash when Flutter is ready (Called from Dart)
     window.removeSplashFromWeb = function () {
       const splash = document.getElementById('splash');
       if (splash) {
@@ -171,6 +171,15 @@
         // setTimeout(() => splash.remove(), 500); // Don't remove, just hide to prevent flash on back nav
       }
     };
+
+    // 🚨 FAILSAFE: Force remove splash after 15 seconds if Flutter fails to load
+    setTimeout(() => {
+      const splash = document.getElementById('splash');
+      if (splash && !splash.classList.contains('hidden')) {
+        console.warn('⚠️ Force removing splash screen due to timeout.');
+        splash.classList.add('hidden');
+      }
+    }, 15000);
 
     // ✅ Service Worker Registration (DISABLED for iOS stability)
     /*

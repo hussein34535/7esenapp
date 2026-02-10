@@ -154,25 +154,24 @@ Future<void> main() async {
             'https://497e74778a74137c33499f17b57c3efa@o4510853875826688.ingest.de.sentry.io/4510853923012688';
         options.tracesSampleRate = 1.0;
       },
-      appRunner: () {
-        runApp(
-          ChangeNotifierProvider(
-            create: (_) => ThemeProvider(),
-            child: MyApp(initFuture: initFuture),
-          ),
-        );
-
-        // 3. Remove Web Splash Immediately
-        if (kIsWeb) {
-          try {
-            registerVidstackPlayer();
-            removeWebSplash();
-          } catch (e) {
-            debugPrint("Vidstack Reg/Splash Remove Error: $e");
-          }
-        }
-      },
     );
+    // 2. Run App (Outside appRunner to avoid Zone Mismatch)
+    runApp(
+      ChangeNotifierProvider(
+        create: (_) => ThemeProvider(),
+        child: MyApp(initFuture: initFuture),
+      ),
+    );
+
+    // 3. Remove Web Splash Immediately
+    if (kIsWeb) {
+      try {
+        registerVidstackPlayer();
+        removeWebSplash();
+      } catch (e) {
+        debugPrint("Vidstack Reg/Splash Remove Error: $e");
+      }
+    }
   } catch (e) {
     debugPrint("Sentry Init Failed (Running App Anyway): $e");
     // Fallback if Sentry fails
@@ -548,10 +547,10 @@ class MyApp extends StatelessWidget {
                   ),
                 ),
               ),
-              initialRoute: '/home',
+              initialRoute: '/',
               routes: {
                 '/pwa_install': (context) => const PwaInstallScreen(),
-                '/home': (context) => HomePage(
+                '/': (context) => HomePage(
                       key: homeKey,
                       onThemeChanged: (isDarkMode) {
                         themeProvider.setThemeMode(
@@ -665,42 +664,47 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Future<void> _checkAndAskForName() async {
-    final user = FirebaseAuth.instance.currentUser;
-    String? finalName;
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      String? finalName;
 
-    // 1. Try to get name from Firebase Auth
-    if (user != null &&
-        user.displayName != null &&
-        user.displayName!.isNotEmpty) {
-      finalName = user.displayName;
-    }
+      // 1. Try to get name from Firebase Auth
+      if (user != null &&
+          user.displayName != null &&
+          user.displayName!.isNotEmpty) {
+        finalName = user.displayName;
+      }
 
-    // 2. If no Auth name, try SharedPreferences
-    if (finalName == null) {
-      final prefs = await SharedPreferences.getInstance();
-      finalName = prefs.getString('user_name');
-    }
-
-    // 3. If found, set it. If not, ask user.
-    if (finalName != null && finalName.isNotEmpty) {
-      if (mounted) {
-        setState(() {
-          _userName = finalName;
-        });
-        // Sync Prefs if it came from Auth
+      // 2. If no Auth name, try SharedPreferences
+      if (finalName == null) {
         final prefs = await SharedPreferences.getInstance();
-        if (prefs.getString('user_name') != finalName) {
-          await prefs.setString('user_name', finalName);
-        }
+        finalName = prefs.getString('user_name');
+      }
 
-        if (_fcmToken != null) {
-          _sendDeviceInfoToServer(name: _userName!, token: _fcmToken);
+      // 3. If found, set it. If not, ask user.
+      if (finalName != null && finalName.isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            _userName = finalName;
+          });
+          // Sync Prefs if it came from Auth
+          final prefs = await SharedPreferences.getInstance();
+          if (prefs.getString('user_name') != finalName) {
+            await prefs.setString('user_name', finalName);
+          }
+
+          if (_fcmToken != null) {
+            _sendDeviceInfoToServer(
+                name: _userName ?? "Unknown", token: _fcmToken);
+          }
+        }
+      } else {
+        if (mounted) {
+          _showNameInputDialog();
         }
       }
-    } else {
-      if (mounted) {
-        _showNameInputDialog();
-      }
+    } catch (e) {
+      debugPrint("_checkAndAskForName Error: $e");
     }
   }
 
@@ -890,11 +894,23 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final stream = AuthService().getUserStream();
     if (stream != null) {
       _userSubscription = stream.listen((snapshot) {
-        if (snapshot.exists && snapshot.data() != null) {
-          _updateAppStateWithUserData(
-            snapshot.data() as Map<String, dynamic>,
-            currentDeviceId,
-          );
+        try {
+          if (snapshot.exists && snapshot.data() != null) {
+            final dataMap = snapshot.data();
+            if (dataMap is Map<String, dynamic>) {
+              _updateAppStateWithUserData(
+                dataMap,
+                currentDeviceId,
+              );
+            } else if (dataMap is Map) {
+              _updateAppStateWithUserData(
+                Map<String, dynamic>.from(dataMap),
+                currentDeviceId,
+              );
+            }
+          }
+        } catch (e) {
+          debugPrint("Monitor User Status Error: $e");
         }
       });
     }

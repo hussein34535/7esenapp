@@ -138,6 +138,13 @@ class AuthService {
 
     // Merge with Firestore data
     try {
+      // 🛑 WEB FIX: Skip Firestore read on Web to prevent NullError/Crash
+      // We rely on API data for Web users.
+      if (kIsWeb) {
+        // Return mostly API data + defaults
+        return finalData;
+      }
+
       final doc = await _firestore
           .collection('users')
           .doc(user.uid)

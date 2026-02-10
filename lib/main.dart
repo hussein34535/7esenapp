@@ -863,9 +863,9 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final prefs = await SharedPreferences.getInstance();
     final currentDeviceId = prefs.getString('device_id');
 
-    // On Windows, real-time streams often cause platform channel threading issues.
-    // We will use a periodic timer as a safe alternative, but we will make it adaptive.
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
+    // On Windows AND Web, real-time streams can be unstable (Web: NullError crash).
+    // We will use a periodic timer or manual checks as a safe alternative.
+    if (kIsWeb || defaultTargetPlatform == TargetPlatform.windows) {
       // FORCE INITIAL FETCH execution
       debugPrint("Windows: Performing initial status check...");
       final uid = FirebaseAuth.instance.currentUser?.uid;

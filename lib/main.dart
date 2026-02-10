@@ -52,6 +52,9 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 
 SharedPreferences? prefs;
 
+// 🛑 Global flag moved to AuthService
+// bool _firebaseInitOk = false;
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -120,6 +123,7 @@ Future<void> main() async {
       );
     }
 
+    AuthService.isFirebaseInitialized = true;
     debugPrint("Firebase initialized successfully.");
   } catch (e) {
     debugPrint("Firebase Init Error: $e");
@@ -665,14 +669,16 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Future<void> _checkAndAskForName() async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
       String? finalName;
 
-      // 1. Try to get name from Firebase Auth
-      if (user != null &&
-          user.displayName != null &&
-          user.displayName!.isNotEmpty) {
-        finalName = user.displayName;
+      // 1. Try to get name from Firebase Auth (only if Firebase initialized)
+      if (AuthService.isFirebaseInitialized) {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null &&
+            user.displayName != null &&
+            user.displayName!.isNotEmpty) {
+          finalName = user.displayName;
+        }
       }
 
       // 2. If no Auth name, try SharedPreferences
@@ -855,6 +861,11 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   void _monitorUserStatus() async {
+    // Skip entirely if Firebase failed to initialize
+    if (!AuthService.isFirebaseInitialized) {
+      debugPrint("MonitorUserStatus: Skipped (Firebase not initialized).");
+      return;
+    }
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       ApiService.sendTelemetry(user.uid);
@@ -866,25 +877,29 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
     // On Windows AND Web, real-time streams can be unstable (Web: NullError crash).
     // We will use a periodic timer or manual checks as a safe alternative.
     if (kIsWeb || defaultTargetPlatform == TargetPlatform.windows) {
-      // FORCE INITIAL FETCH execution
-      debugPrint("Windows: Performing initial status check...");
-      final uid = FirebaseAuth.instance.currentUser?.uid;
-      final prefs = await SharedPreferences.getInstance();
-      final deviceId = prefs.getString('device_id');
+      try {
+        // FORCE INITIAL FETCH execution
+        debugPrint("Web/Windows: Performing initial status check...");
+        final uid = FirebaseAuth.instance.currentUser?.uid;
+        final prefs = await SharedPreferences.getInstance();
+        final deviceId = prefs.getString('device_id');
 
-      if (uid != null) {
-        // 1. Load CACHED data first (Instant UI)
-        final cachedData = await AuthService().getCachedUserDataOnly();
-        if (cachedData != null && mounted) {
-          debugPrint("Windows: Loaded cached user data.");
-          _updateAppStateWithUserData(cachedData, deviceId);
-        }
+        if (uid != null) {
+          // 1. Load CACHED data first (Instant UI)
+          final cachedData = await AuthService().getCachedUserDataOnly();
+          if (cachedData != null && mounted) {
+            debugPrint("Web/Windows: Loaded cached user data.");
+            _updateAppStateWithUserData(cachedData, deviceId);
+          }
 
-        // 2. Fetch FRESH data (Background update)
-        final initialData = await AuthService().getUserData();
-        if (initialData != null && mounted) {
-          _updateAppStateWithUserData(initialData, deviceId);
+          // 2. Fetch FRESH data (Background update)
+          final initialData = await AuthService().getUserData();
+          if (initialData != null && mounted) {
+            _updateAppStateWithUserData(initialData, deviceId);
+          }
         }
+      } catch (e) {
+        debugPrint("Monitor User Status (Web) Error: $e");
       }
 
       _scheduleWindowsPolling();
@@ -963,27 +978,29 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _windowsStatusTimer = Timer(duration, () async {
       if (!mounted) return;
 
-      final uid = FirebaseAuth.instance.currentUser?.uid;
-      final prefs = await SharedPreferences.getInstance();
-      final currentDeviceId = prefs.getString('device_id');
+      try {
+        final uid = FirebaseAuth.instance.currentUser?.uid;
+        final prefs = await SharedPreferences.getInstance();
+        final currentDeviceId = prefs.getString('device_id');
 
-      if (uid != null) {
-        // Fast mode implies we expect a change, so we hit the API
-        final statusData = await AuthService().getUserData();
-        if (statusData != null && mounted) {
-          // If we became subscribed, stop fast polling immediately
-          if (statusData['isSubscribed'] == true) {
-            debugPrint(
-              "Windows: Subscription detected! Stopping fast polling.",
-            );
-            _isFastPollingMode = false;
+        if (uid != null) {
+          final statusData = await AuthService().getUserData();
+          if (statusData != null && mounted) {
+            if (statusData['isSubscribed'] == true) {
+              debugPrint(
+                "Polling: Subscription detected! Stopping fast polling.",
+              );
+              _isFastPollingMode = false;
+            }
+            _updateAppStateWithUserData(statusData, currentDeviceId);
           }
-          _updateAppStateWithUserData(statusData, currentDeviceId);
         }
+      } catch (e) {
+        debugPrint("Polling Error: $e");
       }
 
       if (mounted && _isFastPollingMode) {
-        _scheduleWindowsPolling(); // Recurse only if still in fast mode
+        _scheduleWindowsPolling();
       }
     });
   }
@@ -1168,7 +1185,9 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
     // Get Auth Token for premium content fetching (if logged in)
     String? token;
     try {
-      final user = FirebaseAuth.instance.currentUser;
+      final user = AuthService.isFirebaseInitialized
+          ? FirebaseAuth.instance.currentUser
+          : null;
       if (user != null) {
         token = await user.getIdToken();
 
@@ -1181,7 +1200,10 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
         final authService = AuthService();
         // Start all data fetching in parallel
         final List<Future<dynamic>> initFutures = [
-          authService.getUserData(),
+          authService.getUserData().catchError((e) {
+            debugPrint('Error fetching user data: $e');
+            return null;
+          }),
           ApiService.fetchChannels(authToken: token).catchError((e) {
             debugPrint('Error fetching channels: $e');
             if (mounted) setState(() => _channelsHasError = true);
@@ -1215,7 +1237,12 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
         ];
 
         final results = await Future.wait(initFutures);
-        final userData = results[0] as Map<String, dynamic>?;
+        Map<String, dynamic>? userData;
+        try {
+          userData = results[0] as Map<String, dynamic>?;
+        } catch (e) {
+          debugPrint('Error casting userData: $e');
+        }
         final fetchedResults = results.sublist(1);
 
         if (mounted && userData != null) {
@@ -1259,10 +1286,10 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
             _isSubscribed = isSub;
             _subscriptionExpiryDays = daysRemaining;
             // Map planId to a readable string if generic subscriptionPlan is missing
-            if (userData['subscriptionPlan'] != null) {
-              _subscriptionPlan = userData['subscriptionPlan'];
-            } else if (userData['planId'] != null) {
-              _subscriptionPlan = 'Premium (Plan ${userData['planId']})';
+            if (userData?['subscriptionPlan'] != null) {
+              _subscriptionPlan = userData!['subscriptionPlan'];
+            } else if (userData?['planId'] != null) {
+              _subscriptionPlan = 'Premium (Plan ${userData!['planId']})';
             } else {
               _subscriptionPlan = isSub ? 'Premium' : null;
             }
@@ -1951,7 +1978,9 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
       switch (index) {
         case 0:
           try {
-            final user = FirebaseAuth.instance.currentUser;
+            final user = AuthService.isFirebaseInitialized
+                ? FirebaseAuth.instance.currentUser
+                : null;
             final token = await user?.getIdToken();
 
             final List<dynamic> results = await Future.wait([

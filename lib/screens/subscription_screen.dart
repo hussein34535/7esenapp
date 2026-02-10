@@ -3,7 +3,7 @@ import 'package:hesen/services/api_service.dart';
 import 'package:hesen/services/currency_service.dart';
 import 'package:hesen/services/auth_service.dart';
 import 'package:hesen/screens/payment_screen.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // For Timestamp
+// cloud_firestore import removed (not needed, prevents Web crash)
 import 'dart:ui'; // For formatting
 
 class SubscriptionScreen extends StatefulWidget {
@@ -159,10 +159,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                     _userData!['subscriptionExpiry'];
                             DateTime? expiry;
 
-                            if (expiryStamp is Timestamp) {
-                              expiry = expiryStamp.toDate();
-                            } else if (expiryStamp is DateTime) {
+                            if (expiryStamp is DateTime) {
                               expiry = expiryStamp;
+                            } else if (expiryStamp is String) {
+                              expiry = DateTime.tryParse(expiryStamp);
                             }
 
                             if (expiry == null) return const SizedBox.shrink();

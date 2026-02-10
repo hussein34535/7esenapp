@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:hesen/services/auth_service.dart';
 import 'package:hesen/screens/login_screen.dart';
@@ -31,7 +31,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _fetchUserData() async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
+      final user = _authService.currentUser;
       if (user != null) {
         try {
           await user.reload(); // Force refresh auth token

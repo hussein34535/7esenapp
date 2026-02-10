@@ -7,16 +7,35 @@ import 'package:hesen/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  // 🛑 Static flag set by main.dart on successful init
+  static bool isFirebaseInitialized = false;
+
+  FirebaseAuth? get _auth {
+    if (!isFirebaseInitialized) return null;
+    return FirebaseAuth.instance;
+  }
+
+  // 🛑 LAZY Firestore: Only create on non-Web platforms to prevent iOS Safari crash
+  FirebaseFirestore? _firestoreInstance;
+  FirebaseFirestore get _firestore {
+    _firestoreInstance ??= FirebaseFirestore.instance;
+    return _firestoreInstance!;
+  }
+
   static const String _premiumApiUrl =
       'https://7esentvbackend.vercel.app/api/mobile/premium';
 
   // Auth State Stream
-  Stream<User?> get user => _auth.authStateChanges();
+  Stream<User?> get user {
+    if (!isFirebaseInitialized) return const Stream.empty();
+    return _auth!.authStateChanges();
+  }
 
   // Current User
-  User? get currentUser => _auth.currentUser;
+  User? get currentUser {
+    if (!isFirebaseInitialized) return null;
+    return _auth!.currentUser;
+  }
 
   // Sign Up
   Future<UserCredential?> signUp({
@@ -26,22 +45,25 @@ class AuthService {
     String? deviceId,
     String? imageUrl,
   }) async {
+    if (!isFirebaseInitialized) throw Exception("Firebase not initialized");
     try {
-      UserCredential result = await _auth.createUserWithEmailAndPassword(
+      UserCredential result = await _auth!.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
-      // Initialize User Data in Firestore
-      await _firestore.collection('users').doc(result.user!.uid).set({
-        'name': displayName,
-        'email': email,
-        'createdAt': FieldValue.serverTimestamp(),
-        'isSubscribed': false, // Default to false
-        'platform': defaultTargetPlatform.toString(),
-        if (deviceId != null) 'activeDeviceId': deviceId,
-        'image_url': imageUrl,
-        'photoUrl': imageUrl, // Maintain compatibility
-      });
+      // Initialize User Data in Firestore (Skip on Web)
+      if (!kIsWeb) {
+        await _firestore.collection('users').doc(result.user!.uid).set({
+          'name': displayName,
+          'email': email,
+          'createdAt': FieldValue.serverTimestamp(),
+          'isSubscribed': false,
+          'platform': defaultTargetPlatform.toString(),
+          if (deviceId != null) 'activeDeviceId': deviceId,
+          'image_url': imageUrl,
+          'photoUrl': imageUrl,
+        });
+      }
       // Update Firebase User Display Name
       await result.user!.updateDisplayName(displayName);
       ApiService.sendTelemetry(result.user!.uid);
@@ -58,14 +80,15 @@ class AuthService {
     required String password,
     String? deviceId,
   }) async {
+    if (!isFirebaseInitialized) throw Exception("Firebase not initialized");
     try {
-      final cred = await _auth.signInWithEmailAndPassword(
+      final cred = await _auth!.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
       if (cred.user != null) {
         ApiService.sendTelemetry(cred.user!.uid);
-        if (deviceId != null) {
+        if (deviceId != null && !kIsWeb) {
           await _firestore
               .collection('users')
               .doc(cred.user!.uid)
@@ -80,17 +103,19 @@ class AuthService {
 
   // Update User Name
   Future<void> updateUserName(String newName) async {
-    User? user = _auth.currentUser;
+    User? user = currentUser;
     if (user == null) return;
 
     try {
       // 1. Update Firebase Auth Display Name
       await user.updateDisplayName(newName);
 
-      // 2. Update Firestore User Document
-      await _firestore.collection('users').doc(user.uid).update({
-        'name': newName,
-      });
+      // 2. Update Firestore User Document (Skip on Web)
+      if (!kIsWeb) {
+        await _firestore.collection('users').doc(user.uid).update({
+          'name': newName,
+        });
+      }
     } catch (e) {
       debugPrint("Update User Name Error: $e");
       rethrow;
@@ -99,7 +124,8 @@ class AuthService {
 
   // Sign Out
   Future<void> signOut() async {
-    await _auth.signOut();
+    if (!isFirebaseInitialized) return;
+    await _auth!.signOut();
   }
 
   // Check Subscription Status
@@ -112,8 +138,10 @@ class AuthService {
   }
 
   // Get User Stream for real-time updates (Banned status, etc.)
+  // 🛑 Returns null on Web to prevent iOS Safari crash
   Stream<DocumentSnapshot>? getUserStream() {
-    User? user = _auth.currentUser;
+    if (kIsWeb || !isFirebaseInitialized) return null;
+    User? user = currentUser;
     if (user == null) return null;
     return _firestore.collection('users').doc(user.uid).snapshots();
   }
@@ -122,7 +150,7 @@ class AuthService {
   static const String _userCacheKey = 'cached_user_data';
 
   Future<Map<String, dynamic>?> getUserData({bool forceRefresh = false}) async {
-    User? user = _auth.currentUser;
+    User? user = currentUser;
     if (user == null) return null;
 
     final prefs = await SharedPreferences.getInstance();
@@ -212,7 +240,7 @@ class AuthService {
     required String type,
     required int id,
   }) async {
-    User? user = _auth.currentUser;
+    User? user = currentUser;
     if (user == null) {
       debugPrint("unlockPremiumContent: No user logged in");
       return null;
@@ -260,7 +288,11 @@ class AuthService {
 
   /// Activates a one-time 24-hour free trial for the current user.
   Future<bool> startTrial() async {
-    User? user = _auth.currentUser;
+    if (kIsWeb || !isFirebaseInitialized) {
+      debugPrint("startTrial: Not supported on Web or Firebase not init.");
+      return false;
+    }
+    User? user = currentUser;
     if (user == null) return false;
 
     try {
@@ -270,7 +302,6 @@ class AuthService {
       if (doc.exists && doc.data() != null) {
         final data = doc.data() as Map<String, dynamic>;
 
-        // Don't allow if already used or if already subbed
         if (data['trialUsed'] == true) {
           debugPrint("Trial already used for this user.");
           return false;
@@ -302,18 +333,20 @@ class AuthService {
   }
 
   Future<void> updateProfilePicture(String url) async {
-    User? user = _auth.currentUser;
+    User? user = currentUser;
     if (user == null) return;
 
     try {
       // 1. Update Firebase Auth Photo URL
       await user.updatePhotoURL(url);
 
-      // 2. Update Firestore User Document
-      await _firestore.collection('users').doc(user.uid).update({
-        'photoUrl': url,
-        'image_url': url, // Maintain compatibility
-      });
+      // 2. Update Firestore User Document (Skip on Web)
+      if (!kIsWeb) {
+        await _firestore.collection('users').doc(user.uid).update({
+          'photoUrl': url,
+          'image_url': url,
+        });
+      }
 
       ApiService.sendTelemetry(user.uid);
     } catch (e) {

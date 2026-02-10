@@ -222,6 +222,51 @@
     };
   </script>
 
+  <!-- 🛑 CRYPTO POLYFILL for HTTP (Insecure Context) -->
+  <script>
+    if (!window.isSecureContext) {
+      console.warn('⚠️ Running in Insecure Context (HTTP). Injecting Basic Crypto Polyfill for Firebase...');
+
+      if (!window.crypto) {
+        window.crypto = {};
+      }
+
+      // 1. Polyfill getRandomValues (Required for Auth UIDs generation)
+      if (!window.crypto.getRandomValues) {
+        window.crypto.getRandomValues = function (array) {
+          for (var i = 0; i < array.length; i++) {
+            array[i] = Math.floor(Math.random() * 256);
+          }
+          return array;
+        };
+      }
+
+      // 2. Polyfill subtle (Required for Auth internal checks)
+      if (!window.crypto.subtle) {
+        // Attempt to map webkitSubtle if exists (older Safari)
+        if (window.crypto.webkitSubtle) {
+          window.crypto.subtle = window.crypto.webkitSubtle;
+        } else {
+          // Dummy implementation to prevent immediate crash on access.
+          // Note: Complex Auth flows like OAuth might still fail, but Email/Pwd might work.
+          window.crypto.subtle = {
+            digest: function (algo, data) {
+              return Promise.resolve(new ArrayBuffer(32));
+            },
+            importKey: function (format, keyData, algo, extractable, usages) {
+              return Promise.resolve({});
+            },
+            sign: function (algo, key, data) {
+              return Promise.resolve(new ArrayBuffer(32));
+            },
+            generateKey: function () { return Promise.resolve({}); },
+            exportKey: function () { return Promise.resolve(new ArrayBuffer(32)); }
+          };
+        }
+      }
+    }
+  </script>
+
   <!-- ✅ Firebase Compat (iOS Fix) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>

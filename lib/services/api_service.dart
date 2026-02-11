@@ -2,22 +2,53 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:hesen/models/match_model.dart';
 import 'package:hesen/models/highlight_model.dart';
-import 'package:hesen/services/web_proxy_service.dart';
 import 'package:flutter/foundation.dart';
 
+// Conditional import: on web, use dart:html's HttpRequest (text-based, no ArrayBuffer crash)
+// On native, use the stub (package:http is used directly)
+import 'web_http_client_stub.dart'
+    if (dart.library.html) 'web_http_client_web.dart';
+
 class ApiService {
-  static const String baseUrl = 'https://7esentvbackend.vercel.app/api/mobile';
+  // On web: use relative URL (same-origin, Nginx proxies to Vercel → NO CORS)
+  // On mobile: use full Vercel URL directly
+  static final String baseUrl =
+      kIsWeb ? '/api/mobile' : 'https://7esentvbackend.vercel.app/api/mobile';
+
+  /// Web-safe GET request. Uses dart:html on web, package:http on native.
+  static Future<http.Response> _safeGet(String url,
+      {Map<String, String>? headers}) async {
+    if (kIsWeb) {
+      final result = await webGet(url, headers: headers);
+      return http.Response(
+        result['body'] as String,
+        result['statusCode'] as int,
+      );
+    }
+    return http.get(Uri.parse(url), headers: headers);
+  }
+
+  /// Web-safe POST request. Uses dart:html on web, package:http on native.
+  static Future<http.Response> _safePost(String url,
+      {Map<String, String>? headers, String? body}) async {
+    if (kIsWeb) {
+      final result = await webPost(url, headers: headers, body: body);
+      return http.Response(
+        result['body'] as String,
+        result['statusCode'] as int,
+      );
+    }
+    return http.post(Uri.parse(url), headers: headers, body: body);
+  }
 
   /// Fetches all highlights.
   static Future<List<Highlight>> fetchHighlights({String? authToken}) async {
     final url = '$baseUrl/highlights';
-    final response = await http
-        .get(
-          Uri.parse(WebProxyService.proxiedUrl(url)),
-          headers:
-              authToken != null ? {'Authorization': 'Bearer $authToken'} : null,
-        )
-        .timeout(const Duration(seconds: 10));
+    final response = await _safeGet(
+      url,
+      headers:
+          authToken != null ? {'Authorization': 'Bearer $authToken'} : null,
+    ).timeout(const Duration(seconds: 30));
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -35,13 +66,11 @@ class ApiService {
   static Future<List<dynamic>> fetchChannels({String? authToken}) async {
     final url = '$baseUrl/channels';
 
-    final response = await http
-        .get(
-          Uri.parse(WebProxyService.proxiedUrl(url)),
-          headers:
-              authToken != null ? {'Authorization': 'Bearer $authToken'} : null,
-        )
-        .timeout(const Duration(seconds: 10));
+    final response = await _safeGet(
+      url,
+      headers:
+          authToken != null ? {'Authorization': 'Bearer $authToken'} : null,
+    ).timeout(const Duration(seconds: 30));
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -57,13 +86,11 @@ class ApiService {
   /// Fetches all categories with images.
   static Future<List<dynamic>> fetchCategories({String? authToken}) async {
     final url = '$baseUrl/categories';
-    final response = await http
-        .get(
-          Uri.parse(WebProxyService.proxiedUrl(url)),
-          headers:
-              authToken != null ? {'Authorization': 'Bearer $authToken'} : null,
-        )
-        .timeout(const Duration(seconds: 10));
+    final response = await _safeGet(
+      url,
+      headers:
+          authToken != null ? {'Authorization': 'Bearer $authToken'} : null,
+    ).timeout(const Duration(seconds: 30));
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -79,13 +106,11 @@ class ApiService {
   /// Fetches all news items.
   static Future<List<dynamic>> fetchNews({String? authToken}) async {
     final url = '$baseUrl/news';
-    final response = await http
-        .get(
-          Uri.parse(WebProxyService.proxiedUrl(url)),
-          headers:
-              authToken != null ? {'Authorization': 'Bearer $authToken'} : null,
-        )
-        .timeout(const Duration(seconds: 10));
+    final response = await _safeGet(
+      url,
+      headers:
+          authToken != null ? {'Authorization': 'Bearer $authToken'} : null,
+    ).timeout(const Duration(seconds: 30));
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -101,13 +126,11 @@ class ApiService {
   /// Fetches all matches.
   static Future<List<Match>> fetchMatches({String? authToken}) async {
     final url = '$baseUrl/matches';
-    final response = await http
-        .get(
-          Uri.parse(WebProxyService.proxiedUrl(url)),
-          headers:
-              authToken != null ? {'Authorization': 'Bearer $authToken'} : null,
-        )
-        .timeout(const Duration(seconds: 10));
+    final response = await _safeGet(
+      url,
+      headers:
+          authToken != null ? {'Authorization': 'Bearer $authToken'} : null,
+    ).timeout(const Duration(seconds: 30));
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -124,13 +147,11 @@ class ApiService {
   /// Fetches all goals.
   static Future<List<dynamic>> fetchGoals({String? authToken}) async {
     final url = '$baseUrl/goals';
-    final response = await http
-        .get(
-          Uri.parse(WebProxyService.proxiedUrl(url)),
-          headers:
-              authToken != null ? {'Authorization': 'Bearer $authToken'} : null,
-        )
-        .timeout(const Duration(seconds: 10));
+    final response = await _safeGet(
+      url,
+      headers:
+          authToken != null ? {'Authorization': 'Bearer $authToken'} : null,
+    ).timeout(const Duration(seconds: 30));
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -146,9 +167,7 @@ class ApiService {
   /// Fetches subscription packages.
   static Future<List<dynamic>> fetchPackages() async {
     final url = '$baseUrl/packages';
-    final response = await http
-        .get(Uri.parse(WebProxyService.proxiedUrl(url)))
-        .timeout(const Duration(seconds: 10));
+    final response = await _safeGet(url).timeout(const Duration(seconds: 30));
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -168,9 +187,7 @@ class ApiService {
   /// Fetches payment methods.
   static Future<List<dynamic>> fetchPaymentMethods() async {
     final url = '$baseUrl/payment-methods';
-    final response = await http
-        .get(Uri.parse(WebProxyService.proxiedUrl(url)))
-        .timeout(const Duration(seconds: 10));
+    final response = await _safeGet(url).timeout(const Duration(seconds: 30));
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -188,13 +205,11 @@ class ApiService {
   /// Verifies a coupon code.
   static Future<Map<String, dynamic>> verifyCoupon(String code) async {
     final url = '$baseUrl/coupon';
-    final response = await http
-        .post(
-          Uri.parse(WebProxyService.proxiedUrl(url)),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'code': code}),
-        )
-        .timeout(const Duration(seconds: 10));
+    final response = await _safePost(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'code': code}),
+    ).timeout(const Duration(seconds: 30));
 
     if (response.statusCode == 200) {
       return json.decode(response.body);
@@ -215,13 +230,11 @@ class ApiService {
       'paymentIdentifier': paymentIdentifier ?? '',
     };
 
-    final response = await http
-        .post(
-          Uri.parse(WebProxyService.proxiedUrl(url)),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode(requestBody),
-        )
-        .timeout(const Duration(seconds: 10));
+    final response = await _safePost(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(requestBody),
+    ).timeout(const Duration(seconds: 30));
 
     if (response.statusCode == 200 || response.statusCode == 201) {
       return json.decode(response.body);
@@ -234,13 +247,11 @@ class ApiService {
   static Future<void> sendTelemetry(String uid) async {
     final url = '$baseUrl/telemetry';
     try {
-      await http
-          .post(
-            Uri.parse(WebProxyService.proxiedUrl(url)),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'uid': uid}),
-          )
-          .timeout(const Duration(seconds: 5));
+      await _safePost(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'uid': uid}),
+      ).timeout(const Duration(seconds: 5));
     } catch (e) {
       debugPrint('Telemetry error: $e');
     }
@@ -250,9 +261,7 @@ class ApiService {
   static Future<Map<String, dynamic>?> fetchUserStatus(String uid) async {
     final url = '$baseUrl/user-status?uid=$uid';
     try {
-      final response = await http
-          .get(Uri.parse(WebProxyService.proxiedUrl(url)))
-          .timeout(const Duration(seconds: 5));
+      final response = await _safeGet(url).timeout(const Duration(seconds: 5));
 
       debugPrint("ApiService: fetchUserStatus status: ${response.statusCode}");
 

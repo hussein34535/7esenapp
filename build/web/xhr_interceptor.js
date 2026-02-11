@@ -1,6 +1,7 @@
 
 (function () {
     const OriginalXHR = window.XMLHttpRequest;
+    const PROXY_PREFIX = 'https://web.7esentv.com/proxy?url=';
 
     class ProxyXHR extends OriginalXHR {
         constructor() {
@@ -31,10 +32,8 @@
                 return super.send(body);
             }
 
-            // console.log('[XHR Interceptor] ⚡ Hijacking request');
-            // console.log('[XHR Interceptor] 🌍 Fetching real content');
-
-            const proxyUrl = 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(targetUrl);
+            // Don't double-prefix if already proxied
+            const proxyUrl = targetUrl.startsWith(PROXY_PREFIX) ? targetUrl : PROXY_PREFIX + targetUrl;
 
             fetch(proxyUrl)
                 .then(res => {
@@ -42,7 +41,7 @@
                     return res.text();
                 })
                 .then(text => {
-                    // Rewrite Manifest
+                    // Rewrite Manifest: wrap all segment URLs through our proxy
                     const baseUrl = targetUrl.substring(0, targetUrl.lastIndexOf('/') + 1);
                     const lines = text.split(/\r?\n/);
                     const rewritten = [];
@@ -53,15 +52,15 @@
                             if (line.startsWith('#EXT-X-KEY') && line.includes('URI="')) {
                                 line = line.replace(/URI="([^"]+)"/, (m, uri) => {
                                     if (!uri.startsWith('http')) uri = new URL(uri, baseUrl).toString();
-                                    return 'URI="https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(uri) + '"';
+                                    return 'URI="' + PROXY_PREFIX + uri + '"';
                                 });
                             }
                             rewritten.push(line);
                         } else {
                             let seg = line;
                             if (!seg.startsWith('http')) seg = new URL(seg, baseUrl).toString();
-                            // Wrap segment in proxy
-                            rewritten.push('https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(seg));
+                            // Wrap segment in our HTTPS proxy
+                            rewritten.push(PROXY_PREFIX + seg);
                         }
                     });
 
@@ -73,7 +72,7 @@
                     Object.defineProperty(this, 'responseText', { value: responseData, writable: true });
                     Object.defineProperty(this, 'response', { value: responseData, writable: true });
                     Object.defineProperty(this, 'readyState', { value: 4, writable: true });
-                    Object.defineProperty(this, 'responseURL', { value: this._url, writable: true }); // Trick HLS into thinking it got what it asked for
+                    Object.defineProperty(this, 'responseURL', { value: this._url, writable: true });
 
                     // Trigger events
                     this.dispatchEvent(new Event('readystatechange'));
@@ -90,5 +89,5 @@
     }
 
     window.XMLHttpRequest = ProxyXHR;
-    // console.log('[XHR Interceptor] 🚀 Installed and ready.');
+    console.log('[XHR Interceptor] Installed - using Nginx proxy');
 })();

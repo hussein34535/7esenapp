@@ -600,6 +600,8 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
   List<dynamic> _filteredChannels = [];
   bool _isDarkMode = false;
   bool _isSearchBarVisible = false;
+  // Error tracking
+  String _lastError = '';
   bool _isLoading = true;
   bool _hasError = false;
   bool _channelsHasError = false;
@@ -1206,32 +1208,56 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
           }),
           ApiService.fetchChannels(authToken: token).catchError((e) {
             debugPrint('Error fetching channels: $e');
-            if (mounted) setState(() => _channelsHasError = true);
+            if (mounted)
+              setState(() {
+                _channelsHasError = true;
+                _lastError = 'فشل تحميل القنوات: $e';
+              });
             return <dynamic>[];
           }),
           ApiService.fetchNews(authToken: token).catchError((e) {
             debugPrint('Error fetching news: $e');
-            if (mounted) setState(() => _newsHasError = true);
+            if (mounted)
+              setState(() {
+                _newsHasError = true;
+                _lastError = 'فشل تحميل الأخبار: $e';
+              });
             return <dynamic>[];
           }),
           ApiService.fetchMatches(authToken: token).catchError((e) {
             debugPrint('Error fetching matches: $e');
-            if (mounted) setState(() => _matchesHasError = true);
+            if (mounted)
+              setState(() {
+                _matchesHasError = true;
+                _lastError = 'فشل تحميل المباريات: $e';
+              });
             return <Match>[];
           }),
           ApiService.fetchGoals(authToken: token).catchError((e) {
             debugPrint('Error fetching goals: $e');
-            if (mounted) setState(() => _goalsHasError = true);
+            if (mounted)
+              setState(() {
+                _goalsHasError = true;
+                _lastError = 'فشل تحميل الأهداف: $e';
+              });
             return <dynamic>[];
           }),
           ApiService.fetchHighlights(authToken: token).catchError((e) {
             debugPrint('Error fetching highlights: $e');
-            if (mounted) setState(() => _highlightsHasError = true);
+            if (mounted)
+              setState(() {
+                _highlightsHasError = true;
+                _lastError = 'فشل تحميل ملخصات: $e';
+              });
             return <Highlight>[];
           }),
           ApiService.fetchCategories(authToken: token).catchError((e) {
             debugPrint('Error fetching categories: $e');
-            if (mounted) setState(() => _categoriesHasError = true);
+            if (mounted)
+              setState(() {
+                _categoriesHasError = true;
+                _lastError = 'فشل تحميل التصنيفات: $e';
+              });
             return <dynamic>[];
           }),
         ];
@@ -1354,32 +1380,56 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final List<Future<dynamic>> guestFutures = [
       ApiService.fetchChannels(authToken: token).catchError((e) {
         debugPrint('Error fetching channels: $e');
-        if (mounted) setState(() => _channelsHasError = true);
+        if (mounted)
+          setState(() {
+            _channelsHasError = true;
+            _lastError = 'فشل تحميل القنوات: $e';
+          });
         return <dynamic>[];
       }),
       ApiService.fetchNews(authToken: token).catchError((e) {
         debugPrint('Error fetching news: $e');
-        if (mounted) setState(() => _newsHasError = true);
+        if (mounted)
+          setState(() {
+            _newsHasError = true;
+            _lastError = 'فشل تحميل الأخبار: $e';
+          });
         return <dynamic>[];
       }),
       ApiService.fetchMatches(authToken: token).catchError((e) {
         debugPrint('Error fetching matches: $e');
-        if (mounted) setState(() => _matchesHasError = true);
+        if (mounted)
+          setState(() {
+            _matchesHasError = true;
+            _lastError = 'فشل تحميل المباريات: $e';
+          });
         return <Match>[];
       }),
       ApiService.fetchGoals(authToken: token).catchError((e) {
         debugPrint('Error fetching goals: $e');
-        if (mounted) setState(() => _goalsHasError = true);
+        if (mounted)
+          setState(() {
+            _goalsHasError = true;
+            _lastError = 'فشل تحميل الأهداف: $e';
+          });
         return <dynamic>[];
       }),
       ApiService.fetchHighlights(authToken: token).catchError((e) {
         debugPrint('Error fetching highlights: $e');
-        if (mounted) setState(() => _highlightsHasError = true);
+        if (mounted)
+          setState(() {
+            _highlightsHasError = true;
+            _lastError = 'فشل تحميل الملخصات: $e';
+          });
         return <Highlight>[];
       }),
       ApiService.fetchCategories(authToken: token).catchError((e) {
         debugPrint('Error fetching categories: $e');
-        if (mounted) setState(() => _categoriesHasError = true);
+        if (mounted)
+          setState(() {
+            _categoriesHasError = true;
+            _lastError = 'فشل تحميل التصنيفات: $e';
+          });
         return <dynamic>[];
       }),
     ];
@@ -1425,6 +1475,7 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
         setState(() {
           _isLoading = false;
           _hasError = true;
+          _lastError = 'خطأ في معالجة البيانات: $e';
           if (kIsWeb) removeWebSplash();
         });
       }
@@ -2510,7 +2561,9 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
           const Icon(Icons.error_outline, color: Colors.red, size: 60),
           const SizedBox(height: 20),
           Text(
-            'حدث خطأ أثناء تحميل البيانات.',
+            _lastError.isNotEmpty
+                ? _lastError
+                : 'حدث خطأ أثناء تحميل البيانات.',
             style: TextStyle(
               color: Theme.of(context).textTheme.bodyLarge!.color,
               fontSize: 18,

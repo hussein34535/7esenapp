@@ -53,7 +53,5 @@ if (!window._flutter) {
 _flutter.buildConfig = { "engineRevision": "ddf47dd3ff96dbde6d9c614db0d7f019d7c7a2b7", "builds": [{ "compileTarget": "dart2js", "renderer": "html", "mainJsPath": "main.dart.js" }, {}] };
 
 _flutter.loader.load({
-  serviceWorkerSettings: {
-    serviceWorkerVersion: "2995162641"
-  }
+  // Service Worker disabled to prevent caching issues
 });

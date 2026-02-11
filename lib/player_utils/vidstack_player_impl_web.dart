@@ -111,20 +111,37 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
     try {
       String finalUrl = rawUrl;
 
-      // 1. Handle 7esenlink (JSON)
+      // 1. Handle 7esenlink (JSON resolution)
+      // Works with both raw and proxied 7esenlink URLs
+      String? sevenEsenUrl;
       if (finalUrl.contains('7esenlink.vercel.app')) {
+        if (finalUrl.contains('/proxy?url=')) {
+          // Already proxied — extract raw URL from query param
+          final uri = Uri.parse(finalUrl);
+          sevenEsenUrl = uri.queryParameters['url'];
+        } else {
+          sevenEsenUrl = finalUrl;
+        }
+      }
+
+      if (sevenEsenUrl != null) {
         try {
-          final jsonUri = Uri.parse(finalUrl).replace(queryParameters: {
-            ...Uri.parse(finalUrl).queryParameters,
+          final jsonUri = Uri.parse(sevenEsenUrl).replace(queryParameters: {
+            ...Uri.parse(sevenEsenUrl).queryParameters,
             'json': 'true'
           });
-          final request = await html.HttpRequest.request(jsonUri.toString());
-          if (myRequestId != _loadRequestId) return; // Stale request
+          // Fetch through our HTTPS proxy to avoid CORS
+          final proxyJsonUrl =
+              'https://web.7esentv.com/proxy?url=${jsonUri.toString()}';
+          print('[VIDSTACK] Resolving 7esenlink: $proxyJsonUrl');
+          final request = await html.HttpRequest.request(proxyJsonUrl);
+          if (myRequestId != _loadRequestId) return;
 
           final jsonResponse =
               js.context['JSON'].callMethod('parse', [request.responseText]);
           if (jsonResponse['url'] != null) {
             finalUrl = jsonResponse['url'];
+            print('[VIDSTACK] 7esenlink resolved to: $finalUrl');
           }
         } catch (e) {
           print('[VIDSTACK] Error resolving 7esenlink: $e');
@@ -147,22 +164,20 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         }
       }
 
-      // 3. Direct Play with CORS Proxy Fallback (Using Custom JS Loader)
-      // We no longer manually rewrite manifest in Dart to avoid "Static Blob" issue.
-      // We delegate to 'HlsProxyLoader' in JS.
+      // 3. Wrap HTTP URLs through HTTPS proxy to avoid Mixed Content
+      if (finalUrl.startsWith('http://')) {
+        finalUrl = 'https://web.7esentv.com/proxy?url=$finalUrl';
+        print('[VIDSTACK] Wrapped HTTP->HTTPS proxy: $finalUrl');
+      }
 
+      // 4. Direct Play with CORS Proxy Fallback
       String sourceToUse = finalUrl;
       bool shouldProxy = _usedProxyForCurrentStream;
 
       if (shouldProxy) {
         print('[VIDSTACK] 🔒 Activate JS Proxy Loader for: $finalUrl');
-
-        // 1. Set Global Variable for JS Loader
         js.context['currentStreamUrl'] = finalUrl;
-
-        // 2. Use a Fake URL to trigger HLS provider but allow Loader to intercept
-        // We use a dummy .m3u8 extension to ensure HLS provider is chosen.
-        sourceToUse = 'http://proxy-live-stream/index.m3u8';
+        sourceToUse = 'https://proxy-live-stream/index.m3u8';
       }
 
       print('[VIDSTACK] Final Source URL: $sourceToUse');

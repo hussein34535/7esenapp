@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 // Conditional import: on web, use dart:html's HttpRequest (text-based, no ArrayBuffer crash)
 // On native, use the stub (package:http is used directly)
 import 'web_http_client_stub.dart'
+    if (dart.library.js_interop) 'web_http_client_wasm.dart'
     if (dart.library.html) 'web_http_client_web.dart';
 
 class ApiService {

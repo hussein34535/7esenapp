@@ -9,15 +9,22 @@
   <meta name="description" content="Watch Live TV and News">
   <meta name="referrer" content="no-referrer">
 
-  <!-- 🔴 FORCE UNREGISTER SERVICE WORKERS IMMEDIATELY -->
+  <!-- 🔴 FORCE PURGE ALL CACHES AND SERVICE WORKERS -->
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(function (registrations) {
         for (let registration of registrations) {
           registration.unregister().then(function (boolean) {
-            console.log('Service Worker Force Unregistered (HEAD): ', boolean);
+            console.log('Service Worker Purged: ', boolean);
           });
         }
+      });
+    }
+    // Clear all caches (to fix MIME corruption)
+    if ('caches' in window) {
+      caches.keys().then(function (names) {
+        for (let name of names) caches.delete(name);
+        console.log('All Caches Purged');
       });
     }
   </script>
@@ -238,14 +245,6 @@
     };
     // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
-  </script>
-
-  <!-- ✅ vConsole for Mobile Debugging -->
-  <script src="https://unpkg.com/vconsole@latest/dist/vconsole.min.js"></script>
-  <script>
-    // تشغيل الكونسول فقط لو إحنا مش في وضع الـ Debug العادي
-    var vConsole = new VConsole();
-    console.log('vConsole is loaded');
   </script>
 
   <!-- ✅ Flutter Initialization -->

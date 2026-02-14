@@ -37,6 +37,7 @@ dependencies:
   flutter_dotenv: ^5.1.0 # Add dotenv for environment variables
   crypto: ^3.0.3 # Added for Cloudinary signature generation
 
+  web: ^1.0.0
   android_pip: ^2.0.1
   provider: ^6.1.2
   flex_color_picker: ^3.7.1

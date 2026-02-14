@@ -12,6 +12,8 @@ import 'package:hesen/firebase_api.dart';
 import 'package:hesen/services/currency_service.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -126,6 +128,12 @@ Future<void> main() async {
     AuthService.isFirebaseInitialized = true;
     debugPrint("Firebase initialized successfully.");
   } catch (e) {
+    if (e is JSObject) {
+      try {
+        final msg = e.getProperty('message'.toJS);
+        debugPrint("Firebase Init Error (JS Detail): $msg");
+      } catch (_) {}
+    }
     debugPrint("Firebase Init Error: $e");
   }
 

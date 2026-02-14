@@ -1,9 +1,9 @@
 import 'dart:html' as html;
-import 'dart:js' as js;
 import 'dart:js_util' as js_util;
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:hesen/player_utils/video_player_web.dart';
+import 'package:hesen/services/web_proxy_service.dart';
 
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -130,15 +130,19 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             ...Uri.parse(sevenEsenUrl).queryParameters,
             'json': 'true'
           });
-          // Fetch through our HTTPS proxy to avoid CORS
-          final proxyJsonUrl =
-              'https://web.7esentv.com/proxy?url=${jsonUri.toString()}';
+          // Fetch through our HTTPS proxy ONLY if it's an HTTP URL to avoid Mixed Content
+          final targetUrlStr = jsonUri.toString();
+          final proxyJsonUrl = targetUrlStr.startsWith('http://')
+              ? WebProxyService.getProxiedUrl(targetUrlStr)
+              : targetUrlStr;
           print('[VIDSTACK] Resolving 7esenlink: $proxyJsonUrl');
           final request = await html.HttpRequest.request(proxyJsonUrl);
           if (myRequestId != _loadRequestId) return;
 
-          final jsonResponse =
-              js.context['JSON'].callMethod('parse', [request.responseText]);
+          final jsonResponse = js_util.callMethod(
+              js_util.getProperty(js_util.globalThis, 'JSON'),
+              'parse',
+              [request.responseText]);
           if (jsonResponse['url'] != null) {
             finalUrl = jsonResponse['url'];
             print('[VIDSTACK] 7esenlink resolved to: $finalUrl');
@@ -166,7 +170,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
 
       // 3. Wrap HTTP URLs through HTTPS proxy to avoid Mixed Content
       if (finalUrl.startsWith('http://')) {
-        finalUrl = 'https://web.7esentv.com/proxy?url=$finalUrl';
+        finalUrl = WebProxyService.getProxiedUrl(finalUrl);
         print('[VIDSTACK] Wrapped HTTP->HTTPS proxy: $finalUrl');
       }
 
@@ -176,7 +180,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
 
       if (shouldProxy) {
         print('[VIDSTACK] 🔒 Activate JS Proxy Loader for: $finalUrl');
-        js.context['currentStreamUrl'] = finalUrl;
+        js_util.setProperty(js_util.globalThis, 'currentStreamUrl', finalUrl);
         sourceToUse = 'https://proxy-live-stream/index.m3u8';
       }
 

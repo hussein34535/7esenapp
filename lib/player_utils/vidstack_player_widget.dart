@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'vidstack_player_impl_stub.dart'
+    if (dart.library.js_interop) 'vidstack_player_impl_wasm.dart'
     if (dart.library.html) 'vidstack_player_impl_web.dart' as impl;
 
 class VidstackPlayerWidget extends StatelessWidget {

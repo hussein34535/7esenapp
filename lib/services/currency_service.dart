@@ -3,30 +3,13 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class CurrencyService {
-  static const String _baseUrl = 'https://ipwho.is/'; // HTTPS supported
+  static const String _baseUrl = 'https://ipwho.is/';
   static String _currencyCode = 'EGP';
   static String _currencySymbol = 'جنية';
   static double _exchangeRate = 1.0;
 
-  // Base is EGP
-  static final Map<String, double> _rates = {
-    'EG': 1.0, // Egypt
-    'US': 0.02, // USA (1 EGP = ~0.02 USD)
-    'SA': 0.076, // Saudi Arabia
-    'AE': 0.074, // UAE
-    'KW': 0.0062, // Kuwait
-    'QA': 0.073, // Qatar
-    'BH': 0.0076, // Bahrain
-    'OM': 0.0078, // Oman
-    'JO': 0.014, // Jordan
-    'LB': 1800.0, // Lebanon (volatile, maybe stick to USD?)
-    'DE': 0.019, // Germany (Euro)
-    'FR': 0.019, // France
-    'IT': 0.019, // Italy
-    'ES': 0.019, // Spain
-    'GB': 0.016, // UK
-    'CA': 0.027, // Canada
-  };
+  static const String _ratesUrl =
+      'https://api.exchangerate-api.com/v4/latest/EGP';
 
   static final Map<String, String> _symbols = {
     'EG': 'جنية',
@@ -47,55 +30,45 @@ class CurrencyService {
     'CA': 'C\$',
   };
 
-  static final Map<String, String> _codes = {
-    'EG': 'EGP',
-    'US': 'USD',
-    'SA': 'SAR',
-    'AE': 'AED',
-    'KW': 'KWD',
-    'QA': 'QAR',
-    'BH': 'BHD',
-    'OM': 'OMR',
-    'JO': 'JOD',
-    'LB': 'LBP',
-    'DE': 'EUR',
-    'FR': 'EUR',
-    'IT': 'EUR',
-    'ES': 'EUR',
-    'GB': 'GBP',
-    'CA': 'CAD',
-  };
-
   static Future<void> init() async {
     try {
       final prefs = await SharedPreferences.getInstance();
 
-      // Try to load cached country
+      // 1. Get Country & Currency Code
       String? countryCode = prefs.getString('user_country_code');
+      String? currencyCode = prefs.getString('user_currency_code');
 
-      if (countryCode == null) {
-        // Fetch from API (HTTPS)
+      if (countryCode == null || currencyCode == null) {
         final response = await http.get(Uri.parse(_baseUrl));
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
-          // ipwho.is uses 'country_code'
           if (data['success'] == true) {
             countryCode = data['country_code'];
-            if (countryCode != null) {
+            currencyCode = data['currency']?['code'];
+
+            if (countryCode != null)
               await prefs.setString('user_country_code', countryCode);
-            }
+            if (currencyCode != null)
+              await prefs.setString('user_currency_code', currencyCode);
           }
         }
       }
 
-      if (countryCode != null && _rates.containsKey(countryCode)) {
-        _exchangeRate = _rates[countryCode]!;
-        _currencySymbol = _symbols[countryCode] ?? '\$';
-        _currencyCode = _codes[countryCode] ?? 'USD';
+      // 2. Fetch Live Exchange Rates (Proxied)
+      final rateResponse = await http.get(Uri.parse(_ratesUrl));
+      if (rateResponse.statusCode == 200) {
+        final rateData = json.decode(rateResponse.body);
+        final fetchedRates = rateData['rates'] as Map<String, dynamic>;
+
+        if (currencyCode != null && fetchedRates.containsKey(currencyCode)) {
+          _exchangeRate = (fetchedRates[currencyCode] as num).toDouble();
+          _currencyCode = currencyCode;
+          _currencySymbol = _symbols[countryCode] ?? currencyCode;
+          print('Currency Auto-Init: 1 EGP = $_exchangeRate $_currencyCode');
+        }
       }
     } catch (e) {
       print('Currency init failed: $e');
-      // Fallback to defaults (EGP)
     }
   }
 

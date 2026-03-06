@@ -2608,26 +2608,34 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.error_outline, color: Colors.red, size: 50),
-          const SizedBox(height: 15),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Theme.of(context).textTheme.bodyLarge!.color,
-              fontSize: 16,
+          Icon(Icons.wifi_off_rounded, color: Colors.red[400], size: 60),
+          const SizedBox(height: 20),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            child: Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Theme.of(context).textTheme.bodyLarge?.color ??
+                    Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
           const SizedBox(height: 25),
           ElevatedButton.icon(
             onPressed: onRetry,
-            icon: const Icon(Icons.replay),
-            label: const Text('إعادة المحاولة'),
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('إعادة المحاولة',
+                style: TextStyle(fontWeight: FontWeight.bold)),
             style: ElevatedButton.styleFrom(
               backgroundColor: Theme.of(context).primaryColor,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 12),
-              textStyle: const TextStyle(fontSize: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 14),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30)),
+              elevation: 0,
             ),
           ),
         ],
@@ -2681,7 +2689,7 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
           );
         }
       case 3: // Matches
-        if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+        if (_matchesHasError) {
           return _buildSectionErrorWidget(
             'فشل تحميل المباريات. الرجاء المحاولة مرة أخرى.',
             _retryMatches,

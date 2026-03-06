@@ -12,8 +12,6 @@ import 'package:hesen/firebase_api.dart';
 import 'package:hesen/services/currency_service.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'dart:js_interop';
-import 'dart:js_interop_unsafe';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -58,7 +56,7 @@ SharedPreferences? prefs;
 // bool _firebaseInitOk = false;
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  SentryWidgetsFlutterBinding.ensureInitialized();
 
   // Initialize MediaKit safely
   try {
@@ -128,13 +126,13 @@ Future<void> main() async {
     AuthService.isFirebaseInitialized = true;
     debugPrint("Firebase initialized successfully.");
   } catch (e) {
-    if (e is JSObject) {
-      try {
-        final msg = e.getProperty('message'.toJS);
-        debugPrint("Firebase Init Error (JS Detail): $msg");
-      } catch (_) {}
+    if (e.toString().contains('duplicate-app')) {
+      AuthService.isFirebaseInitialized = true;
+      debugPrint("Firebase already initialized (duplicate handled).");
+    } else {
+      handleWebFirebaseError(e);
+      debugPrint("Firebase Init Error: $e");
     }
-    debugPrint("Firebase Init Error: $e");
   }
 
   // Dashboard / Telemetry
@@ -160,13 +158,15 @@ Future<void> main() async {
   // 2. Initialize Sentry and Run App
   // 2. Initialize Sentry and Run App Safe
   try {
-    await SentryFlutter.init(
-      (options) {
-        options.dsn =
-            'https://497e74778a74137c33499f17b57c3efa@o4510853875826688.ingest.de.sentry.io/4510853923012688';
-        options.tracesSampleRate = 1.0;
-      },
-    );
+    if (!Sentry.isEnabled) {
+      await SentryFlutter.init(
+        (options) {
+          options.dsn =
+              'https://497e74778a74137c33499f17b57c3efa@o4510853875826688.ingest.de.sentry.io/4510853923012688';
+          options.tracesSampleRate = 1.0;
+        },
+      );
+    }
     // 2. Run App (Outside appRunner to avoid Zone Mismatch)
     runApp(
       ChangeNotifierProvider(

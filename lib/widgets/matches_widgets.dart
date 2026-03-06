@@ -23,14 +23,43 @@ class MatchesSection extends StatelessWidget {
           return Center(child: CircularProgressIndicator());
         } else if (snapshot.hasError) {
           return Center(
-              child: Text('خطأ في استرجاع المباريات',
-                  style: TextStyle(
-                      color: Theme.of(context).textTheme.bodyLarge!.color)));
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 50, color: Colors.red[400]),
+                const SizedBox(height: 16),
+                Text('حدث خطأ أثناء الاتصال',
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).textTheme.bodyLarge?.color ??
+                            Colors.white)),
+                const SizedBox(height: 8),
+                Text('يرجى المحاولة مرة أخرى لاحقاً',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[500])),
+              ],
+            ),
+          );
         } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return Center(
-              child: Text('لا توجد مباريات لعرضها',
-                  style: TextStyle(
-                      color: Theme.of(context).textTheme.bodyLarge!.color)));
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.sports_soccer_outlined,
+                    size: 60, color: Colors.grey[600]),
+                const SizedBox(height: 16),
+                Text('لا توجد مباريات حالياً',
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).textTheme.bodyLarge?.color ??
+                            Colors.white)),
+                const SizedBox(height: 8),
+                Text('يرجى التحقق لاحقاً',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[500])),
+              ],
+            ),
+          );
         } else {
           final matches = snapshot.data!;
 
@@ -132,10 +161,10 @@ class _MatchBoxState extends State<MatchBox> {
     final streamLink = widget.match.streamLinks;
 
     if (logoA.isNotEmpty && !logoA.startsWith('http')) {
-      logoA = 'https://st9.onrender.com$logoA';
+      logoA = 'https://7esentvbackend.vercel.app$logoA';
     }
     if (logoB.isNotEmpty && !logoB.startsWith('http')) {
-      logoB = 'https://st9.onrender.com$logoB';
+      logoB = 'https://7esentvbackend.vercel.app$logoB';
     }
 
     DateTime now = DateTime.now();
@@ -156,7 +185,7 @@ class _MatchBoxState extends State<MatchBox> {
       badgeColor = Colors.red.withValues(alpha: 0.5); // Lighter/Transparent Red
     } else if (now
         .isAfter(matchDateTimeWithToday.add(const Duration(minutes: 110)))) {
-      timeStatus = 'انتهت المباراة';
+      timeStatus = 'انتهت';
       borderColor = Colors.grey[800]!; // Status box = Chic Dark Grey
       badgeColor = Colors.grey[800]!; // Badge = Chic Dark Grey
     } else {
@@ -250,9 +279,9 @@ class _MatchBoxState extends State<MatchBox> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     // --- TEAMS & SCORE (Centered) ---
-                    // Added Top Padding as requested to separate logos from top border
+                    // Added Top Padding to separate logos from top border
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16.0, 24.0, 16.0, 0),
+                      padding: const EdgeInsets.fromLTRB(16.0, 20.0, 16.0, 0),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         crossAxisAlignment: CrossAxisAlignment.center,
@@ -346,20 +375,21 @@ class _MatchBoxState extends State<MatchBox> {
                     const SizedBox(height: 8),
 
                     // --- METADATA (Channel & Commentator) ---
-                    // Adjusted spacing: Increased gap and bottom padding to clear the badge
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 45),
+                      padding: EdgeInsets.fromLTRB(
+                          16, 0, 16, champion.isNotEmpty ? 40 : 16),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           // Channel
                           Flexible(
                             child: Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(Icons.tv,
                                     size: 14, color: Colors.grey[500]),
-                                const SizedBox(width: 6),
+                                const SizedBox(width: 4),
                                 Flexible(
                                   child: Text(
                                     channel.isEmpty ? 'غير محدد' : channel,
@@ -375,14 +405,14 @@ class _MatchBoxState extends State<MatchBox> {
                             ),
                           ),
 
-                          // Increased Gap
-                          if (commentator.isNotEmpty)
-                            const SizedBox(width: 130),
+                          // Sane Gap
+                          if (commentator.isNotEmpty) const SizedBox(width: 16),
 
                           // Commentator
                           if (commentator.isNotEmpty)
                             Flexible(
                               child: Row(
+                                mainAxisAlignment: MainAxisAlignment.start,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(Icons.mic,
@@ -391,7 +421,6 @@ class _MatchBoxState extends State<MatchBox> {
                                   Flexible(
                                     child: Text(
                                       commentator,
-                                      textAlign: TextAlign.start,
                                       style: TextStyle(
                                         color: Colors.grey[400],
                                         fontSize: 11,

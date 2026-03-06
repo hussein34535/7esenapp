@@ -34,22 +34,34 @@ class _GoalsSectionState extends State<GoalsSection> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         } else if (snapshot.hasError) {
-          // Use CustomScrollView + SliverFillRemaining for centering + scrollability
           return CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               SliverFillRemaining(
                 hasScrollBody: false,
                 child: Center(
-                    child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text(
-                    'Error loading goals',
-                    textAlign: TextAlign.center, // Center text
-                    style: TextStyle(
-                        color: Theme.of(context).textTheme.bodyLarge!.color),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.error_outline,
+                          size: 50, color: Colors.red[400]),
+                      const SizedBox(height: 16),
+                      Text('حدث خطأ أثناء الاتصال',
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context)
+                                      .textTheme
+                                      .bodyLarge
+                                      ?.color ??
+                                  Colors.white)),
+                      const SizedBox(height: 8),
+                      Text('يرجى المحاولة مرة أخرى لاحقاً',
+                          style:
+                              TextStyle(fontSize: 14, color: Colors.grey[500])),
+                    ],
                   ),
-                )),
+                ),
               ),
             ],
           );
@@ -61,15 +73,28 @@ class _GoalsSectionState extends State<GoalsSection> {
               SliverFillRemaining(
                 hasScrollBody: false,
                 child: Center(
-                    child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text(
-                    'No goals available',
-                    textAlign: TextAlign.center, // Center text
-                    style: TextStyle(
-                        color: Theme.of(context).textTheme.bodyLarge!.color),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.sports_soccer_outlined,
+                          size: 60, color: Colors.grey[600]),
+                      const SizedBox(height: 16),
+                      Text('لا توجد أهداف حالياً',
+                          style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context)
+                                      .textTheme
+                                      .bodyLarge
+                                      ?.color ??
+                                  Colors.white)),
+                      const SizedBox(height: 8),
+                      Text('يرجى التحقق لاحقاً',
+                          style:
+                              TextStyle(fontSize: 14, color: Colors.grey[500])),
+                    ],
                   ),
-                )),
+                ),
               ),
             ],
           );

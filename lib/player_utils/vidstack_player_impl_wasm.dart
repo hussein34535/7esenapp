@@ -637,9 +637,9 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         void setLoader(bool visible) {
           if (loader != null) {
             if (visible) {
-              loader!.classList.add('visible');
+              loader.classList.add('visible');
             } else {
-              loader!.classList.remove('visible');
+              loader.classList.remove('visible');
             }
           }
         }

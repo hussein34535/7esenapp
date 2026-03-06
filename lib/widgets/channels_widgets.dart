@@ -22,9 +22,21 @@ class _ChannelsSectionState extends State<ChannelsSection> {
   Widget build(BuildContext context) {
     if (widget.channelCategories.isEmpty) {
       return Center(
-        child: Text(
-          'لا توجد قنوات لعرضها',
-          style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.tv_off_outlined, size: 60, color: Colors.grey[600]),
+            const SizedBox(height: 16),
+            Text('لا توجد قنوات حالياً',
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).textTheme.bodyLarge?.color ??
+                        Colors.white)),
+            const SizedBox(height: 8),
+            Text('يرجى التحقق لاحقاً',
+                style: TextStyle(fontSize: 14, color: Colors.grey[500])),
+          ],
         ),
       );
     }
@@ -664,7 +676,7 @@ class _ChannelTileState extends State<ChannelTile> {
                       textChild['text']?.toString() ?? 'Unknown Stream';
                   if (streamUrl != null && streamUrl.isNotEmpty) {
                     if (!streamUrl.startsWith('http')) {
-                      streamUrl = 'https://st9.onrender.com$streamUrl';
+                      streamUrl = 'https://7esentvbackend.vercel.app$streamUrl';
                     }
                     streams.add({'name': streamName, 'url': streamUrl});
                   }

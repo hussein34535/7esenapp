@@ -57,6 +57,16 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
   void dispose() {
     WakelockPlus.disable();
     _safetyTimer?.cancel();
+    _overlayTimer?.cancel();
+    _retryTimer?.cancel();
+    
+    if (_currentPlayer != null) {
+      try {
+        js_util.callMethod(_currentPlayer!, 'destroy', []);
+      } catch (e) {
+        print('[VIDSTACK] Ignored destroy error: $e');
+      }
+    }
     super.dispose();
   }
 

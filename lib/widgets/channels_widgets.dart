@@ -110,84 +110,43 @@ class _ChannelBoxState extends State<ChannelBox> {
     // --- Modern Categorical Color Palette ---
     Color baseColor;
     IconData iconData;
-    List<Color> gradientColors;
 
     if (lowerName.contains('sport') ||
         lowerName.contains('koora') ||
         lowerName.contains('match')) {
       baseColor = Colors.green;
       iconData = Icons.sports_soccer_rounded;
-      gradientColors = [
-        const Color(0xFF00C853),
-        const Color(0xFF2E7D32),
-        const Color(0xFF1B5E20)
-      ];
     } else if (lowerName.contains('movie') ||
         lowerName.contains('film') ||
         lowerName.contains('cinema')) {
       baseColor = Colors.red;
       iconData = Icons.movie_filter_rounded;
-      gradientColors = [
-        const Color(0xFFFF1744),
-        const Color(0xFFC62828),
-        const Color(0xFFB71C1C)
-      ];
     } else if (lowerName.contains('news') || lowerName.contains('akhbar')) {
       baseColor = Colors.blue;
       iconData = Icons.newspaper_rounded;
-      gradientColors = [
-        const Color(0xFF2979FF),
-        const Color(0xFF1565C0),
-        const Color(0xFF0D47A1)
-      ];
     } else if (lowerName.contains('serie') ||
         lowerName.contains('show') ||
         lowerName.contains('drama') ||
         lowerName.contains('مسلسل')) {
       baseColor = Colors.purple;
       iconData = Icons.video_collection_rounded;
-      gradientColors = [
-        const Color(0xFFD500F9),
-        const Color(0xFF7B1FA2),
-        const Color(0xFF4A148C)
-      ];
     } else if (lowerName.contains('kid') ||
         lowerName.contains('toon') ||
         lowerName.contains('carton') ||
         lowerName.contains('أطفال')) {
       baseColor = Colors.orange;
       iconData = Icons.child_care_rounded;
-      gradientColors = [
-        const Color(0xFFFF9100),
-        const Color(0xFFEF6C00),
-        const Color(0xFFE65100)
-      ];
     } else if (lowerName.contains('music') ||
         lowerName.contains('song') ||
         lowerName.contains('أغاني')) {
       baseColor = Colors.pink;
       iconData = Icons.music_note_rounded;
-      gradientColors = [
-        const Color(0xFFF50057),
-        const Color(0xFFC2185B),
-        const Color(0xFF880E4F)
-      ];
     } else if (lowerName.contains('bein')) {
       baseColor = const Color(0xFF673ab7);
       iconData = Icons.live_tv_rounded;
-      gradientColors = [
-        const Color(0xFF9067C6),
-        const Color(0xFF673AB7),
-        const Color(0xFF240046)
-      ];
     } else {
       baseColor = const Color(0xFF673ab7);
       iconData = Icons.tv_rounded;
-      gradientColors = [
-        const Color(0xFF7E57C2),
-        const Color(0xFF673AB7),
-        const Color(0xFF512DA8)
-      ];
     }
 
     return MouseRegion(

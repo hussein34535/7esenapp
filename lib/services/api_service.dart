@@ -1,5 +1,6 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:hesen/models/match_model.dart';
 import 'package:hesen/models/highlight_model.dart';
 import 'package:flutter/foundation.dart';
@@ -14,16 +15,19 @@ class ApiService {
   // On web: use relative URL (same-origin, Nginx proxies to Vercel → NO CORS)
   // On mobile: use full Vercel URL directly
   static final String baseUrl =
-      kIsWeb ? '/api/mobile' : 'https://7esentvbackend.vercel.app/api/mobile';
+      kIsWeb && !(Uri.base.toString().contains('localhost') || Uri.base.toString().contains('127.0.0.1'))
+          ? '/api/mobile'
+          : 'https://7esentvbackend.vercel.app/api/mobile';
 
   /// Web-safe GET request. Uses dart:html on web, package:http on native.
   static Future<http.Response> _safeGet(String url,
       {Map<String, String>? headers}) async {
     if (kIsWeb) {
       final result = await webGet(url, headers: headers);
-      return http.Response(
-        result['body'] as String,
+      return http.Response.bytes(
+        result['bodyBytes'] as Uint8List,
         result['statusCode'] as int,
+        headers: {'content-type': 'application/json; charset=utf-8'},
       );
     }
     return http.get(Uri.parse(url), headers: headers);
@@ -34,9 +38,10 @@ class ApiService {
       {Map<String, String>? headers, String? body}) async {
     if (kIsWeb) {
       final result = await webPost(url, headers: headers, body: body);
-      return http.Response(
-        result['body'] as String,
+      return http.Response.bytes(
+        result['bodyBytes'] as Uint8List,
         result['statusCode'] as int,
+        headers: {'content-type': 'application/json; charset=utf-8'},
       );
     }
     return http.post(Uri.parse(url), headers: headers, body: body);
@@ -45,21 +50,25 @@ class ApiService {
   /// Fetches all highlights.
   static Future<List<Highlight>> fetchHighlights({String? authToken}) async {
     final url = '$baseUrl/highlights';
-    final response = await _safeGet(
-      url,
-      headers:
-          authToken != null ? {'Authorization': 'Bearer $authToken'} : null,
-    ).timeout(const Duration(seconds: 30));
+    try {
+      final response = await _safeGet(
+        url,
+        headers:
+            authToken != null ? {'Authorization': 'Bearer $authToken'} : null,
+      ).timeout(const Duration(seconds: 30));
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      if (data['success'] == true) {
-        final List highlightsJson = data['data'] ?? [];
-        return highlightsJson.map((h) => Highlight.fromJson(h)).toList();
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          final List highlightsJson = data['data'] ?? [];
+          return highlightsJson.map((h) => Highlight.fromJson(h)).toList();
+        }
+        throw Exception('API returned success=false');
+      } else {
+        throw Exception('Failed to load highlights: ${response.statusCode}');
       }
-      throw Exception('API returned success=false');
-    } else {
-      throw Exception('Failed to load highlights: ${response.statusCode}');
+    } catch (e) {
+      rethrow;
     }
   }
 
@@ -127,21 +136,25 @@ class ApiService {
   /// Fetches all matches.
   static Future<List<Match>> fetchMatches({String? authToken}) async {
     final url = '$baseUrl/matches';
-    final response = await _safeGet(
-      url,
-      headers:
-          authToken != null ? {'Authorization': 'Bearer $authToken'} : null,
-    ).timeout(const Duration(seconds: 30));
+    try {
+      final response = await _safeGet(
+        url,
+        headers:
+            authToken != null ? {'Authorization': 'Bearer $authToken'} : null,
+      ).timeout(const Duration(seconds: 30));
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      if (data['success'] == true) {
-        final List matchesJson = data['data'] ?? [];
-        return matchesJson.map((match) => Match.fromJson(match)).toList();
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          final List matchesJson = data['data'] ?? [];
+          return matchesJson.map((match) => Match.fromJson(match)).toList();
+        }
+        throw Exception('API returned success=false');
+      } else {
+        throw Exception('Failed to load matches: ${response.statusCode}');
       }
-      throw Exception('API returned success=false');
-    } else {
-      throw Exception('Failed to load matches: ${response.statusCode}');
+    } catch (e) {
+      rethrow;
     }
   }
 

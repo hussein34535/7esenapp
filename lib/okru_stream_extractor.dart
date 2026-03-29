@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:html_unescape/html_unescape.dart'; // Added html_unescape
+import 'package:flutter/foundation.dart'; // Added kIsWeb
+import 'package:hesen/services/web_proxy_service.dart'; // Added WebProxyService
+import 'package:html_unescape/html_unescape.dart';
 
 const String _userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)';
 
@@ -20,7 +22,10 @@ Future<String?> getOkruStreamUrl(String videoId) async {
   try {
     // Use Uri.https to correctly handle encoding of special characters in videoId
     final videoUri = Uri.https('ok.ru', '/video/$videoId');
-    final res = await http.get(videoUri, headers: headers).timeout(const Duration(seconds: 15));
+    String videoUrl = videoUri.toString();
+    if (kIsWeb) videoUrl = WebProxyService.getProxiedUrl(videoUrl);
+
+    final res = await http.get(Uri.parse(videoUrl), headers: headers).timeout(const Duration(seconds: 15));
 
     if (res.statusCode != 200) {
       print('Failed to load ok.ru page: ${res.statusCode}');
@@ -47,8 +52,11 @@ Future<String?> getOkruStreamUrl(String videoId) async {
           'cmd': 'videoPlayerMetadata',
           'mid': videoId,
         });
+        String metaApiUrl = metaApi.toString();
+        if (kIsWeb) metaApiUrl = WebProxyService.getProxiedUrl(metaApiUrl);
+
         final apiRes = await http
-            .get(metaApi, headers: headers)
+            .get(Uri.parse(metaApiUrl), headers: headers)
             .timeout(const Duration(seconds: 15));
         if (apiRes.statusCode == 200) {
           final metaJson = utf8.decode(apiRes.bodyBytes, allowMalformed: true);
@@ -118,9 +126,12 @@ Future<String?> getOkruStreamUrl(String videoId) async {
           return null;
         }
 
+        String targetUrl = sanitizedMetaUrl;
+        if (kIsWeb) targetUrl = WebProxyService.getProxiedUrl(targetUrl);
+
         final metaRes = await http
             .post(
-              Uri.parse(sanitizedMetaUrl),
+              Uri.parse(targetUrl),
               headers: headers,
             )
             .timeout(const Duration(seconds: 15));

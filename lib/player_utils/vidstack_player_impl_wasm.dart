@@ -4,7 +4,6 @@ import 'dart:js_interop_unsafe';
 import 'package:flutter/material.dart';
 import 'package:hesen/player_utils/video_player_wasm.dart'; // Import WASM version
 import 'package:hesen/services/web_proxy_service.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:web/web.dart' as web;
 import 'package:http/http.dart'
     as http; // Use http package for requests in WASM
@@ -41,7 +40,6 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
   void initState() {
     super.initState();
     _currentUrl = widget.url;
-    WakelockPlus.enable();
   }
 
   @override
@@ -58,7 +56,6 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
 
   @override
   void dispose() {
-    WakelockPlus.disable();
     _safetyTimer?.cancel();
     super.dispose();
   }
@@ -109,8 +106,6 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
     _safetyTimer?.cancel();
     // Start Safety Timer (Give it 25 seconds for slow IPTV)
     _safetyTimer = Timer(const Duration(seconds: 25), () {
-      print(
-          '[VIDSTACK] ⚠️ Safety Timer Expired: Video did not start. Force-switching...');
       _handleErrorLogic();
     });
 
@@ -141,7 +136,6 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           final proxyJsonUrl = targetUrlStr.startsWith('http://')
               ? WebProxyService.getProxiedUrl(targetUrlStr)
               : targetUrlStr;
-          print('[VIDSTACK] Resolving 7esenlink: $proxyJsonUrl');
 
           // Use http package for WASM compatibility
           final response = await http.get(Uri.parse(proxyJsonUrl));
@@ -150,10 +144,9 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           final jsonResponse = jsonDecode(response.body);
           if (jsonResponse['url'] != null) {
             finalUrl = jsonResponse['url'];
-            print('[VIDSTACK] 7esenlink resolved to: $finalUrl');
           }
         } catch (e) {
-          print('[VIDSTACK] Error resolving 7esenlink: $e');
+          // Error resolving 7esenlink - silently fall through
         }
       }
 
@@ -176,37 +169,56 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
       // 3. Wrap HTTP URLs through HTTPS proxy to avoid Mixed Content
       final String rawStreamUrl = finalUrl; // Keep RAW URL for Interceptor
       if (finalUrl.startsWith('http://')) {
-        finalUrl = WebProxyService.getProxiedUrl(finalUrl);
-        print('[VIDSTACK] Wrapped HTTP->HTTPS proxy: $finalUrl');
+        String referer;
+        if (finalUrl.contains('ok.ru')) {
+          referer = 'https://ok.ru/';
+        } else {
+          referer = 'https://7esentv.com/';
+        }
+        finalUrl = WebProxyService.getProxiedUrl(finalUrl, referer: referer);
+        // HTTP wrapped through HTTPS proxy
+      } else if (finalUrl.contains('ok.ru') && !finalUrl.contains('workers.dev')) {
+        // Even if HTTPS, proxy ok.ru to bypass CORS and set referer
+        finalUrl = WebProxyService.getProxiedUrl(finalUrl, referer: 'https://ok.ru/');
       }
+      // 4. Determine if it's HLS or MP4 for correct player behavior
+      final lowerRawUrl = rawStreamUrl.toLowerCase();
+      final lowerFinalUrl = finalUrl.toLowerCase();
+      bool isMp4 = lowerRawUrl.contains('.mp4') ||
+                   lowerFinalUrl.contains('.mp4') ||
+                   lowerFinalUrl.contains('type=mp4') ||
+                   lowerFinalUrl.contains('video/mp4') ||
+                   lowerFinalUrl.contains('type=video/mp4');
 
-      // 4. Direct Play with CORS Proxy Fallback
+      String type = isMp4 ? 'video/mp4' : 'application/x-mpegurl';
+
+      // 5. Decide whether to use the JS Interceptor (Only for HLS)
       String sourceToUse = finalUrl;
-      // NEW: Force proxy mode if it's an IPTV link or starts with worker URL
-      bool isIptv =
-          rawStreamUrl.contains(':8080') || rawStreamUrl.contains(':80');
+      bool isIptv = rawStreamUrl.contains(':8080') || rawStreamUrl.contains(':80');
       bool isProxied = finalUrl.contains('workers.dev');
       bool shouldProxy = _usedProxyForCurrentStream || isIptv || isProxied;
 
-      if (shouldProxy) {
-        print('[VIDSTACK] 🔒 Activate JS Proxy Loader for: $rawStreamUrl');
-        // Set global variables using js_interop
+
+      // We ONLY use the JS Interceptor for HLS because it rewrites playlists.
+      // If it's an MP4, the interceptor would try to parse binary as text and fail.
+      bool shouldUseInterceptor = !isMp4 && shouldProxy;
+
+      if (shouldUseInterceptor) {
+        // Set global variables using js_interop for the interceptor
         web.window.setProperty('currentStreamUrl'.toJS, rawStreamUrl.toJS);
         web.window.setProperty('isProxyMode'.toJS, true.toJS);
+        // This dummy domain is intercepted by xhr_interceptor.js
         sourceToUse = 'https://proxy-live-stream/index.m3u8';
       }
-
-      print('[VIDSTACK] Final Source URL: $sourceToUse');
 
       // Create JS Object for src
       final srcObj = JSObject();
       srcObj.setProperty('src'.toJS, sourceToUse.toJS);
-      srcObj.setProperty('type'.toJS, 'application/x-mpegurl'.toJS);
+      srcObj.setProperty('type'.toJS, type.toJS);
 
       (_currentPlayer as JSObject).setProperty('src'.toJS, srcObj);
-      _currentPlayer!.setAttribute('title', 'Live Stream');
+      _currentPlayer!.setAttribute('title', isMp4 ? 'Video' : 'Live Stream');
     } catch (e) {
-      print('[VIDSTACK] Critical Error in _loadSource: $e');
       _handleErrorLogic();
     }
   }
@@ -219,7 +231,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
 
     if (_retryCount < 2) {
       if (!_usedProxyForCurrentStream) {
-        print('[VIDSTACK] Direct Play Failed. Retrying with Proxy Fallback...');
+        // Direct play failed, retrying with proxy fallback
         _usedProxyForCurrentStream = true;
         Timer(const Duration(milliseconds: 100), () {
           if (mounted) _loadSource(_currentUrl);
@@ -228,13 +240,13 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
       }
 
       _retryCount++;
-      print('[VIDSTACK] Auto-Retrying same stream (Attempt $_retryCount)...');
+      // Auto-retrying same stream
       _retryTimer?.cancel();
       _retryTimer = Timer(const Duration(milliseconds: 1000), () {
         if (mounted) _loadSource(_currentUrl);
       });
     } else {
-      print('[VIDSTACK] Max retries reached. Switching to Next Stream...');
+      // Max retries reached, switching to next stream
       if (widget.streamLinks.isNotEmpty) {
         int currentIndex = -1;
         String? currentRawUrl;
@@ -260,7 +272,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             currentIndex + 1 < widget.streamLinks.length) {
           final nextStream = widget.streamLinks[currentIndex + 1];
           final nextUrl = nextStream['url'];
-          print('[VIDSTACK] Switching to Next Stream: ${nextStream['name']}');
+          // Switching to next stream
           _retryCount = 0;
           _usedProxyForCurrentStream = false; // Reset for new stream
           if (mounted) {
@@ -294,31 +306,22 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
       key: ValueKey(widget.url),
       viewType: 'vidstack-player',
       onPlatformViewCreated: (int viewId) {
-        print('[VIDSTACK_IMPL] onPlatformViewCreated: $viewId');
         final element = vidstackViews[viewId];
         if (element == null) {
-          print('[VIDSTACK_IMPL] Element is null for viewId: $viewId');
           return;
         }
-        print('[VIDSTACK_IMPL] Element found: $element');
 
         try {
           element.innerHTML = ''.toJS;
-          print('[VIDSTACK_IMPL] innerHTML set');
           element.style.position = 'relative';
           element.style.width = '100%';
           element.style.height = '100%';
           element.style.display = 'block';
-          print('[VIDSTACK_IMPL] Base styles set');
-        } catch (e) {
-          print('[VIDSTACK_IMPL] Error setting base styles/innerHTML: $e');
-        }
+        } catch (e) {}
 
         // --- CSS Styles ---
-        print('[VIDSTACK_IMPL] Creating style element...');
         final style =
             web.document.createElement('style') as web.HTMLStyleElement;
-        print('[VIDSTACK_IMPL] Style element created: $style');
 
         try {
           final cssContent = """
@@ -329,6 +332,8 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             position: absolute; 
             top: 0; left: 0;
             z-index: 0; 
+            transform: translateZ(0); 
+            will-change: transform;
           }
           media-icon { width: 28px; height: 28px; }
           
@@ -397,101 +402,62 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           @keyframes vds-spin { 0% { transform: translate(-50%, -50%) rotate(0deg); } 100% { transform: translate(-50%, -50%) rotate(360deg); } }
         """;
           style.appendChild(web.document.createTextNode(cssContent));
-          print('[VIDSTACK_IMPL] Style textNode appended');
         } catch (e) {
-          print('[VIDSTACK_IMPL] Error setting style content: $e');
+          // CSS injection error - non-fatal
         }
 
         element.append(style);
-        print('[VIDSTACK_IMPL] Style appended');
-        print('[VIDSTACK_IMPL] VIDEO_PLAYER_WASM_DEBUG_VERSION_999');
 
         // CREATE PLAYER
         web.HTMLElement player;
         try {
-          print('[VIDSTACK_IMPL] Creating media-player...');
           final rawPlayer = web.document.createElement('media-player');
-          print(
-              '[VIDSTACK_IMPL] rawPlayer created (Element). Tag: ${rawPlayer.tagName}');
-          // Safe cast attempt
-          if (rawPlayer.instanceOfString('HTMLElement')) {
-            print('[VIDSTACK_IMPL] rawPlayer IS HTMLElement');
-            player = rawPlayer as web.HTMLElement;
-          } else {
-            print(
-                '[VIDSTACK_IMPL] rawPlayer IS NOT HTMLElement - forcing unsafe cast');
-            player = rawPlayer as web.HTMLElement;
-          }
-          print('[VIDSTACK_IMPL] media-player cast success: $player');
+          player = rawPlayer as web.HTMLElement;
         } catch (e) {
-          print('[VIDSTACK_IMPL] Error creating media-player: $e');
           rethrow;
         }
 
         try {
           player.className = 'vds-player controls-visible';
-          print('[VIDSTACK_IMPL] className set');
-        } catch (e) {
-          print('[VIDSTACK_IMPL] Error setting className: $e');
-        }
-
-        _currentPlayer = player;
-
-        try {
+          // iOS/Safari: Muted autoplay is the only way to play without user interaction.
+          // We unmute on the 'playing' event.
           player.setAttribute('autoplay', 'true');
+          player.setAttribute('muted', 'true');
           player.setAttribute('playsinline', 'true');
-          player.setAttribute('crossorigin', 'true');
+          player.setAttribute('crossorigin', 'anonymous'); // Essential for CORS on Safari
           player.setAttribute('aspect-ratio', '16/9');
           player.setAttribute('load', 'eager');
           player.setAttribute('user-idle-delay', '3000');
-          print('[VIDSTACK_IMPL] Attributes set');
-        } catch (e) {
-          print('[VIDSTACK_IMPL] Error setting attributes: $e');
-        }
-
-        try {
           player.append(web.document.createElement('media-provider'));
           player.append(web.document.createElement('media-video-layout'));
-          print('[VIDSTACK_IMPL] Children appended to player');
-        } catch (e) {
-          print('[VIDSTACK_IMPL] Error appending children: $e');
-        }
-
-        try {
           element.append(player);
-          print('[VIDSTACK_IMPL] Player appended to container');
+          _currentPlayer = player;
+          debugPrint('[VIDSTACK] Player created and attached to DOM.');
         } catch (e) {
-          print('[VIDSTACK_IMPL] Error appending player to container: $e');
+          debugPrint('[VIDSTACK] Error creating player: $e');
+          rethrow;
         }
 
         // LOADER
         web.HTMLDivElement? loader;
         try {
-          print('[VIDSTACK_IMPL] Creating Loader...');
           final rawLoader = web.document.createElement('div');
           loader = rawLoader as web.HTMLDivElement;
           loader.className = 'vds-loader visible';
           element.append(loader);
-          print('[VIDSTACK_IMPL] Loader appended');
-        } catch (e) {
-          print('[VIDSTACK_IMPL] Error creating/appending Loader: $e');
-        }
+        } catch (e) {}
 
         // OVERLAY HEADER
         web.HTMLDivElement? overlay;
         try {
-          print('[VIDSTACK_IMPL] Creating Overlay...');
           final rawOverlay = web.document.createElement('div');
           overlay = rawOverlay as web.HTMLDivElement;
           overlay.className = 'vds-overlay-header';
-        } catch (e) {
-          print('[VIDSTACK_IMPL] Error creating Overlay: $e');
-        }
+        } catch (e) {}
 
         // Back Button
         web.HTMLButtonElement? backBtn;
         try {
-          print('[VIDSTACK_IMPL] Creating BackBtn...');
           final rawBtn = web.document.createElement('button');
           backBtn = rawBtn as web.HTMLButtonElement;
           backBtn.className = 'vds-back-btn';
@@ -503,23 +469,16 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           backBtn.append(backSpan);
 
           if (overlay != null) overlay.append(backBtn);
-          print('[VIDSTACK_IMPL] BackBtn appended');
-        } catch (e) {
-          print('[VIDSTACK_IMPL] Error creating BackBtn: $e');
-        }
+        } catch (e) {}
 
         // Links Container
         web.HTMLDivElement? linksContainer;
         try {
-          print('[VIDSTACK_IMPL] Creating LinksContainer...');
           final rawLC = web.document.createElement('div');
           linksContainer = rawLC as web.HTMLDivElement;
           linksContainer.className = 'vds-links-container';
           if (overlay != null) overlay.append(linksContainer);
-          print('[VIDSTACK_IMPL] LinksContainer appended');
-        } catch (e) {
-          print('[VIDSTACK_IMPL] Error creating LinksContainer: $e');
-        }
+        } catch (e) {}
 
         try {
           if (overlay != null) {
@@ -628,9 +587,9 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
                 linksContainer.append(btn);
               }
             }
-            print('[VIDSTACK_IMPL] streamLinks processed');
+            // streamLinks processed
           } catch (e) {
-            print('[VIDSTACK_IMPL] Error processing streamLinks: $e');
+            // Error processing streamLinks - non-fatal
           }
         }
 
@@ -644,9 +603,9 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           }
         }
 
+        // ignore: unnecessary_null_comparison
         if (player != null) {
           try {
-            print('[VIDSTACK_IMPL] Adding player listeners...');
             player.addEventListener(
                 'can-play',
                 (web.Event event) {
@@ -654,15 +613,25 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
                   _safetyTimer?.cancel();
                   _retryCount = 0;
 
-                  final isPaused = ((player as JSObject)
-                              .getProperty('paused'.toJS) as JSBoolean?)
-                          ?.toDart ??
-                      false;
-                  if (isPaused == true) {
+                  final playerObj = player as JSObject;
+                  bool isPaused = false;
+                  try {
+                    if (playerObj.hasProperty('paused'.toJS).toDart) {
+                      isPaused = (playerObj.getProperty('paused'.toJS) as JSBoolean?)
+                              ?.toDart ??
+                          false;
+                    }
+                  } catch (e) {
+                    debugPrint('[VIDSTACK] Error checking paused state: $e');
+                  }
+
+                  if (isPaused) {
                     try {
-                      (player as JSObject).callMethod('play'.toJS, JSArray());
+                      playerObj.callMethod('play'.toJS, JSArray());
                       setLoader(true);
-                    } catch (e) {/* ignore */}
+                    } catch (e) {
+                      debugPrint('[VIDSTACK] play() failed: $e');
+                    }
                   }
                 }.toJS);
 
@@ -676,6 +645,17 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
                 'playing',
                 (web.Event event) {
                   setLoader(false);
+                  debugPrint('[VIDSTACK] Playing started.');
+                  // iOS: Unmute after autoplay starts (muted autoplay workaround)
+                  try {
+                    final playerObj = player as JSObject;
+                    if (playerObj.hasProperty('muted'.toJS).toDart) {
+                      playerObj.setProperty('muted'.toJS, false.toJS);
+                      debugPrint('[VIDSTACK] Auto-unmuted.');
+                    }
+                  } catch (e) {
+                    debugPrint('[VIDSTACK] Auto-unmute failed: $e');
+                  }
                 }.toJS);
 
             void handleFullscreenExit(web.Event e) {
@@ -684,8 +664,6 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
                       ?.toDart ??
                   false;
               if (isPaused == true) {
-                print(
-                    '[VIDSTACK] iOS Fullscreen Exit Detected - Resuming Playback');
                 try {
                   (player as JSObject).callMethod('play'.toJS, JSArray());
                   setLoader(true);
@@ -721,7 +699,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             player.addEventListener(
                 'provider-change',
                 (web.Event event) {
-                  print('[VIDSTACK] Provider changed.');
+                  // Provider changed - no action needed
                 }.toJS);
 
             player.addEventListener(
@@ -744,56 +722,19 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             player.addEventListener(
                 'error',
                 (web.Event event) {
-                  final detail = (event as JSObject).getProperty('detail'.toJS);
-                  print('[VIDSTACK] Error Event: $detail');
                   setLoader(true);
                   _handleErrorLogic();
                 }.toJS);
 
-            // Debugging Stalls
-            player.addEventListener(
-                'loaded-metadata',
-                (web.Event e) {
-                  print('[VIDSTACK] Event: loaded-metadata');
-                }.toJS);
-            player.addEventListener(
-                'loaded-data',
-                (web.Event e) {
-                  print('[VIDSTACK] Event: loaded-data');
-                }.toJS);
-            player.addEventListener(
-                'can-play',
-                (web.Event e) {
-                  print('[VIDSTACK] Event: can-play');
-                }.toJS);
-            player.addEventListener(
-                'stalled',
-                (web.Event e) {
-                  print('[VIDSTACK] Event: stalled');
-                }.toJS);
-            player.addEventListener(
-                'suspend',
-                (web.Event e) {
-                  print('[VIDSTACK] Event: suspend');
-                }.toJS);
-            player.addEventListener(
-                'waiting',
-                (web.Event e) {
-                  print('[VIDSTACK] Event: waiting');
-                }.toJS);
-
-            print('[VIDSTACK_IMPL] Player listeners added');
           } catch (e) {
-            print('[VIDSTACK_IMPL] Error adding player listeners: $e');
+            // Error adding player listeners
           }
         }
 
         try {
-          print('[VIDSTACK_IMPL] Calling _loadSource...');
           _loadSource(initialUrl);
-          print('[VIDSTACK_IMPL] _loadSource called');
         } catch (e) {
-          print('[VIDSTACK_IMPL] Error calling _loadSource: $e');
+          // Error calling _loadSource
         }
       },
     );

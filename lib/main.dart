@@ -28,7 +28,6 @@ import 'package:hesen/widgets.dart';
 import 'dart:async';
 import 'package:hesen/privacy_policy_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:hesen/player_utils/web_player_registry.dart';
 import 'package:hesen/services/auth_service.dart';
@@ -137,13 +136,6 @@ Future<void> main() async {
 
   // Dashboard / Telemetry
   final initFuture = _initializeDeviceId();
-
-  // 4. Background Config
-  try {
-    await dotenv.load(fileName: ".env");
-  } catch (e) {
-    debugPrint(".env warning (safely ignored).");
-  }
 
   // Initialize other services that depend on Firebase
   if (!kIsWeb && defaultTargetPlatform != TargetPlatform.windows) {
@@ -668,13 +660,9 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   void _sendDeviceInfoToServer({required String name, required String? token}) {
     if (token == null) {
-      debugPrint('Cannot send user info to server: FCM token is null.');
       return;
     }
-    debugPrint('--- SENDING USER INFO TO SERVER (SIMULATION) ---');
-    debugPrint('User Name: $name');
-    debugPrint('FCM Token: $token');
-    debugPrint('-------------------------------------------------');
+    // Simulation logic omitted for cleanliness
   }
 
   Future<void> _checkAndAskForName() async {
@@ -1802,17 +1790,32 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
     int? contentId,
     String? category,
   }) async {
-    await navigatorKey.currentState?.push(
-      MaterialPageRoute(
-        builder: (context) => VideoPlayerScreen(
-          initialUrl: initialUrl,
-          streamLinks: streamLinks,
-          isLocked: isLocked,
-          contentId: contentId,
-          category: category,
-        ),
-      ),
+    final videoScreen = VideoPlayerScreen(
+      initialUrl: initialUrl,
+      streamLinks: streamLinks,
+      isLocked: isLocked,
+      contentId: contentId,
+      category: category,
     );
+
+    if (kIsWeb) {
+      // Web: Use lightweight fade transition (slide composites 2 layers = heavy for WASM)
+      await navigatorKey.currentState?.push(
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => videoScreen,
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+          transitionDuration: const Duration(milliseconds: 200),
+          reverseTransitionDuration: const Duration(milliseconds: 150),
+        ),
+      );
+    } else {
+      // Mobile/Desktop: Keep the standard Material transition
+      await navigatorKey.currentState?.push(
+        MaterialPageRoute(builder: (context) => videoScreen),
+      );
+    }
   }
 
   List<Widget> _buildAppBarActions() {
@@ -2652,12 +2655,6 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
             _retryChannels,
           );
         } else {
-          debugPrint(
-            "DEBUG UI: ChannelsSection receiving (Filtered: ${_filteredChannels.length} / Total: ${channels.length})",
-          );
-          debugPrint(
-            "DEBUG UI: Current Search Query: '${_searchController.text}'",
-          );
           return ChannelsSection(
             channelCategories: _filteredChannels,
             openVideo: openVideo,

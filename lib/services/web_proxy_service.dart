@@ -7,7 +7,7 @@ class WebProxyService {
   static const String _workerUrl = 'https://hi.husseinh2711.workers.dev/?url=';
 
   /// يعيد الرابط مبركساً مع تشفير كامل للرابط الأصلي لضمان عمل الـ Tokens والـ Query Params
-  static String getProxiedUrl(String url) {
+  static String getProxiedUrl(String url, {String? referer}) {
     if (url.isEmpty) return url;
 
     // تشفير الرابط ضروري جداً لتجنب قطع الروابط التي تحتوي على & أو ?
@@ -15,8 +15,14 @@ class WebProxyService {
 
     // إضافة User-Agent لضمان عدم الحظر من السيرفرات
     const workerSuffix = '&ua=VLC%2F3.0.18%20LibVLC%2F3.0.18';
+    
+    String finalProxied = '$_workerUrl$encodedUrl$workerSuffix';
+    
+    if (referer != null && referer.isNotEmpty) {
+      finalProxied += '&ref=${Uri.encodeComponent(referer)}';
+    }
 
-    return '$_workerUrl$encodedUrl$workerSuffix';
+    return finalProxied;
   }
 
   // القائمة الذهبية للبروكسيات (للتوافق مع الكود القديم إن وجد)
@@ -32,8 +38,8 @@ class WebProxyService {
     return [getProxiedUrl(url)];
   }
 
-  /// (Deprecated) Returns the first proxy
-  static String proxiedUrl(String url) {
-    return url; // Don't auto-proxy anything anymore
+  /// Returns the proxied URL using the golden worker
+  static String proxiedUrl(String url, {String? referer, String? userAgent}) {
+    return getProxiedUrl(url, referer: referer);
   }
 }

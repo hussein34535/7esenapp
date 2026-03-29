@@ -6,7 +6,6 @@ import 'dart:convert';
 
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
-import 'package:hesen/utils/video_thumbnail_helper.dart';
 
 class GoalsSection extends StatefulWidget {
   final Future<List<dynamic>> goalsArticles;
@@ -121,7 +120,7 @@ class _GoalsSectionState extends State<GoalsSection> {
               return GoalBox(
                 goal: goals[index],
                 openVideo: widget.openVideo,
-                loadThumbnail: index < 3, // Only load most recent 3
+                loadThumbnail: true, // Loads when scrolled into view
               );
             },
           );
@@ -135,7 +134,7 @@ class _GoalsSectionState extends State<GoalsSection> {
             return GoalBox(
               goal: goals[index],
               openVideo: widget.openVideo,
-              loadThumbnail: index < 3, // Only load most recent 3
+              loadThumbnail: true, // Loads when scrolled into view
             );
           },
         );
@@ -343,6 +342,16 @@ class _GoalBoxState extends State<GoalBox> {
       int? id = int.tryParse(widget.goal['id']?.toString() ?? '');
       String firstUrl = streamLinks.isNotEmpty ? streamLinks[0]['url'] : '';
 
+      // On Web, always open the full player (Vidstack) instead of trying inline media_kit playback
+      // This ensures better compatibility (especially on iOS) and access to resolved ok.ru streams.
+      if (kIsWeb) {
+        if (firstUrl.isNotEmpty || isPremium) {
+          widget.openVideo(context, firstUrl, streamLinks, 'goals',
+              contentId: id, isPremium: isPremium);
+        }
+        return;
+      }
+
       if (firstUrl.isNotEmpty) {
         if (_isPlayingInline) {
           // Stop playback and reset to show thumbnail
@@ -502,15 +511,12 @@ class _GoalBoxState extends State<GoalBox> {
                                         errorWidget: (context, url, error) =>
                                             const Icon(Icons.error),
                                       );
-                                    } else if (streamLinks.isNotEmpty &&
-                                        widget.loadThumbnail) {
-                                      return VideoThumbnail(
-                                          url: streamLinks[0]['url']);
                                     } else {
+                                      // Fallback completely to an empty placeholder when no image from API
                                       return Container(
                                         color: Colors.black26,
                                         child: const Icon(
-                                            Icons.play_circle_outline,
+                                            Icons.image_not_supported_outlined,
                                             color: Colors.white24,
                                             size: 50),
                                       );
@@ -624,7 +630,6 @@ class _GoalBoxState extends State<GoalBox> {
                             ),
                           ],
                         ),
-                        // Issue 3: Removed "عرض الفيديو" text
                       ],
                     ),
                   ],
@@ -636,161 +641,4 @@ class _GoalBoxState extends State<GoalBox> {
       ),
     );
   }
-}
-
-class VideoThumbnail extends StatefulWidget {
-  final String url;
-  const VideoThumbnail({super.key, required this.url});
-
-  @override
-  State<VideoThumbnail> createState() => _VideoThumbnailState();
-}
-
-class _VideoThumbnailState extends State<VideoThumbnail> {
-  Uint8List? _thumbnail;
-  bool _isLoading = false;
-
-  // Static queue to limit concurrent extractions (improves performance)
-  static final List<_VideoThumbnailState> _queue = [];
-  static bool _isProcessing = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _thumbnail = ThumbnailCache.get(widget.url);
-    if (_thumbnail == null && widget.url.isNotEmpty) {
-      _enqueueExtraction();
-    }
-  }
-
-  void _enqueueExtraction() {
-    if (!_queue.contains(this)) {
-      _queue.add(this);
-    }
-    if (!_isProcessing) {
-      _startQueueProcessing();
-    }
-  }
-
-  static void _startQueueProcessing() {
-    if (_isProcessing) return;
-    _isProcessing = true;
-    // Reduced initial delay to 1 second as promised
-    // Snappier feel while still preventing peak load.
-    Future.delayed(const Duration(seconds: 1), () {
-      _processNextInQueue();
-    });
-  }
-
-  static Future<void> _processNextInQueue() async {
-    if (_queue.isEmpty) {
-      _isProcessing = false;
-      return;
-    }
-
-    final state = _queue.removeAt(0);
-    if (state.mounted && state._thumbnail == null) {
-      await state._extractThumbnail();
-      // Delay between extractions for smoothness
-      await Future.delayed(const Duration(milliseconds: 1000));
-    }
-
-    // Process next item
-    _processNextInQueue();
-  }
-
-  Future<void> _extractThumbnail() async {
-    if (kIsWeb) return;
-
-    if (!mounted || _isLoading || widget.url.isEmpty) return;
-    setState(() => _isLoading = true);
-
-    try {
-      final uri = Uri.tryParse(widget.url);
-      if (uri == null || !uri.hasScheme) {
-        setState(() => _isLoading = false);
-        return;
-      }
-
-      if (defaultTargetPlatform == TargetPlatform.android ||
-          defaultTargetPlatform == TargetPlatform.iOS) {
-        final Uint8List? thumbnail =
-            await VideoThumbnailHelper.getThumbnail(widget.url);
-
-        if (thumbnail != null && thumbnail.isNotEmpty) {
-          ThumbnailCache.set(widget.url, thumbnail);
-          if (mounted) {
-            setState(() {
-              _thumbnail = thumbnail;
-              _isLoading = false;
-            });
-          }
-          return;
-        }
-      } else if (defaultTargetPlatform == TargetPlatform.windows) {
-        Player? player;
-        try {
-          player = Player();
-          await player.setVolume(0);
-          await player.open(Media(widget.url), play: true);
-          await Future.delayed(const Duration(seconds: 2));
-
-          if (!mounted) {
-            await player.dispose();
-            return;
-          }
-
-          final screenshot = await player.screenshot();
-          if (screenshot != null && screenshot.isNotEmpty) {
-            ThumbnailCache.set(widget.url, screenshot);
-            if (mounted) {
-              setState(() {
-                _thumbnail = screenshot;
-                _isLoading = false;
-              });
-            }
-            return;
-          }
-        } finally {
-          await player?.dispose();
-        }
-      }
-    } catch (e) {
-      debugPrint("Thumbnail Extraction Error: $e");
-    } finally {
-      if (mounted && _isLoading) setState(() => _isLoading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_thumbnail != null) {
-      return Image.memory(
-        _thumbnail!,
-        fit: BoxFit.cover,
-      );
-    }
-
-    return Container(
-      color: Colors.black,
-      child: Center(
-        child: _isLoading
-            ? const SizedBox(
-                width: 30,
-                height: 30,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white24,
-                ),
-              )
-            : const SizedBox.shrink(),
-      ),
-    );
-  }
-}
-
-class ThumbnailCache {
-  static final Map<String, Uint8List> _cache = {};
-  static Uint8List? get(String url) => _cache[url];
-  static void set(String url, Uint8List data) => _cache[url] = data;
 }

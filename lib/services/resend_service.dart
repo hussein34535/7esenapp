@@ -1,7 +1,6 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:math';
 
 class ResendService {
@@ -13,8 +12,8 @@ class ResendService {
 
   /// Sends a verification code to the specified email using Resend.
   static Future<bool> sendVerificationCode(String email) async {
-    final apiKey = dotenv.env['RESEND_API_KEY'];
-    if (apiKey == null || apiKey.isEmpty) {
+    const apiKey = String.fromEnvironment('RESEND_API_KEY');
+    if (apiKey.isEmpty) {
       debugPrint("ResendService Error: RESEND_API_KEY not found in .env");
       return false;
     }
@@ -88,8 +87,8 @@ class ResendService {
     required String imageUrl,
     String? paymentIdentifier,
   }) async {
-    final apiKey = dotenv.env['RESEND_API_KEY'];
-    if (apiKey == null || apiKey.isEmpty) return false;
+    const apiKey = String.fromEnvironment('RESEND_API_KEY');
+    if (apiKey.isEmpty) return false;
 
     try {
       final response = await http.post(
@@ -128,8 +127,8 @@ class ResendService {
 
   /// Sends a welcome/activation email to the user.
   static Future<bool> sendUserActivationNotification(String email) async {
-    final apiKey = dotenv.env['RESEND_API_KEY'];
-    if (apiKey == null || apiKey.isEmpty) return false;
+    const apiKey = String.fromEnvironment('RESEND_API_KEY');
+    if (apiKey.isEmpty) return false;
 
     try {
       final response = await http.post(

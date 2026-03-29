@@ -99,12 +99,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    WakelockPlus.enable();
+    // Skip orientation/system UI on Web - not supported and causes layout jank
+    if (!kIsWeb) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      WakelockPlus.enable();
+    }
 
     if (widget.isLocked && widget.contentId != null) {
       _isLoading = true;
@@ -113,7 +116,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       _isLoading = true;
       _validStreamLinks = List<Map<String, dynamic>>.from(widget.streamLinks);
       _currentStreamUrl = widget.initialUrl;
-      _initializePlayerInternal(_currentStreamUrl!);
+      // Defer player init to let page transition animation complete
+      Future.delayed(const Duration(milliseconds: 400), () {
+        if (mounted) _initializePlayerInternal(_currentStreamUrl!);
+      });
     }
 
     _pipHelper = PipHelper(
@@ -358,13 +364,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _hideControlsTimer?.cancel();
-    _bufferingRetryTimer?.cancel(); // MODIFIED: Cancel buffering timer
+    _bufferingRetryTimer?.cancel();
     _connectivitySubscription?.cancel();
     _animationController.dispose();
     _releaseControllers().then((_) {
-      WakelockPlus.disable();
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-      SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+      if (!kIsWeb) {
+        WakelockPlus.disable();
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+        SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+      }
     });
     super.dispose();
   }
@@ -571,7 +579,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     }
 
     // Enable WakeLock to keep screen on during playback (Mobile & Web)
-    WakelockPlus.enable();
+    if (!kIsWeb) {
+      WakelockPlus.enable();
+    }
 
     debugPrint('[HESEN PLAYER] Initializing player with sourceUrl: $sourceUrl');
     await _releaseControllers();
@@ -609,7 +619,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
           }
           return;
         } else if (urlToProcess.contains('ok.ru/')) {
-          // Ok.ru - Extract ID then use direct embed (no API call needed on web)
+          // Ok.ru - Resolve to direct stream for Vidstack on Web
           String? videoId;
           if (urlToProcess.contains('/video/')) {
             videoId = urlToProcess.split('/video/').last.split('?').first;
@@ -618,11 +628,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
           }
 
           if (videoId != null && videoId.isNotEmpty) {
-            // ✅ استخدم رابط Embed مباشر (Vidstack يدعمه)
-            videoUrlToLoad = 'https://ok.ru/videoembed/$videoId';
-            debugPrint('[WEB] Ok.ru embed URL: $videoUrlToLoad');
+            debugPrint('[WEB] Resolving Ok.ru stream for ID: $videoId');
+            final resolvedUrl = await getOkruStreamUrl(videoId);
+            if (resolvedUrl != null && resolvedUrl.isNotEmpty) {
+              videoUrlToLoad = WebProxyService.proxiedUrl(resolvedUrl);
+              debugPrint('[WEB] Resolved Ok.ru stream: $videoUrlToLoad');
+            } else {
+              videoUrlToLoad = WebProxyService.proxiedUrl(urlToProcess);
+            }
           } else {
-            // ✅ إذا فشل، استخدم الرابط الخام مع Proxy
             videoUrlToLoad = WebProxyService.proxiedUrl(urlToProcess);
           }
         } else {
@@ -1030,7 +1044,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     if (kIsWeb) {
       String urlToUse = newStreamUrl;
 
-      // Apply proxy if needed
+      // Apply proxy and resolution if needed
       if (!newStreamUrl.contains('youtube.com') &&
           !newStreamUrl.contains('youtu.be')) {
         if (newStreamUrl.contains('ok.ru/')) {
@@ -1041,7 +1055,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
             videoId = newStreamUrl.split('/live/').last.split('?').first;
           }
           if (videoId != null && videoId.isNotEmpty) {
-            urlToUse = 'https://ok.ru/videoembed/$videoId';
+            final resolvedUrl = await getOkruStreamUrl(videoId);
+            urlToUse = WebProxyService.proxiedUrl(resolvedUrl ?? newStreamUrl);
           } else {
             urlToUse = WebProxyService.proxiedUrl(newStreamUrl);
           }

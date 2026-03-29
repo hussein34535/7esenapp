@@ -84,10 +84,10 @@
 
 ## 3. تعليمات البناء والرفع (Build & Deploy)
 
-بما أن المشروع يستخدم تعديلات خاصة في الويب، يفضل استخدام الأمر التالي للبناء لضمان التوافق:
+بما أن المشروع يعتمد الآن على WebAssembly (WASM) للأداء العالي وتأمين المفاتيح، يجب استخدام الأمر التالي للبناء مع توفير المفاتيح السرية (بيئة العمل):
 
 ```bash
-flutter build web --release --dart-define=FLUTTER_WEB_RENDERER=html
+flutter build web --wasm --dart-define=RESEND_API_KEY="YOUR_RESEND_KEY_HERE" --dart-define=CRYPTO_SECRET="YOUR_CRYPTO_SECRET_HERE" --dart-define=GITHUB_TOKEN="YOUR_GITHUB_TOKEN_HERE" --dart-define=UNITY_GAME_ID="YOUR_UNITY_ID_HERE"
 ```
 
 ### الرفع للسيرفر (Deploy)
@@ -123,7 +123,7 @@ flutter build web --release --dart-define=FLUTTER_WEB_RENDERER=html
 
 ## 5. ملاحظات النشر والتحديثات الأخيرة (Jan 2026 Updates)
 
-### أ. نشر التطبيق على سيرفر Oracle (Deployment Instructions)
+### أ. نشر التطبيق على سيرفر Oracle (WASM Deployment)
 للتعامل مع سيرفر Oracle الخاص بالمشروع (`141.147.40.102`)، استخدم الأوامر التالية بدقة:
 
 1. **تحضير الصلاحيات (بما أن المستخدم `ubuntu` هو المسموح له بالدخول):**
@@ -131,15 +131,29 @@ flutter build web --release --dart-define=FLUTTER_WEB_RENDERER=html
    ssh -i "C:\Users\husso\Downloads\ssh-key-2025-10-30 (1).key" ubuntu@141.147.40.102 "sudo chown -R ubuntu:ubuntu /var/www/hesen"
    ```
 
-2. **رفع ملفات الويب (`scp`):**
-   تأكد أنك قمت ببناء المشروع أولاً (`flutter build web --release --dart-define=FLUTTER_WEB_RENDERER=html`).
+2. **بناء المشروع (WASM Secure Build):**
+   يجب أن تتأكد من البناء باستخدام الأمر الآمن قبل الرفع:
+   ```powershell
+   flutter build web --wasm --dart-define=RESEND_API_KEY="YOUR_RESEND_KEY_HERE" --dart-define=CRYPTO_SECRET="YOUR_CRYPTO_SECRET_HERE" --dart-define=GITHUB_TOKEN="YOUR_GITHUB_TOKEN_HERE" --dart-define=UNITY_GAME_ID="YOUR_UNITY_ID_HERE"
+   ```
+
+3. **رفع ملفات الويب (`scp`):**
+   يفضل ضغط مجلد المشارك `build/web` أو استخدام `scp` مباشرة (تأكد من شمول مجلدات `.wasm`):
    ```powershell
    scp -r -i "C:\Users\husso\Downloads\ssh-key-2025-10-30 (1).key" "D:\flutterproject\hesen\build\web\*" ubuntu@141.147.40.102:/var/www/hesen/
    ```
 
-3. **إعادة ضبط الصلاحيات (لخادم الويب Nginx/Apache):**
+4. **إعادة ضبط الصلاحيات (لخادم الويب Nginx/Apache):**
    ```powershell
    ssh -i "C:\Users\husso\Downloads\ssh-key-2025-10-30 (1).key" ubuntu@141.147.40.102 "sudo chown -R www-data:www-data /var/www/hesen && sudo chmod -R 755 /var/www/hesen"
+   ```
+
+5. **تنبيه هام جداً عن Nginx:**
+   تطبيقات WASM تتطلب إعدادات `Headers` إجبارية في Nginx لتعمل، تأكد من وجود هذه الأسطر في ملف الـ vhost الخاص بـ hesen:
+   ```nginx
+   add_header Cross-Origin-Embedder-Policy "require-corp";
+   add_header Cross-Origin-Opener-Policy "same-origin";
+   types { application/wasm weba wasm; }
    ```
 
 ### ب. تصميم واجهة المباريات (MatchBox Layout) - **هام جداً**

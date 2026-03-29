@@ -14,10 +14,20 @@ void removeWebSplash() {
 }
 
 void handleWebFirebaseError(dynamic e) {
+  debugPrint("Firebase Init Error (Raw): $e");
   if (e is JSObject) {
     try {
-      final msg = e.getProperty('message'.toJS);
-      debugPrint("Firebase Init Error (JS Detail): $msg");
-    } catch (_) {}
+      final jsObj = e;
+      if (jsObj.hasProperty('message'.toJS).toDart) {
+        final msg = jsObj.getProperty('message'.toJS);
+        debugPrint("Firebase Init Error (JS Detail): $msg");
+      }
+      if (jsObj.hasProperty('code'.toJS).toDart) {
+        final code = jsObj.getProperty('code'.toJS);
+        debugPrint("Firebase Init Error (JS Code): $code");
+      }
+    } catch (err) {
+      debugPrint("Error extracting JS details: $err");
+    }
   }
 }

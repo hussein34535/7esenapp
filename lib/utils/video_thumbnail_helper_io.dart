@@ -13,6 +13,7 @@ class VideoThumbnailImpl {
           imageFormat: vt.ImageFormat.JPEG,
           maxWidth: 640,
           quality: 75,
+          timeMs: 5000,
         ).timeout(const Duration(seconds: 10), onTimeout: () => null);
       }
       // Windows logic was custom in the original file, handling separately or via media_kit there.

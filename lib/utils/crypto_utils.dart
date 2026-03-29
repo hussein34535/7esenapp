@@ -1,13 +1,12 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:crypto/crypto.dart';
 
 class CryptoUtils {
   static String decrypt(String base64Encrypted) {
     // A single long secret is retrieved from environment variables.
-    final String secret = dotenv.env['CRYPTO_SECRET'] ?? '';
+    const String secret = String.fromEnvironment('CRYPTO_SECRET');
 
     if (secret.isEmpty || base64Encrypted.isEmpty) {
       print('Decryption failed: Secret key or encrypted data is missing.');

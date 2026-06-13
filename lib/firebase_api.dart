@@ -1,4 +1,4 @@
-import 'package:hesen/main.dart';
+import 'package:hesen/navigation.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
@@ -24,7 +24,7 @@ class FirebaseApi {
     }
   }
 
-  void HandleMessage(RemoteMessage? message) {
+  void handleMessage(RemoteMessage? message) {
     if (message == null) return;
     navigatorKey.currentState?.pushNamed(
       '/notification_screen',
@@ -33,7 +33,7 @@ class FirebaseApi {
   }
 
   Future initPushNotification() async {
-    FirebaseMessaging.instance.getInitialMessage().then(HandleMessage);
-    FirebaseMessaging.onMessageOpenedApp.listen(HandleMessage);
+    FirebaseMessaging.instance.getInitialMessage().then(handleMessage);
+    FirebaseMessaging.onMessageOpenedApp.listen(handleMessage);
   }
 }

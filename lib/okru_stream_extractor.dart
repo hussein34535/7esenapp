@@ -1,7 +1,5 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:flutter/foundation.dart'; // Added kIsWeb
-import 'package:hesen/services/web_proxy_service.dart'; // Added WebProxyService
 import 'package:html_unescape/html_unescape.dart';
 
 const String _userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)';
@@ -23,7 +21,7 @@ Future<String?> getOkruStreamUrl(String videoId) async {
     // Use Uri.https to correctly handle encoding of special characters in videoId
     final videoUri = Uri.https('ok.ru', '/video/$videoId');
     String videoUrl = videoUri.toString();
-    if (kIsWeb) videoUrl = WebProxyService.getProxiedUrl(videoUrl);
+    // if (kIsWeb) videoUrl = WebProxyService.getProxiedUrl(videoUrl); // Removed to avoid double-proxy
 
     final res = await http.get(Uri.parse(videoUrl), headers: headers).timeout(const Duration(seconds: 15));
 
@@ -53,7 +51,7 @@ Future<String?> getOkruStreamUrl(String videoId) async {
           'mid': videoId,
         });
         String metaApiUrl = metaApi.toString();
-        if (kIsWeb) metaApiUrl = WebProxyService.getProxiedUrl(metaApiUrl);
+        // if (kIsWeb) metaApiUrl = WebProxyService.getProxiedUrl(metaApiUrl); // Removed
 
         final apiRes = await http
             .get(Uri.parse(metaApiUrl), headers: headers)
@@ -127,7 +125,7 @@ Future<String?> getOkruStreamUrl(String videoId) async {
         }
 
         String targetUrl = sanitizedMetaUrl;
-        if (kIsWeb) targetUrl = WebProxyService.getProxiedUrl(targetUrl);
+        // if (kIsWeb) targetUrl = WebProxyService.getProxiedUrl(targetUrl); // Removed
 
         final metaRes = await http
             .post(

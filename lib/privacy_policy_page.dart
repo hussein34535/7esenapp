@@ -16,7 +16,7 @@ class PrivacyPolicyPage extends StatelessWidget {
           text: TextSpan(
             style: TextStyle(
                 fontSize: 16,
-                color: Theme.of(context).textTheme.bodyLarge!.color),
+                color: Theme.of(context).textTheme.bodyLarge?.color ?? Colors.white),
             children: [
               TextSpan(
                 text: '7eSen TV Application\n\n',

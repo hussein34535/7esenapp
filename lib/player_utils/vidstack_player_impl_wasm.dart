@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:hesen/player_utils/video_player_wasm.dart'; // Import WASM version
 import 'package:hesen/services/web_proxy_service.dart';
 import 'package:web/web.dart' as web;
@@ -30,10 +31,10 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
   Timer? _safetyTimer; // Safety timer for black screen
   bool _controlsVisible = true;
   int _retryCount = 0; // Track retries for current stream
-  bool _usedProxyForCurrentStream =
-      false; // Flag to track if we switched to proxy
+  bool _usedProxyForCurrentStream = false; // Flag to track if we switched to proxy
   String _currentUrl = ""; // Track the ACTUAL current playing URL
   int _loadRequestId = 0; // Prevent race conditions in async load
+  bool _isPlayerInitializing = false; // NEW: Track initialization state
   Timer? _retryTimer; // To cancel pending retries
 
   @override
@@ -46,9 +47,12 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
   void didUpdateWidget(VidstackPlayerImpl oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.url != oldWidget.url && _currentPlayer != null) {
-      _retryCount = 0; // Reset on new URL
-      _usedProxyForCurrentStream = false; // direct first
+      _retryCount = 0;
+      _usedProxyForCurrentStream = false;
       _currentUrl = widget.url;
+      _loadRequestId++;
+      _isPlayerInitializing = false;
+      _safetyTimer?.cancel();
       _loadSource(widget.url);
       _updateActiveButton(widget.url);
     }
@@ -57,7 +61,25 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
   @override
   void dispose() {
     _safetyTimer?.cancel();
+    _retryTimer?.cancel();
+    _overlayTimer?.cancel();
+
+    if (_currentPlayer != null) {
+      try {
+        (_currentPlayer as JSObject).callMethod('destroy'.toJS, JSArray());
+      } catch (e) {
+        debugPrint('[VIDSTACK] Ignored destroy error: $e');
+      }
+    }
     super.dispose();
+  }
+
+  // 🛡️ FIX: Prevent TypeError in Debug Mode when Flutter inspects JS objects
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    // Do NOT add _currentPlayer or other JS objects here as they cause
+    // 'LegacyJavaScriptObject is not a subtype of DiagnosticsNode' in WASM
   }
 
   void _showControls() {
@@ -69,7 +91,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
   }
 
   void _hideControls() {
-    // Only hide if playing
+    if (_currentPlayer == null) return;
     final isPaused =
         ((_currentPlayer as JSObject).getProperty('paused'.toJS) as JSBoolean?)
                 ?.toDart ??
@@ -78,7 +100,6 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
 
     _controlsVisible = false;
     _currentPlayer?.classList.remove('controls-visible');
-    // Sync with Native Controls
     _currentPlayer?.setAttribute('user-idle', 'true');
     _overlayTimer?.cancel();
   }
@@ -96,7 +117,15 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
 
   // Helper function to load source
   Future<void> _loadSource(String rawUrl) async {
-    if (_currentPlayer == null) return;
+    if (rawUrl.isEmpty) return;
+    
+    if (_isPlayerInitializing) return;
+    _isPlayerInitializing = true;
+
+    if (_currentPlayer == null) {
+      _isPlayerInitializing = false;
+      return;
+    }
 
     _loadRequestId++; // New request invalidates older ones
     final myRequestId = _loadRequestId;
@@ -111,48 +140,72 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
 
     try {
       String finalUrl = rawUrl;
+      // Extract original URL if it's already proxied to avoid double-proxying later
+      String rawTargetUrlForInterceptor = rawUrl;
 
-      // 1. Handle 7esenlink (JSON resolution)
-      // Works with both raw and proxied 7esenlink URLs
-      String? sevenEsenUrl;
-      if (finalUrl.contains('7esenlink.vercel.app')) {
-        if (finalUrl.contains('/proxy?url=')) {
-          // Already proxied — extract raw URL from query param
-          final uri = Uri.parse(finalUrl);
-          sevenEsenUrl = uri.queryParameters['url'];
-        } else {
-          sevenEsenUrl = finalUrl;
-        }
-      }
+      // 🛡️ OPTIMIZATION: If URL is already resolved by VideoPlayerScreen (e.g. proxied), SKIP heavy lookups
+      bool isPreResolved = finalUrl.contains('workers.dev') || finalUrl.contains('hi.husseinh2711.workers.dev');
 
-      if (sevenEsenUrl != null) {
+      if (isPreResolved) {
         try {
-          final jsonUri = Uri.parse(sevenEsenUrl).replace(queryParameters: {
-            ...Uri.parse(sevenEsenUrl).queryParameters,
-            'json': 'true'
-          });
-          // Fetch through our HTTPS proxy ONLY if it's an HTTP URL to avoid Mixed Content
-          final targetUrlStr = jsonUri.toString();
-          final proxyJsonUrl = targetUrlStr.startsWith('http://')
-              ? WebProxyService.getProxiedUrl(targetUrlStr)
-              : targetUrlStr;
-
-          // Use http package for WASM compatibility
-          final response = await http.get(Uri.parse(proxyJsonUrl));
-          if (myRequestId != _loadRequestId) return;
-
-          final jsonResponse = jsonDecode(response.body);
-          if (jsonResponse['url'] != null) {
-            finalUrl = jsonResponse['url'];
+          final uri = Uri.parse(finalUrl);
+          rawTargetUrlForInterceptor = uri.queryParameters['url'] ?? finalUrl;
+          debugPrint('[VIDSTACK] Extracted original URL for interceptor from proxy: $rawTargetUrlForInterceptor');
+        } catch (e) {}
+      } else {
+        // 1. Handle 7esenlink (JSON resolution)
+        String? sevenEsenUrl;
+        if (finalUrl.contains('7esenlink.vercel.app')) {
+          if (finalUrl.contains('/proxy?url=')) {
+            final uri = Uri.parse(finalUrl);
+            sevenEsenUrl = uri.queryParameters['url'];
+          } else {
+            sevenEsenUrl = finalUrl;
           }
-        } catch (e) {
-          // Error resolving 7esenlink - silently fall through
+        }
+
+        if (sevenEsenUrl != null) {
+          try {
+            final jsonUri = Uri.parse(sevenEsenUrl).replace(queryParameters: {
+              ...Uri.parse(sevenEsenUrl).queryParameters,
+              'json': 'true'
+            });
+            final targetUrlStr = jsonUri.toString();
+            final proxyJsonUrl = targetUrlStr.startsWith('http://')
+                ? WebProxyService.getProxiedUrl(targetUrlStr)
+                : targetUrlStr;
+
+            final response = await http.get(Uri.parse(proxyJsonUrl));
+            if (myRequestId != _loadRequestId) return;
+
+            final jsonResponse = jsonDecode(response.body);
+            if (jsonResponse['url'] != null) {
+              finalUrl = jsonResponse['url'];
+              rawTargetUrlForInterceptor = finalUrl;
+            }
+          } catch (e) {
+            // Error resolving 7esenlink - silently fall through
+          }
         }
       }
 
-      // 2. Handle IPTV (TS -> HLS)
-      if (finalUrl.contains(':8080') ||
-          (finalUrl.contains(':80') && !finalUrl.contains('stream.php'))) {
+      // 2. Handle IPTV (TS -> HLS) - Only for actual IPTV servers (numeric IPs with port 80/8080)
+      bool isActualIptv = false;
+      try {
+        final parsedUri = Uri.parse(finalUrl);
+        final host = parsedUri.host;
+        final port = parsedUri.port;
+        // Real IPTV servers are numeric IPs (e.g., 192.168.1.1:8080) not domain names
+        final isNumericHost = RegExp(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$').hasMatch(host);
+        isActualIptv = isNumericHost && (port == 8080 || port == 80);
+        // Also catch explicit :8080 or :80 in the authority for edge cases
+        if (!isActualIptv) {
+          final authority = parsedUri.authority;
+          isActualIptv = authority.endsWith(':8080') || (authority.endsWith(':80') && !finalUrl.contains('stream.php'));
+        }
+      } catch (_) {}
+      
+      if (isActualIptv) {
         Uri uri = Uri.parse(finalUrl);
         List<String> segments = List.from(uri.pathSegments);
         if (segments.length == 3 && segments[0] != 'live') {
@@ -194,9 +247,8 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
 
       // 5. Decide whether to use the JS Interceptor (Only for HLS)
       String sourceToUse = finalUrl;
-      bool isIptv = rawStreamUrl.contains(':8080') || rawStreamUrl.contains(':80');
       bool isProxied = finalUrl.contains('workers.dev');
-      bool shouldProxy = _usedProxyForCurrentStream || isIptv || isProxied;
+      bool shouldProxy = _usedProxyForCurrentStream || isActualIptv || isProxied;
 
 
       // We ONLY use the JS Interceptor for HLS because it rewrites playlists.
@@ -205,21 +257,41 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
 
       if (shouldUseInterceptor) {
         // Set global variables using js_interop for the interceptor
+        // Use the proxied URL so the interceptor can fetch it bypass CORS
         web.window.setProperty('currentStreamUrl'.toJS, rawStreamUrl.toJS);
         web.window.setProperty('isProxyMode'.toJS, true.toJS);
         // This dummy domain is intercepted by xhr_interceptor.js
         sourceToUse = 'https://proxy-live-stream/index.m3u8';
+        debugPrint('[VIDSTACK] Using JS Interceptor with proxied URL: $rawStreamUrl');
       }
 
-      // Create JS Object for src
-      final srcObj = JSObject();
-      srcObj.setProperty('src'.toJS, sourceToUse.toJS);
-      srcObj.setProperty('type'.toJS, type.toJS);
-
-      (_currentPlayer as JSObject).setProperty('src'.toJS, srcObj);
-      _currentPlayer!.setAttribute('title', isMp4 ? 'Video' : 'Live Stream');
+      // Assign src via a plain JS object using jsify()
+      final srcMap = {
+        'src': sourceToUse,
+        'type': type,
+      };
+      
+      try {
+        (_currentPlayer as JSObject).setProperty('src'.toJS, srcMap.jsify());
+      } catch (e) {
+        // Fallback setting attribute
+        _currentPlayer!.setAttribute('src', sourceToUse);
+      }
+      
+      // 🏁 Set title and stream type (Live vs VOD)
+      bool isMatch = rawStreamUrl.contains('dmcdn.net') || rawStreamUrl.contains('dailymotion.com');
+      String title = isMp4 ? 'Video' : (isMatch ? 'Full Match' : 'Live Stream');
+      
+      _currentPlayer!.setAttribute('title', title);
+      
+      // Force VOD type for matches and mp4 so seeker bar works properly
+      if (isMp4 || isMatch) {
+        _currentPlayer!.setAttribute('stream-type', 'vod');
+      }
     } catch (e) {
       _handleErrorLogic();
+    } finally {
+      _isPlayerInitializing = false;
     }
   }
 
@@ -253,8 +325,8 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         if (_linksContainer != null) {
           for (int i = 0; i < _linksContainer!.children.length; i++) {
             final child = _linksContainer!.children.item(i) as web.HTMLElement;
-            if (child.classList.contains('active')) {
-              currentRawUrl = child.dataset['raw-url'];
+            if (child.classList.contains('active') && child.hasAttribute('data-raw-url')) {
+              currentRawUrl = child.getAttribute('data-raw-url');
               break;
             }
           }
@@ -290,11 +362,13 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
     for (int i = 0; i < _linksContainer!.children.length; i++) {
       final child = _linksContainer!.children.item(i) as web.HTMLElement;
       if (child.tagName == 'BUTTON') {
-        final btnUrl = child.dataset['raw-url'];
-        if (btnUrl == currentUrl) {
-          child.classList.add('active');
-        } else {
-          child.classList.remove('active');
+        if (child.hasAttribute('data-raw-url')) {
+          final btnUrl = child.getAttribute('data-raw-url');
+          if (btnUrl == currentUrl) {
+            child.classList.add('active');
+          } else {
+            child.classList.remove('active');
+          }
         }
       }
     }
@@ -303,7 +377,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
   @override
   Widget build(BuildContext context) {
     return HtmlElementView(
-      key: ValueKey(widget.url),
+      key: const ValueKey('vidstack-player-stable'),
       viewType: 'vidstack-player',
       onPlatformViewCreated: (int viewId) {
         final element = vidstackViews[viewId];
@@ -612,27 +686,8 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
                   setLoader(false);
                   _safetyTimer?.cancel();
                   _retryCount = 0;
-
-                  final playerObj = player as JSObject;
-                  bool isPaused = false;
-                  try {
-                    if (playerObj.hasProperty('paused'.toJS).toDart) {
-                      isPaused = (playerObj.getProperty('paused'.toJS) as JSBoolean?)
-                              ?.toDart ??
-                          false;
-                    }
-                  } catch (e) {
-                    debugPrint('[VIDSTACK] Error checking paused state: $e');
-                  }
-
-                  if (isPaused) {
-                    try {
-                      playerObj.callMethod('play'.toJS, JSArray());
-                      setLoader(true);
-                    } catch (e) {
-                      debugPrint('[VIDSTACK] play() failed: $e');
-                    }
-                  }
+                  // We removed the manual .play() call here to prevent "AbortError" 
+                  // race conditions since the player handles autoplay natively.
                 }.toJS);
 
             player.addEventListener(

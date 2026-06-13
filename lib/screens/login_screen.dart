@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hesen/services/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:hesen/services/resend_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
@@ -18,8 +17,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _newPasswordController = TextEditingController();
-  final _otpController = TextEditingController();
   final _authService = AuthService();
   final _formKey = GlobalKey<FormState>();
 
@@ -29,14 +26,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _isLoading = false;
   bool _isLogin = true; // Toggle between Login and Signup
-  bool _showVerification = false; // Show OTP field
   bool _isForgotPassword = false; // Forgot Password flow
 
   Future<void> _pickImage() async {
+    if (!mounted) return;
     final XFile? pickedFile =
         await _picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
       final bytes = await pickedFile.readAsBytes();
+      if (!mounted) return;
       setState(() {
         _profileImage = pickedFile;
         _profileImageBytes = bytes;
@@ -50,74 +48,23 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      if (_showVerification) {
-        // Step 2: Verify OTP
-        final success = await ResendService.verifyCode(
-          _emailController.text.trim(),
-          _otpController.text.trim(),
+      if (_isForgotPassword) {
+        await _authService.sendPasswordResetEmail(_emailController.text.trim());
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك'),
+            backgroundColor: Colors.green,
+          ),
         );
+        setState(() {
+          _isForgotPassword = false;
+          _isLogin = true;
+        });
+        return;
+      }
 
-        if (!success) {
-          throw Exception('كود التحقق غير صحيح');
-        }
-
-        if (_isForgotPassword) {
-          // In-App Password Reset logic
-          // Normally this calls a backend that uses Admin SDK
-          debugPrint(
-              "RESET PASSWORD: Email: ${_emailController.text}, NewPass: ${_newPasswordController.text}, OTP: ${_otpController.text}");
-
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                  content: Text(
-                      'تم إعادة تعيين كلمة المرور بنجاح! يمكنك الدخول الآن'),
-                  backgroundColor: Colors.green),
-            );
-            setState(() {
-              _showVerification = false;
-              _isForgotPassword = false;
-              _isLogin = true;
-              _passwordController.text = _newPasswordController.text;
-            });
-          }
-        } else {
-          // Finish Signup
-          if (_profileImage == null) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('برجاء اختيار صورة شخصية')),
-              );
-              setState(() => _isLoading = false);
-            }
-            return;
-          }
-
-          final imageUrl = await CloudinaryService.uploadImage(_profileImage!);
-          final prefs = await SharedPreferences.getInstance();
-          final deviceId = prefs.getString('device_id');
-          await _authService.signUp(
-            email: _emailController.text.trim(),
-            password: _passwordController.text.trim(),
-            displayName: _nameController.text.trim(),
-            deviceId: deviceId,
-            imageUrl: imageUrl,
-          );
-          if (mounted) Navigator.of(context).pop();
-        }
-      } else if (_isForgotPassword) {
-        // Forgot Password Step 1: Send OTP
-        final success =
-            await ResendService.sendResetCode(_emailController.text.trim());
-        if (success) {
-          setState(() {
-            _showVerification = true;
-          });
-        } else {
-          throw Exception('فشل إرسال كود التحقق');
-        }
-      } else if (_isLogin) {
-        // Standard Login
+      if (_isLogin) {
         final prefs = await SharedPreferences.getInstance();
         final deviceId = prefs.getString('device_id');
         await _authService.signIn(
@@ -126,17 +73,39 @@ class _LoginScreenState extends State<LoginScreen> {
           deviceId: deviceId,
         );
         if (mounted) Navigator.of(context).pop();
-      } else {
-        // Signup Step 1: Send OTP
-        final success = await ResendService.sendVerificationCode(
-            _emailController.text.trim());
-        if (success) {
-          setState(() {
-            _showVerification = true;
-          });
-        } else {
-          throw Exception('فشل إرسال كود التحقق');
+        return;
+      }
+
+      if (_profileImage == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('برجاء اختيار صورة شخصية')),
+          );
+          setState(() => _isLoading = false);
         }
+        return;
+      }
+
+      final imageUrl = await CloudinaryService.uploadImage(_profileImage!);
+      final prefs = await SharedPreferences.getInstance();
+      final deviceId = prefs.getString('device_id');
+      await _authService.signUp(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+        displayName: _nameController.text.trim(),
+        deviceId: deviceId,
+        imageUrl: imageUrl,
+      );
+      await _authService.sendEmailVerification();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم إنشاء الحساب. تم إرسال رابط التحقق إلى بريدك'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.of(context).pop();
       }
     } catch (e) {
       String message = 'حدث خطأ غير متوقع، برجاء المحاولة لاحقاً';
@@ -183,7 +152,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       if (mounted) {
-        debugPrint("Auth Final Message: $message"); // Debug log
+        debugPrint("Auth Final Message: $message");
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(message, textAlign: TextAlign.center),
@@ -197,6 +166,14 @@ class _LoginScreenState extends State<LoginScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
   @override
@@ -235,13 +212,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    _showVerification
-                        ? 'تأكيد الحساب'
-                        : _isForgotPassword
-                            ? 'نسيت كلمة المرور'
-                            : _isLogin
-                                ? 'تسجيل الدخول'
-                                : 'إنشاء حساب جديد',
+                    _isForgotPassword
+                        ? 'نسيت كلمة المرور'
+                        : _isLogin
+                            ? 'تسجيل الدخول'
+                            : 'إنشاء حساب جديد',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 18,
@@ -251,9 +226,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 40),
 
                   // Profile Image Picker (Only for Signup)
-                  if (!_isLogin &&
-                      !_showVerification &&
-                      !_isForgotPassword) ...[
+                  if (!_isLogin && !_isForgotPassword) ...[
                     Center(
                       child: GestureDetector(
                         onTap: _pickImage,
@@ -291,9 +264,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
 
                   // Name Field (Only for Signup & Not verifying)
-                  if (!_isLogin &&
-                      !_showVerification &&
-                      !_isForgotPassword) ...[
+                  if (!_isLogin && !_isForgotPassword) ...[
                     TextFormField(
                       controller: _nameController,
                       style: const TextStyle(color: Colors.white),
@@ -328,92 +299,52 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 20),
                   ],
 
-                  // OTP Field (Only for Verification)
-                  if (_showVerification) ...[
-                    TextFormField(
-                      controller: _otpController,
-                      key: const ValueKey('otp_field'),
-                      maxLength: 6,
-                      keyboardType: TextInputType.number,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                          color: Colors.white, fontSize: 24, letterSpacing: 8),
-                      decoration: InputDecoration(
-                        labelText: 'كود التحقق',
-                        labelStyle: const TextStyle(color: Colors.grey),
-                        counterText: '',
-                        filled: true,
-                        fillColor: const Color(0xFF1E1E1E),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              const BorderSide(color: Colors.purple, width: 1),
-                        ),
+                  // Email Field
+                  TextFormField(
+                    controller: _emailController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'البريد الإلكتروني',
+                      labelStyle: const TextStyle(color: Colors.grey),
+                      prefixIcon: const Icon(Icons.email_outlined,
+                          color: Colors.grey),
+                      filled: true,
+                      fillColor: const Color(0xFF1E1E1E),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
                       ),
-                      validator: (value) {
-                        if (value == null || value.length < 4) {
-                          return 'كود غير صحيح';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'تم إرسال كود التحقق إلى ${_emailController.text}',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.grey, fontSize: 12),
-                    ),
-                    if (_isForgotPassword) ...[
-                      const SizedBox(height: 30),
-                      TextFormField(
-                        controller: _newPasswordController,
-                        obscureText: true,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: InputDecoration(
-                          labelText: 'كلمة المرور الجديدة',
-                          labelStyle: const TextStyle(color: Colors.grey),
-                          prefixIcon:
-                              const Icon(Icons.lock_reset, color: Colors.grey),
-                          filled: true,
-                          fillColor: const Color(0xFF1E1E1E),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                                color: Colors.purple, width: 1),
-                          ),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.length < 6) {
-                            return 'كلمة المرور يجب أن تكون 6 أحرف على الأقل';
-                          }
-                          return null;
-                        },
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
                       ),
-                    ],
-                    const SizedBox(height: 40),
-                  ],
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide:
+                            const BorderSide(color: Colors.purple, width: 1),
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null ||
+                          value.isEmpty ||
+                          !value.contains('@')) {
+                        return 'برجاء إدخال بريد إلكتروني صحيح';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 20),
 
-                  // Email Field (Hidden during verification)
-                  if (!_showVerification) ...[
+                  // Password Field (Only for Login/Signup)
+                  if (!_isForgotPassword) ...[
                     TextFormField(
-                      controller: _emailController,
+                      controller: _passwordController,
                       style: const TextStyle(color: Colors.white),
+                      obscureText: true,
                       decoration: InputDecoration(
-                        labelText: 'البريد الإلكتروني',
+                        labelText: 'كلمة المرور',
                         labelStyle: const TextStyle(color: Colors.grey),
-                        prefixIcon: const Icon(Icons.email_outlined,
+                        prefixIcon: const Icon(Icons.lock_outline,
                             color: Colors.grey),
                         filled: true,
                         fillColor: const Color(0xFF1E1E1E),
@@ -427,73 +358,34 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              const BorderSide(color: Colors.purple, width: 1),
+                          borderSide: const BorderSide(
+                              color: Colors.purple, width: 1),
                         ),
                       ),
                       validator: (value) {
-                        if (value == null ||
-                            value.isEmpty ||
-                            !value.contains('@')) {
-                          return 'برجاء إدخال بريد إلكتروني صحيح';
+                        if (value == null || value.length < 6) {
+                          return 'كلمة المرور يجب أن تكون 6 أحرف على الأقل';
                         }
                         return null;
                       },
                     ),
-                    const SizedBox(height: 20),
-
-                    // Password Field (Only for Login/Signup)
-                    if (!_isForgotPassword) ...[
-                      TextFormField(
-                        controller: _passwordController,
-                        style: const TextStyle(color: Colors.white),
-                        obscureText: true,
-                        decoration: InputDecoration(
-                          labelText: 'كلمة المرور',
-                          labelStyle: const TextStyle(color: Colors.grey),
-                          prefixIcon: const Icon(Icons.lock_outline,
-                              color: Colors.grey),
-                          filled: true,
-                          fillColor: const Color(0xFF1E1E1E),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                                color: Colors.purple, width: 1),
-                          ),
+                    const SizedBox(height: 10),
+                    if (_isLogin)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _isForgotPassword = true;
+                              _isLogin = false;
+                            });
+                          },
+                          child: const Text('نسيت كلمة المرور؟',
+                              style: TextStyle(
+                                  color: Colors.grey, fontSize: 13)),
                         ),
-                        validator: (value) {
-                          if (value == null || value.length < 6) {
-                            return 'كلمة المرور يجب أن تكون 6 أحرف على الأقل';
-                          }
-                          return null;
-                        },
                       ),
-                      const SizedBox(height: 10),
-                      if (_isLogin)
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: TextButton(
-                            onPressed: () {
-                              setState(() {
-                                _isForgotPassword = true;
-                                _isLogin = false;
-                              });
-                            },
-                            child: const Text('نسيت كلمة المرور؟',
-                                style: TextStyle(
-                                    color: Colors.grey, fontSize: 13)),
-                          ),
-                        ),
-                      const SizedBox(height: 30),
-                    ],
+                    const SizedBox(height: 30),
                   ],
 
                   // Action Button
@@ -515,13 +407,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                   color: Colors.white, strokeWidth: 2),
                             )
                           : Text(
-                              _showVerification
-                                  ? 'تأكيد الرمز'
-                                  : _isForgotPassword
-                                      ? 'استعادة الحساب'
-                                      : _isLogin
-                                          ? 'دخول'
-                                          : 'إنشاء حساب',
+                              _isForgotPassword
+                              ? 'إرسال رابط إعادة التعيين'
+                              : _isLogin
+                                  ? 'دخول'
+                                  : 'إنشاء حساب',
                               style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
@@ -536,9 +426,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextButton(
                     onPressed: () {
                       setState(() {
-                        if (_showVerification) {
-                          _showVerification = false;
-                        } else if (_isForgotPassword) {
+                        if (_isForgotPassword) {
                           _isForgotPassword = false;
                           _isLogin = true;
                         } else {
@@ -548,13 +436,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       });
                     },
                     child: Text(
-                      _showVerification
-                          ? 'الرجوع للبريد الإلكتروني'
-                          : _isForgotPassword
-                              ? 'الرجوع لتسجيل الدخول'
-                              : _isLogin
-                                  ? 'ليس لديك حساب؟ سجل الآن'
-                                  : 'لديك حساب بالفعل؟ سجل الدخول',
+                      _isForgotPassword
+                          ? 'الرجوع لتسجيل الدخول'
+                          : _isLogin
+                              ? 'ليس لديك حساب؟ سجل الآن'
+                              : 'لديك حساب بالفعل؟ سجل الدخول',
                       style: const TextStyle(color: Colors.purpleAccent),
                     ),
                   ),

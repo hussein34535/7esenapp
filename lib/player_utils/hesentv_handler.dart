@@ -8,7 +8,9 @@ int _findUrlIndexInList(String url, List<Map<String, dynamic>> list) {
 }
 
 Future<StreamDetails> handleHesenTvStream(String url) async {
-  final response = await http.get(Uri.parse(url));
+  final response = await http.get(Uri.parse(url)).timeout(
+    const Duration(seconds: 15),
+  );
 
   if (response.statusCode != 200) {
     throw Exception("API call failed with status code: ${response.statusCode}");

@@ -51,9 +51,11 @@ class AuthService {
         email: email,
         password: password,
       );
-      // Initialize User Data in Firestore (Skip on Web)
+      final user = result.user;
+      if (user == null) throw Exception("User creation succeeded but user is null");
+
       if (!kIsWeb) {
-        await _firestore.collection('users').doc(result.user!.uid).set({
+        await _firestore.collection('users').doc(user.uid).set({
           'name': displayName,
           'email': email,
           'createdAt': FieldValue.serverTimestamp(),
@@ -64,9 +66,8 @@ class AuthService {
           'photoUrl': imageUrl,
         });
       }
-      // Update Firebase User Display Name
-      await result.user!.updateDisplayName(displayName);
-      ApiService.sendTelemetry(result.user!.uid);
+      await user.updateDisplayName(displayName);
+      ApiService.sendTelemetry(user.uid);
       return result;
     } catch (e) {
       debugPrint("SignUp Error: $e");
@@ -86,12 +87,13 @@ class AuthService {
         email: email,
         password: password,
       );
-      if (cred.user != null) {
-        ApiService.sendTelemetry(cred.user!.uid);
+      final user = cred.user;
+      if (user != null) {
+        ApiService.sendTelemetry(user.uid);
         if (deviceId != null && !kIsWeb) {
           await _firestore
               .collection('users')
-              .doc(cred.user!.uid)
+              .doc(user.uid)
               .set({'activeDeviceId': deviceId}, SetOptions(merge: true));
         }
       }
@@ -120,6 +122,19 @@ class AuthService {
       debugPrint("Update User Name Error: $e");
       rethrow;
     }
+  }
+
+  // Send Email Verification
+  Future<void> sendEmailVerification() async {
+    final user = currentUser;
+    if (user == null) return;
+    await user.sendEmailVerification();
+  }
+
+  // Send Password Reset Email
+  Future<void> sendPasswordResetEmail(String email) async {
+    if (!isFirebaseInitialized) throw Exception("Firebase not initialized");
+    await _auth!.sendPasswordResetEmail(email: email);
   }
 
   // Sign Out
@@ -264,7 +279,7 @@ class AuthService {
           'type': type,
           'id': id,
         }),
-      );
+      ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);

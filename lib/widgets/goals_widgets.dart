@@ -3,9 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
+import 'dart:async';
 
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'package:hesen/utils/image_proxy.dart';
 
 class GoalsSection extends StatefulWidget {
   final Future<List<dynamic>> goalsArticles;
@@ -167,9 +169,13 @@ class _GoalBoxState extends State<GoalBox> {
   Player? _inlinePlayer;
   VideoController? _inlineController;
   double _videoAspectRatio = 16 / 9;
+  StreamSubscription? _widthSub;
+  StreamSubscription? _completedSub;
 
   @override
   void dispose() {
+    _widthSub?.cancel();
+    _completedSub?.cancel();
     _inlinePlayer?.dispose();
     _inlinePlayer = null;
     _inlineController = null;
@@ -184,11 +190,13 @@ class _GoalBoxState extends State<GoalBox> {
     });
 
     try {
+      _inlinePlayer?.dispose();
+      _widthSub?.cancel();
+      _completedSub?.cancel();
       _inlinePlayer = Player();
       _inlineController = VideoController(_inlinePlayer!);
 
-      // Listen to video size changes for dynamic aspect ratio
-      _inlinePlayer!.stream.width.listen((width) {
+      _widthSub = _inlinePlayer!.stream.width.listen((width) {
         if (!mounted) return;
         if (width != null && width > 0) {
           final height = _inlinePlayer!.state.height;
@@ -198,7 +206,7 @@ class _GoalBoxState extends State<GoalBox> {
         }
       });
 
-      _inlinePlayer!.stream.completed.listen((completed) {
+      _completedSub = _inlinePlayer!.stream.completed.listen((completed) {
         if (!mounted) return;
         if (completed) {
           setState(() => _isPlayingInline = false);
@@ -291,11 +299,11 @@ class _GoalBoxState extends State<GoalBox> {
     String? imageUrl;
     if (imageObj != null) {
       if (imageObj is String) {
-        imageUrl = imageObj;
+        imageUrl = imageObj.replaceAll('"', '').replaceAll("'", "").trim();
       } else if (imageObj is Map) {
         imageUrl = imageObj['url'];
       } else if (imageObj is List && imageObj.isNotEmpty) {
-        imageUrl = imageObj[0]['url'];
+        imageUrl = (imageObj[0] is Map ? imageObj[0]['url'] : null) as String?;
       }
     }
 
@@ -321,7 +329,9 @@ class _GoalBoxState extends State<GoalBox> {
                 child['type'] == 'link' &&
                 child['url'] != null) {
               streamLinks.add({
-                'name': child['children']?[0]['text'] ?? 'Link',
+                'name': child['children'] is List
+                    ? (child['children'][0]?['text']?.toString() ?? 'Link')
+                    : 'Link',
                 'url': child['url'],
               });
             }
@@ -495,9 +505,9 @@ class _GoalBoxState extends State<GoalBox> {
                                   child: Builder(builder: (context) {
                                     if (imageUrl != null &&
                                         imageUrl.isNotEmpty) {
-                                      return CachedNetworkImage(
-                                        imageUrl: imageUrl,
-                                        fit: BoxFit.cover,
+                                        return CachedNetworkImage(
+                                          imageUrl: ImageProxy.resolveUrl(imageUrl),
+                                          fit: BoxFit.cover,
                                         width: double.infinity,
                                         height: double.infinity,
                                         alignment: Alignment.center,

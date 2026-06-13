@@ -1,0 +1,269 @@
+﻿Analyzing hesen...                                              
+
+   info - Don't invoke 'print' in production code - lib\firebase_api.dart:22:7 - avoid_print
+   info - The variable name 'HandleMessage' isn't a lowerCamelCase identifier - lib\firebase_api.dart:27:8 - non_constant_identifier_names
+   info - Use 'const' with the constructor to improve performance - lib\main.dart:212:16 - prefer_const_constructors
+   info - Statements in an if should be enclosed in a block - lib\main.dart:1220:15 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\main.dart:1229:15 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\main.dart:1238:15 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\main.dart:1247:15 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\main.dart:1256:15 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\main.dart:1265:15 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\main.dart:1392:11 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\main.dart:1401:11 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\main.dart:1410:11 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\main.dart:1419:11 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\main.dart:1428:11 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\main.dart:1437:11 - curly_braces_in_flow_control_structures
+   info - Parameter 'key' could be a super parameter - lib\notification_page.dart:5:9 - use_super_parameters
+   info - Don't invoke 'print' in production code - lib\okru_stream_extractor.dart:26:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\okru_stream_extractor.dart:43:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\okru_stream_extractor.dart:82:9 - avoid_print
+   info - Don't invoke 'print' in production code - lib\okru_stream_extractor.dart:99:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\okru_stream_extractor.dart:116:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\okru_stream_extractor.dart:128:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\okru_stream_extractor.dart:134:9 - avoid_print
+   info - Don't invoke 'print' in production code - lib\okru_stream_extractor.dart:138:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\okru_stream_extractor.dart:146:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\okru_stream_extractor.dart:198:5 - avoid_print
+   info - Don't invoke 'print' in production code - lib\okru_stream_extractor.dart:201:5 - avoid_print
+   info - Don't invoke 'print' in production code - lib\okru_stream_extractor.dart:202:5 - avoid_print
+   info - Don't invoke 'print' in production code - lib\okru_stream_extractor.dart:203:5 - avoid_print
+   info - Don't invoke 'print' in production code - lib\okru_stream_extractor.dart:204:5 - avoid_print
+   info - Don't invoke 'print' in production code - lib\okru_stream_extractor.dart:205:5 - avoid_print
+   info - Don't invoke 'print' in production code - lib\okru_stream_extractor.dart:226:5 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\okru_playlist_parser.dart:64:5 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\video_player_wasm.dart:11:5 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\video_player_wasm.dart:14:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\video_player_wasm.dart:19:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\video_player_wasm.dart:23:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\video_player_wasm.dart:27:7 - avoid_print
+   info - 'dart:html' is deprecated and shouldn't be used. Use package:web and dart:js_interop instead - lib\player_utils\video_player_web.dart:2:1 - deprecated_member_use
+   info - Don't use web-only libraries outside Flutter web plugins - lib\player_utils\video_player_web.dart:2:1 - avoid_web_libraries_in_flutter
+   info - Don't invoke 'print' in production code - lib\player_utils\video_player_web.dart:11:5 - avoid_print
+   info - Parameter 'key' could be a super parameter - lib\player_utils\vidstack_player_impl_stub.dart:7:9 - use_super_parameters
+   info - Parameter 'key' could be a super parameter - lib\player_utils\vidstack_player_impl_wasm.dart:17:9 - use_super_parameters
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:112:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:144:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:153:13 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:156:11 - avoid_print
+   info - Statements in an if should be enclosed in a block - lib\player_utils\vidstack_player_impl_wasm.dart:169:13 - curly_braces_in_flow_control_structures
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:180:9 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:192:9 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:199:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:209:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:222:9 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:231:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:237:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:263:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:297:9 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:300:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:303:9 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:307:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:312:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:314:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:318:9 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:321:9 - avoid_print
+   info - Use 'const' for final variables initialized to a constant value - lib\player_utils\vidstack_player_impl_wasm.dart:324:11 - prefer_const_declarations
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:400:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:402:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:406:9 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:407:9 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:412:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:414:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:418:13 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:421:13 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:425:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:427:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:433:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:435:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:447:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:449:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:455:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:457:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:462:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:464:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:470:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:475:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:477:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:483:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:488:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:494:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:506:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:508:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:514:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:519:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:521:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:527:13 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:530:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:541:15 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:548:15 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:560:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:562:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:575:21 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:580:13 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:582:13 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:600:13 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:602:13 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:606:13 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:631:13 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:633:13 - avoid_print
+warning - The '!' will have no effect because the receiver can't be null - lib\player_utils\vidstack_player_impl_wasm.dart:640:21 - unnecessary_non_null_assertion
+warning - The '!' will have no effect because the receiver can't be null - lib\player_utils\vidstack_player_impl_wasm.dart:642:21 - unnecessary_non_null_assertion
+warning - The operand can't be 'null', so the condition is always 'true' - lib\player_utils\vidstack_player_impl_wasm.dart:647:20 - unnecessary_null_comparison
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:649:13 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:687:17 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:724:19 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:748:19 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:757:19 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:762:19 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:767:19 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:772:19 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:777:19 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:782:19 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:785:13 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:787:13 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:792:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:794:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_wasm.dart:796:11 - avoid_print
+   info - Unnecessary 'this.' qualifier - lib\player_utils\vidstack_player_impl_wasm.dart:805:32 - unnecessary_this
+   info - Statements in an if should be enclosed in a block - lib\player_utils\vidstack_player_impl_wasm.dart:808:7 - curly_braces_in_flow_control_structures
+   info - Unnecessary 'this.' qualifier - lib\player_utils\vidstack_player_impl_wasm.dart:808:7 - unnecessary_this
+   info - Statements in an if should be enclosed in a block - lib\player_utils\vidstack_player_impl_wasm.dart:810:7 - curly_braces_in_flow_control_structures
+   info - Unnecessary 'this.' qualifier - lib\player_utils\vidstack_player_impl_wasm.dart:810:7 - unnecessary_this
+   info - 'dart:html' is deprecated and shouldn't be used. Use package:web and dart:js_interop instead - lib\player_utils\vidstack_player_impl_web.dart:1:1 - deprecated_member_use
+   info - Don't use web-only libraries outside Flutter web plugins - lib\player_utils\vidstack_player_impl_web.dart:1:1 - avoid_web_libraries_in_flutter
+   info - 'dart:js_util' is deprecated and shouldn't be used. Use dart:js_interop instead - lib\player_utils\vidstack_player_impl_web.dart:2:1 - deprecated_member_use
+   info - Don't use web-only libraries outside Flutter web plugins - lib\player_utils\vidstack_player_impl_web.dart:2:1 - avoid_web_libraries_in_flutter
+   info - Parameter 'key' could be a super parameter - lib\player_utils\vidstack_player_impl_web.dart:14:9 - use_super_parameters
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_web.dart:106:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_web.dart:138:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_web.dart:148:13 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_web.dart:151:11 - avoid_print
+   info - Statements in an if should be enclosed in a block - lib\player_utils\vidstack_player_impl_web.dart:164:13 - curly_braces_in_flow_control_structures
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_web.dart:174:9 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_web.dart:182:9 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_web.dart:187:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_web.dart:197:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_web.dart:212:9 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_web.dart:222:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_web.dart:228:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_web.dart:253:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_web.dart:527:13 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_web.dart:554:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_web.dart:578:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_web.dart:585:20 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_web.dart:587:35 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_web.dart:589:32 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_web.dart:591:31 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_web.dart:593:31 - avoid_print
+   info - Don't invoke 'print' in production code - lib\player_utils\vidstack_player_impl_web.dart:595:31 - avoid_print
+   info - Parameter 'key' could be a super parameter - lib\player_utils\vidstack_player_widget.dart:10:9 - use_super_parameters
+   info - Unnecessary braces in a string interpolation - lib\player_utils\youtube_handler.dart:31:18 - unnecessary_brace_in_string_interps
+   info - Unnecessary braces in a string interpolation - lib\player_utils\youtube_handler.dart:37:18 - unnecessary_brace_in_string_interps
+   info - The local variable '_codecPriority' starts with an underscore - lib\player_utils\youtube_handler.dart:66:11 - no_leading_underscores_for_local_identifiers
+   info - Constructors for public widgets should have a named 'key' parameter - lib\privacy_policy_page.dart:5:7 - use_key_in_widget_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:10:16 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:21:15 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:23:24 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:25:15 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:28:15 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:30:24 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:32:15 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:36:15 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:38:24 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:40:15 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:43:24 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:45:15 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:49:15 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:53:15 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:57:15 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:59:24 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:61:15 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:67:24 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:74:15 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:75:15 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:77:24 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:79:15 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:83:15 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:87:15 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:91:15 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:93:24 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:95:15 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:98:24 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:100:15 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:104:15 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:106:24 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:108:15 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:112:15 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:114:24 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:116:15 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:120:15 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:122:24 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\privacy_policy_page.dart:124:15 - prefer_const_constructors
+   info - The import of 'dart:typed_data' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/foundation.dart' - lib\screens\payment_screen.dart:1:8 - unnecessary_import
+   info - Use 'const' with the constructor to improve performance - lib\screens\payment_screen.dart:266:19 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\payment_screen.dart:267:28 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\payment_screen.dart:407:15 - prefer_const_constructors
+   info - Use 'const' for final variables initialized to a constant value - lib\screens\profile_screen.dart:119:5 - prefer_const_declarations
+   info - Parameter 'key' could be a super parameter - lib\screens\pwa_install_screen.dart:6:9 - use_super_parameters
+   info - Use 'const' with the constructor to improve performance - lib\screens\subscription_screen.dart:222:25 - prefer_const_constructors
+   info - Use 'const' for final variables initialized to a constant value - lib\services\api_service.dart:16:10 - prefer_const_declarations
+   info - Statements in an if should be enclosed in a block - lib\services\currency_service.dart:50:15 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\services\currency_service.dart:52:15 - curly_braces_in_flow_control_structures
+   info - Don't invoke 'print' in production code - lib\services\currency_service.dart:67:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\currency_service.dart:71:7 - avoid_print
+   info - Dangling library doc comment - lib\services\web_http_client_stub.dart:1:1 - dangling_library_doc_comments
+   info - 'dart:html' is deprecated and shouldn't be used. Use package:web and dart:js_interop instead - lib\services\web_http_client_web.dart:1:1 - deprecated_member_use
+   info - Dangling library doc comment - lib\services\web_http_client_web.dart:1:1 - dangling_library_doc_comments
+   info - Don't use web-only libraries outside Flutter web plugins - lib\services\web_http_client_web.dart:1:1 - avoid_web_libraries_in_flutter
+   info - Don't use 'BuildContext's across async gaps - lib\telegram_dialog.dart:105:34 - use_build_context_synchronously
+   info - Use 'const' with the constructor to improve performance - lib\theme_customization_screen.dart:273:20 - prefer_const_constructors
+   info - Don't invoke 'print' in production code - lib\utils\crypto_utils.dart:13:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\utils\crypto_utils.dart:33:7 - avoid_print
+   info - 'dart:js' is deprecated and shouldn't be used. Use dart:js_interop instead - lib\utils\pwa\pwa_web.dart:1:1 - deprecated_member_use
+   info - Don't use web-only libraries outside Flutter web plugins - lib\utils\pwa\pwa_web.dart:1:1 - avoid_web_libraries_in_flutter
+   info - Don't invoke 'print' in production code - lib\utils\pwa\pwa_web.dart:41:5 - avoid_print
+   info - The import of 'dart:typed_data' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/foundation.dart' - lib\utils\video_thumbnail_helper_io.dart:2:8 - unnecessary_import
+   info - Parameter 'key' could be a super parameter - lib\video_player_screen.dart:45:9 - use_super_parameters
+   info - Statements in an if should be enclosed in a block - lib\video_player_screen.dart:909:55 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\video_player_screen.dart:989:53 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\video_player_screen.dart:1071:57 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\video_player_screen.dart:1104:7 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\video_player_screen.dart:1106:7 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\video_player_screen.dart:1112:7 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\video_player_screen.dart:1114:7 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\video_player_screen.dart:1141:7 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\video_player_screen.dart:1143:7 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\video_player_screen.dart:1296:7 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\video_player_screen.dart:1303:28 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\video_player_screen.dart:1311:7 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\video_player_screen.dart:1314:7 - curly_braces_in_flow_control_structures
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\video_player_screen.dart:1378:36 - use_build_context_synchronously
+   info - Statements in an if should be enclosed in a block - lib\video_player_screen.dart:1415:27 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\video_player_screen.dart:1455:33 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\video_player_screen.dart:1457:33 - curly_braces_in_flow_control_structures
+warning - The value of the local variable 'gradientColors' isn't used - lib\widgets\channels_widgets.dart:101:17 - unused_local_variable
+   info - Use 'const' with the constructor to improve performance - lib\widgets\channels_widgets.dart:528:21 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\widgets\channels_widgets.dart:529:30 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\widgets\channels_widgets.dart:531:32 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\widgets\channels_widgets.dart:563:34 - prefer_const_constructors
+   info - Unnecessary 'const' keyword - lib\widgets\highlights_widgets.dart:306:45 - unnecessary_const
+   info - Use 'const' with the constructor to improve performance - lib\widgets\matches_widgets.dart:23:18 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\widgets\matches_widgets.dart:23:32 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\widgets\matches_widgets.dart:300:42 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\widgets\matches_widgets.dart:463:19 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\widgets\matches_widgets.dart:463:33 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\widgets\news_widgets.dart:230:21 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\widgets\news_widgets.dart:237:23 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\widgets\news_widgets.dart:237:37 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\widgets\news_widgets.dart:265:27 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\widgets\news_widgets.dart:331:23 - prefer_const_constructors
+
+flutter : 259 issues found. (ran in 3.8s)
+At line:1 char:1
++ flutter analyze --no-pub > analysis_output.txt 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (259 issues found. (ran in 3.8s):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

@@ -1,5 +1,4 @@
 // lib/utils/video_thumbnail_helper_io.dart
-import 'dart:typed_data';
 import 'package:video_thumbnail/video_thumbnail.dart' as vt;
 import 'package:flutter/foundation.dart';
 import 'dart:io';

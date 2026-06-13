@@ -39,7 +39,9 @@ class CurrencyService {
       String? currencyCode = prefs.getString('user_currency_code');
 
       if (countryCode == null || currencyCode == null) {
-        final response = await http.get(Uri.parse(_baseUrl));
+        final response = await http.get(Uri.parse(_baseUrl)).timeout(
+          const Duration(seconds: 10),
+        );
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
           if (data['success'] == true) {
@@ -55,7 +57,9 @@ class CurrencyService {
       }
 
       // 2. Fetch Live Exchange Rates (Proxied)
-      final rateResponse = await http.get(Uri.parse(_ratesUrl));
+      final rateResponse = await http.get(Uri.parse(_ratesUrl)).timeout(
+        const Duration(seconds: 10),
+      );
       if (rateResponse.statusCode == 200) {
         final rateData = json.decode(rateResponse.body);
         final fetchedRates = rateData['rates'] as Map<String, dynamic>;

@@ -41,10 +41,9 @@ import 'package:provider/provider.dart'; // Added
 // import 'dart:io'; // Removed for web compatibility
 import 'package:flutter/foundation.dart'; // Added
 import 'package:hesen/services/resend_service.dart'; // Added
+import 'package:hesen/navigation.dart';
 
 final GlobalKey<HomePageState> homeKey = GlobalKey<HomePageState>();
-
-final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
@@ -796,38 +795,7 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   final user = FirebaseAuth.instance.currentUser;
                   if (user != null) {
                     debugPrint("User already logged in: ${user.uid}");
-                    // Send Telemetry
                     ApiService.sendTelemetry(user.uid);
-
-                    // Check Banned Status
-                    // Check Banned Status
-                    AuthService().getUserStream()?.listen((snapshot) async {
-                      final data = snapshot.data() as Map<String, dynamic>?;
-                      if (snapshot.exists &&
-                          data != null &&
-                          data['status'] == 'banned') {
-                        await FirebaseAuth.instance.signOut();
-                        navigatorKey.currentState?.pushAndRemoveUntil(
-                          MaterialPageRoute(
-                            builder: (context) => const LoginScreen(),
-                          ),
-                          (route) => false,
-                        );
-                        if (navigatorKey.currentContext != null) {
-                          ScaffoldMessenger.of(
-                            navigatorKey.currentContext!,
-                          ).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'تم حظر حسابك. يرجى التواصل مع الدعم.',
-                              ),
-                              backgroundColor: Colors.red,
-                              duration: Duration(seconds: 5),
-                            ),
-                          );
-                        }
-                      }
-                    });
                   }
                   await AuthService().updateUserName(newName);
 
@@ -1478,19 +1446,18 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
-  void _retryLoadingData() {
-    if (mounted) {
-      setState(() {
-        _isLoading = true;
-        _hasError = false;
-        _channelsHasError = false;
-        _newsHasError = false;
-        _goalsHasError = false;
-        _matchesHasError = false;
-        _highlightsHasError = false;
-        _initData();
-      });
-    }
+  Future<void> _retryLoadingData() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+      _channelsHasError = false;
+      _newsHasError = false;
+      _goalsHasError = false;
+      _matchesHasError = false;
+      _highlightsHasError = false;
+    });
+    await _initData();
   }
 
   void _retryChannels() {
@@ -1749,13 +1716,8 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
     int? contentId,
     bool isPremium = false,
   }) async {
-    // WEB SPECIFIC: Skip all ad/premium logic on web for now (or handle differently)
-    // If premium logic is needed on web, it should be mirrored here.
-    // For now, adhering to existing web skip.
-    if (kIsWeb) {
-      _navigateToVideoPlayer(context, initialUrl ?? '', streamLinks);
-      return;
-    }
+    // WEB SPECIFIC: Previously skipped. Now enabled to support decryption/unlocking on Web.
+    // Standard ad logic might still be skipped if initialized as non-web.
 
     // --- PREMIUM CONTENT UNLOCK LOGIC ---
     if (isPremium) {
@@ -1988,14 +1950,14 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   ),
                   onChanged: _filterChannels,
                   style: TextStyle(
-                    color: Theme.of(context).textTheme.bodyLarge!.color,
+                    color: Theme.of(context).textTheme.bodyLarge?.color ?? Colors.white,
                   ),
                 ),
               ),
               IconButton(
                 icon: Icon(
                   Icons.close,
-                  color: Theme.of(context).textTheme.bodyLarge!.color,
+                  color: Theme.of(context).textTheme.bodyLarge?.color ?? Colors.white,
                 ),
                 onPressed: () {
                   if (!mounted) return;
@@ -2118,6 +2080,7 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
               });
             }
           }
+          break;
         case 3:
           try {
             final fetchedMatches = await ApiService.fetchMatches();
@@ -2309,7 +2272,7 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                   fontWeight: FontWeight.bold,
                                   color: Theme.of(
                                     context,
-                                  ).textTheme.bodyLarge!.color,
+                                  ).textTheme.bodyLarge?.color ?? Colors.white,
                                 ),
                               ),
                               onTap: () {
@@ -2334,7 +2297,7 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                   fontWeight: FontWeight.bold,
                                   color: Theme.of(
                                     context,
-                                  ).textTheme.bodyLarge!.color,
+                                  ).textTheme.bodyLarge?.color ?? Colors.white,
                                 ),
                               ),
                               onTap: () async {
@@ -2385,7 +2348,7 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                   fontWeight: FontWeight.bold,
                                   color: Theme.of(
                                     context,
-                                  ).textTheme.bodyLarge!.color,
+                                  ).textTheme.bodyLarge?.color ?? Colors.white,
                                 ),
                               ),
                               onTap: () {
@@ -2406,7 +2369,7 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                   fontWeight: FontWeight.bold,
                                   color: Theme.of(
                                     context,
-                                  ).textTheme.bodyLarge!.color,
+                                  ).textTheme.bodyLarge?.color ?? Colors.white,
                                 ),
                               ),
                               onTap: () {
@@ -2576,7 +2539,7 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ? _lastError
                 : 'حدث خطأ أثناء تحميل البيانات.',
             style: TextStyle(
-              color: Theme.of(context).textTheme.bodyLarge!.color,
+              color: Theme.of(context).textTheme.bodyLarge?.color ?? Colors.white,
               fontSize: 18,
             ),
           ),
@@ -2585,7 +2548,7 @@ class HomePageState extends State<HomePage> with WidgetsBindingObserver {
             'الرجاء التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Theme.of(context).textTheme.bodyMedium!.color,
+              color: Theme.of(context).textTheme.bodyMedium?.color ?? Colors.white70,
               fontSize: 14,
             ),
           ),

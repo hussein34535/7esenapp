@@ -1,30 +1,31 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:crypto/crypto.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter/foundation.dart';
 
 class CloudinaryService {
-  static const String _cloudName = 'djxkwged9';
-  static const String _apiKey = '995382833695689';
-  static const String _apiSecret = 'Y4zFQM1fFjBpNjSv7PpswVMhA8Q';
+  static const String _cloudName = String.fromEnvironment(
+    'CLOUDINARY_CLOUD_NAME',
+    defaultValue: 'djxkwged9',
+  );
+  static const String _uploadPreset = String.fromEnvironment(
+    'CLOUDINARY_UPLOAD_PRESET',
+  );
 
   static Future<String> uploadImage(XFile imageFile) async {
-    final timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    if (_uploadPreset.isEmpty) {
+      throw Exception(
+        'Cloudinary upload preset is not configured. Set CLOUDINARY_UPLOAD_PRESET.',
+      );
+    }
 
-    // 1. Generate Signature
-    final paramsToSign = 'timestamp=$timestamp$_apiSecret';
-    final signature = sha1.convert(utf8.encode(paramsToSign)).toString();
-
-    // 2. Prepare Request
     final uri =
         Uri.parse('https://api.cloudinary.com/v1_1/$_cloudName/image/upload');
     final request = http.MultipartRequest('POST', uri);
 
-    request.fields['api_key'] = _apiKey;
-    request.fields['timestamp'] = timestamp.toString();
-    request.fields['signature'] = signature;
+    request.fields['upload_preset'] = _uploadPreset;
+    request.fields['folder'] = 'hesen_tv/profiles';
 
-    // Add the file (Web-compatible: use bytes)
     final bytes = await imageFile.readAsBytes();
     request.files.add(http.MultipartFile.fromBytes(
       'file',
@@ -32,16 +33,20 @@ class CloudinaryService {
       filename: imageFile.name,
     ));
 
-    // 3. Send
-    final response = await request.send();
-    final responseData = await response.stream.bytesToString();
+    final response = await request.send().timeout(
+      const Duration(seconds: 30),
+    );
+    final responseData = await response.stream.bytesToString().timeout(
+      const Duration(seconds: 10),
+    );
     final jsonResponse = json.decode(responseData);
 
     if (response.statusCode == 200) {
-      return jsonResponse['secure_url'];
+      return jsonResponse['secure_url'] as String;
     } else {
-      throw Exception(
-          'Cloudinary Upload Failed: ${jsonResponse['error']['message']}');
+      final error = jsonResponse['error']?['message']?.toString() ?? responseData;
+      debugPrint('Cloudinary Upload Failed: $error');
+      throw Exception('Cloudinary Upload Failed: $error');
     }
   }
 }

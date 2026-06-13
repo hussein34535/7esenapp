@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:hesen/utils/image_proxy.dart';
 
 class ChannelsSection extends StatefulWidget {
   final List channelCategories;
@@ -55,13 +56,18 @@ class _ChannelsSectionState extends State<ChannelsSection> {
             horizontal: isWindows ? 30 : 16,
             vertical: 20,
           ),
-          gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: isWindows ? 500 : 350,
-            mainAxisExtent:
-                isWindows ? 160 : 135, // Increased height for better fit
-            crossAxisSpacing: isWindows ? 25 : 12,
-            mainAxisSpacing: isWindows ? 25 : 12,
-          ),
+          gridDelegate: isWindows
+              ? const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 500,
+                  mainAxisExtent: 160,
+                  crossAxisSpacing: 25,
+                  mainAxisSpacing: 25,
+                )
+              : const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 1,
+                  mainAxisExtent: 90, // Row height on mobile
+                  mainAxisSpacing: 10,
+                ),
           itemCount: widget.channelCategories.length,
           itemBuilder: (context, index) {
             return ChannelBox(
@@ -249,94 +255,56 @@ class _ChannelBoxState extends State<ChannelBox> {
                     ),
                   ),
 
-                // --- Main Content ---
                 Positioned.fill(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        // IMAGE OR ICON
-                        Flexible(
-                          child: hasImage
-                              ? CachedNetworkImage(
-                                  imageUrl: widget.category['image'].toString(),
-                                  cacheManager: CacheManager(
-                                    Config(
-                                      'categoryCache',
-                                      stalePeriod: const Duration(days: 30),
-                                      maxNrOfCacheObjects: 100,
-                                    ),
-                                  ),
-                                  fit: BoxFit
-                                      .contain, // Show FULL image without clipping
-                                  placeholder: (context, url) => const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: Center(
-                                          child: CircularProgressIndicator(
-                                              strokeWidth: 1.5))),
-                                  errorWidget: (context, url, error) => Icon(
-                                      iconData,
-                                      color: baseColor,
-                                      size: isDesktop ? 40 : 28),
-                                )
-                              : Container(
-                                  width: isDesktop ? 80 : 60,
-                                  height: isDesktop ? 80 : 60,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.2),
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.3),
-                                      width: 1.5,
-                                    ),
-                                  ),
-                                  child: Icon(
-                                    iconData,
-                                    color: Colors.white,
-                                    size: isDesktop ? 48 : 28,
-                                    shadows: const [
-                                      Shadow(
-                                        color: Colors.black26,
-                                        offset: Offset(0, 2),
-                                        blurRadius: 4,
-                                      ),
-                                    ],
-                                  ),
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: hasImage
+                          ? CachedNetworkImage(
+                              imageUrl: ImageProxy.resolveUrl(widget.category['image'].toString()),
+                              cacheManager: CacheManager(
+                                Config(
+                                  'categoryCache',
+                                  stalePeriod: const Duration(days: 30),
+                                  maxNrOfCacheObjects: 100,
                                 ),
-                        ),
-                        SizedBox(height: isDesktop ? 16 : 14),
-                        // Title
-                        Text(
-                          name,
-                          maxLines: 1,
-                          textAlign: TextAlign.center,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: hasImage
-                                ? (Theme.of(context).brightness ==
-                                        Brightness.dark
-                                    ? Colors.white
-                                    : Colors.black87)
-                                : Colors.white,
-                            fontSize: isDesktop ? 22 : 15,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.5,
-                            shadows: !hasImage
-                                ? const [
-                                    Shadow(
-                                      color: Colors.black38,
-                                      offset: Offset(0, 1),
-                                      blurRadius: 3,
-                                    ),
-                                  ]
-                                : null,
-                          ),
-                        ),
-                      ],
+                              ),
+                              fit: BoxFit.contain, // Show FULL image without clipping
+                              placeholder: (context, url) => const SizedBox(
+                                  width: 30,
+                                  height: 30,
+                                  child: Center(
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 1.5))),
+                              errorWidget: (context, url, error) => Icon(
+                                  iconData,
+                                  color: Colors.white,
+                                  size: isDesktop ? 60 : 45),
+                            )
+                          : Container(
+                              width: isDesktop ? 90 : 60,
+                              height: isDesktop ? 90 : 60,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.3),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Icon(
+                                iconData,
+                                color: Colors.white,
+                                size: isDesktop ? 50 : 35,
+                                shadows: const [
+                                  Shadow(
+                                    color: Colors.black26,
+                                    offset: Offset(0, 2),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                              ),
+                            ),
                     ),
                   ),
                 ),
@@ -467,7 +435,7 @@ class _CategoryChannelsScreenState extends State<CategoryChannelsScreen> {
                         width: 50,
                         height: 50,
                         child: CachedNetworkImage(
-                          imageUrl: widget.category['image'].toString(),
+                          imageUrl: ImageProxy.resolveUrl(widget.category['image'].toString()),
                           fit: BoxFit.contain,
                           placeholder: (context, url) => const SizedBox(
                             width: 20,
@@ -689,7 +657,7 @@ class _ChannelTileState extends State<ChannelTile> {
           }
 
           final String firstUrl =
-              streams.isNotEmpty ? streams.first['url']! : '';
+              streams.isNotEmpty ? streams.first['url'] ?? '' : '';
           widget.openVideo(
               context,
               firstUrl,

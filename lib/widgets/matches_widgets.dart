@@ -3,6 +3,7 @@ import 'package:hesen/models/match_model.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart';
+import 'package:hesen/utils/image_proxy.dart';
 
 class MatchesSection extends StatelessWidget {
   final Future<List<Match>> matches;
@@ -70,8 +71,16 @@ class MatchesSection extends StatelessWidget {
           for (var match in matches) {
             final matchDateTime = DateFormat('HH:mm').parse(match.matchTime);
             final now = DateTime.now();
-            final matchDateTimeWithToday = DateTime(now.year, now.month,
+            var matchDateTimeWithToday = DateTime(now.year, now.month,
                 now.day, matchDateTime.hour, matchDateTime.minute);
+
+            // Handle midnight-crossing matches (e.g., 01:00 AM displayed at 10 PM)
+            if (matchDateTimeWithToday.isBefore(now) &&
+                now.difference(matchDateTimeWithToday) >
+                    const Duration(minutes: 180)) {
+              matchDateTimeWithToday = matchDateTimeWithToday
+                  .add(const Duration(days: 1));
+            }
 
             if (matchDateTimeWithToday.isBefore(now) &&
                 now.isBefore(
@@ -218,7 +227,7 @@ class _MatchBoxState extends State<MatchBox> {
       child: GestureDetector(
         onTap: () {
           bool isPremium = widget.match.isPremium;
-          String firstUrl = streams.isNotEmpty ? streams.first['url']! : '';
+          String firstUrl = streams.isNotEmpty ? streams.first['url'] ?? '' : '';
 
           widget.openVideo(
             context,
@@ -481,7 +490,7 @@ class _MatchBoxState extends State<MatchBox> {
       height: size,
       child: logoUrl.isNotEmpty
           ? CachedNetworkImage(
-              imageUrl: logoUrl,
+              imageUrl: ImageProxy.resolveUrl(logoUrl),
               fit: BoxFit.contain, // Maintain aspect ratio
               // Use memCacheHeight/Width to improve quality/performance relation
               // If pixelation is the issue, we avoid resizing too small here.

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hesen/models/highlight_model.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
+import 'package:hesen/utils/image_proxy.dart';
 
 class HighlightsSection extends StatelessWidget {
   final Future<List<Highlight>> highlights;
@@ -200,7 +201,7 @@ class _HighlightBoxState extends State<HighlightBox> {
                     height: 200, // Slightly taller
                     width: double.infinity,
                     child: CachedNetworkImage(
-                      imageUrl: imageUrl ?? '',
+                      imageUrl: ImageProxy.resolveUrl(imageUrl),
                       placeholder: (context, url) => Container(
                         color: Colors.grey[900],
                         child: const Center(child: CircularProgressIndicator()),
@@ -325,7 +326,7 @@ class _HighlightBoxState extends State<HighlightBox> {
               children: [
                 Expanded(
                   child: CachedNetworkImage(
-                    imageUrl: imageUrl ?? '',
+                    imageUrl: ImageProxy.resolveUrl(imageUrl),
                     placeholder: (context, url) =>
                         const Center(child: const CircularProgressIndicator()),
                     errorWidget: (context, url, error) => _buildPlaceholder(),

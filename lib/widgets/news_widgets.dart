@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
+import 'package:hesen/utils/image_proxy.dart';
 
 class NewsSection extends StatelessWidget {
   final Future<List<dynamic>> newsArticles;
@@ -163,7 +164,7 @@ class _NewsBoxState extends State<NewsBox> {
               child['type'] == 'link' &&
               child.containsKey('url') &&
               child.containsKey('children')) {
-            for (var textChild in child['children']) {
+            for (var textChild in (child['children'] as List? ?? [])) {
               if (textChild is Map && textChild.containsKey('text')) {
                 String? streamUrl = child['url']?.toString();
                 String? streamName =
@@ -183,10 +184,15 @@ class _NewsBoxState extends State<NewsBox> {
   @override
   Widget build(BuildContext context) {
     final title = widget.article['title'];
-    final date = widget.article['date'] != null
-        ? DateFormat('dd-MM-yyyy')
-            .format(DateTime.parse(widget.article['date']))
-        : '';
+    String dateStr = '';
+    if (widget.article['date'] != null) {
+      try {
+        dateStr = DateFormat('dd-MM-yyyy')
+            .format(DateTime.parse(widget.article['date']));
+      } catch (e) {
+        dateStr = '';
+      }
+    }
     final linkData = widget.article['link'];
 
     dynamic processedLinkData = linkData;
@@ -258,7 +264,7 @@ class _NewsBoxState extends State<NewsBox> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 CachedNetworkImage(
-                  imageUrl: imageUrl ?? '',
+                  imageUrl: ImageProxy.resolveUrl(imageUrl),
                   placeholder: (context, url) =>
                       Center(child: CircularProgressIndicator()),
                   errorWidget: (context, url, error) => _buildPlaceholder(),
@@ -292,7 +298,7 @@ class _NewsBoxState extends State<NewsBox> {
                               size: 14, color: Colors.grey),
                           const SizedBox(width: 4),
                           Text(
-                            date,
+                            dateStr,
                             style: const TextStyle(
                               color: Colors.grey,
                               fontSize: 12,
@@ -360,7 +366,7 @@ class _NewsBoxState extends State<NewsBox> {
                 children: [
                   Expanded(
                     child: CachedNetworkImage(
-                      imageUrl: imageUrl ?? '',
+                      imageUrl: ImageProxy.resolveUrl(imageUrl),
                       placeholder: (context, url) =>
                           const Center(child: CircularProgressIndicator()),
                       errorWidget: (context, url, error) => _buildPlaceholder(),
@@ -396,7 +402,7 @@ class _NewsBoxState extends State<NewsBox> {
                             const SizedBox(width: 4),
                             Flexible(
                               child: Text(
-                                date,
+                                dateStr,
                                 style: const TextStyle(
                                   color: Colors.grey,
                                   fontSize: 12,

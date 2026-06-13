@@ -57,7 +57,7 @@ class Match {
             debugPrint("Error decoding logo JSON: $e");
           }
         }
-        return logoData;
+        return logoData.replaceAll('"', '').replaceAll("'", "").trim();
       }
       if (logoData is Map<String, dynamic>) {
         return logoData['url'] as String?;
@@ -194,7 +194,7 @@ class Channel {
             debugPrint("Error decoding channel logo JSON: $e");
           }
         }
-        return logoData;
+        return logoData.replaceAll('"', '').replaceAll("'", "").trim();
       }
       if (logoData is Map<String, dynamic>) {
         return logoData['url'] as String?;

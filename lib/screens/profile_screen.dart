@@ -216,7 +216,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       await Navigator.of(context).push(
                         MaterialPageRoute(builder: (_) => const LoginScreen()),
                       );
-                      // Refresh after return
+                      if (!mounted) return;
                       _fetchUserData();
                       setState(() {});
                     },

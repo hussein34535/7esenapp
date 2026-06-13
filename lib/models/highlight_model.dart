@@ -36,7 +36,7 @@ class Highlight {
             // Not JSON
           }
         }
-        return logoData;
+        return logoData.replaceAll('"', '').replaceAll("'", "").trim();
       }
       if (logoData is Map<String, dynamic>) {
         return (logoData['url'] ?? logoData['imageUrl']) as String?;

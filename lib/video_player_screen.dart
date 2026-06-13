@@ -83,6 +83,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   late PipHelper _pipHelper;
   int _autoRetryAttempt = 0;
   bool _isAutoRetrying = false; // Track if we are in a retry loop
+  bool _isPlayerInitializing = false; // 🛡️ Lock to prevent double-init
 
   List<Map<String, dynamic>> _fetchedApiQualities = [];
   int _selectedApiQualityIndex = -1;
@@ -94,6 +95,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   Timer? _bufferingRetryTimer; // ADDED: To handle buffering timeouts
   Duration? _lastPosition; // ADDED: To store position before a retry
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  StreamSubscription? _mediaKitErrorSub;
 
   @override
   void initState() {
@@ -366,14 +368,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     _hideControlsTimer?.cancel();
     _bufferingRetryTimer?.cancel();
     _connectivitySubscription?.cancel();
+    _mediaKitErrorSub?.cancel();
     _animationController.dispose();
-    _releaseControllers().then((_) {
-      if (!kIsWeb) {
-        WakelockPlus.disable();
-        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-        SystemChrome.setPreferredOrientations(DeviceOrientation.values);
-      }
-    });
+    if (!kIsWeb) {
+      WakelockPlus.disable();
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+    }
+    _releaseControllers();
     super.dispose();
   }
 
@@ -479,8 +481,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   @override
   void didUpdateWidget(covariant VideoPlayerScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.initialUrl != oldWidget.initialUrl ||
-        !listEquals(widget.streamLinks, oldWidget.streamLinks)) {
+    // 🛡️ Only re-init if URL ACTUALLY changed, not on a simple rebuild
+    final bool urlChanged = widget.initialUrl != oldWidget.initialUrl;
+    final bool linksChanged = !listEquals(widget.streamLinks, oldWidget.streamLinks);
+    if (urlChanged || linksChanged) {
+      debugPrint('[HESEN PLAYER] didUpdateWidget: URL/links changed. Re-initializing...');
+      _isPlayerInitializing = false; // Reset the lock for the new URL
       _cancelAllTimers();
       _releaseControllers().then((_) {
         if (mounted) {
@@ -567,7 +573,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     _selectedApiQualityIndex = -1;
 
     if (mounted) {
-      setState(() {});
+      if (!kIsWeb) {
+        setState(() {}); // Still needed for mobile/desktop to show loading
+      }
       _initializePlayerInternal(_currentStreamUrl!);
     }
   }
@@ -578,6 +586,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       return;
     }
 
+    // 🛡️ GUARD: Prevent double-initialization (AbortError fix)
+    if (_isPlayerInitializing) {
+      debugPrint('[HESEN PLAYER] ⚠️ Already initializing, skipping duplicate call for: $sourceUrl');
+      return;
+    }
+    _isPlayerInitializing = true;
+
     // Enable WakeLock to keep screen on during playback (Mobile & Web)
     if (!kIsWeb) {
       WakelockPlus.enable();
@@ -587,6 +602,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     await _releaseControllers();
     await Future.delayed(const Duration(milliseconds: 250));
     if (!mounted) {
+      _isPlayerInitializing = false;
       return;
     }
     if (!_isLoading) {
@@ -604,20 +620,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
     try {
       if (kIsWeb) {
-        // ✅ WEB OPTIMIZATION: Minimal parsing + Proxy
-        if (urlToProcess.contains('youtube.com') ||
+        // 🛡️ GUARD: If URL is already proxied, use it directly - prevents double-proxying 404!
+        if (urlToProcess.contains('hi.husseinh2711.workers.dev')) {
+          debugPrint('[WEB] URL already proxied, using directly: $urlToProcess');
+          videoUrlToLoad = urlToProcess;
+        } else if (urlToProcess.contains('youtube.com') ||
             urlToProcess.contains('youtu.be')) {
           // Vidstack handles YouTube natively - NO PROXY NEEDED
           debugPrint('[WEB] YouTube detected - using Vidstack directly');
-          if (mounted) {
-            setState(() {
-              _currentStreamUrl = urlToProcess; // ❌ لا تستخدم Proxy لـ YouTube
-              _isLoading = false;
-              _hasError = false;
-            });
-            _showControls();
-          }
-          return;
+          videoUrlToLoad = urlToProcess;
         } else if (urlToProcess.contains('ok.ru/')) {
           // Ok.ru - Resolve to direct stream for Vidstack on Web
           String? videoId;
@@ -634,11 +645,46 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
               videoUrlToLoad = WebProxyService.proxiedUrl(resolvedUrl);
               debugPrint('[WEB] Resolved Ok.ru stream: $videoUrlToLoad');
             } else {
-              videoUrlToLoad = WebProxyService.proxiedUrl(urlToProcess);
+              // ❌ Extraction failed, don't play raw page URL as it causes infinite loading
+              debugPrint('[WEB] ❌ Failed to extract Ok.ru stream. Showing error.');
+              if (mounted) {
+                setState(() {
+                  _isLoading = false;
+                  _hasError = true;
+                });
+              }
+              _isPlayerInitializing = false; // ✅ Reset lock so clicking other matches works
+              return;
             }
           } else {
+            // Not a valid ID, proxy original URL as last resort
             videoUrlToLoad = WebProxyService.proxiedUrl(urlToProcess);
           }
+        } else if (urlToProcess.startsWith('https://7esentv-match.vercel.app')) {
+          // Guard: Skip if the video ID is empty
+          final matchUri = Uri.tryParse(urlToProcess);
+          final videoId = matchUri?.queryParameters['id'] ?? '';
+          if (videoId.isEmpty) {
+            debugPrint('[WEB] ❌ Empty video ID in match URL, skipping: $urlToProcess');
+            if (mounted) {
+              setState(() {
+                _hasError = true;
+                _isLoading = false;
+              });
+            }
+            _isPlayerInitializing = false;
+            return;
+          }
+          debugPrint('[WEB] Resolving 7esentv-match API stream...');
+          final streamDetails = await handleHesenTvStream(urlToProcess);
+          // RE-ENABLED PROXY: dmcdn.net works direct ONLY in browser tabs, needs proxy for CORS in Web Apps
+          videoUrlToLoad = WebProxyService.proxiedUrl(streamDetails.videoUrlToLoad ?? '');
+          if (mounted) {
+            // Store details locally to be applied in the final setState
+            _fetchedApiQualities = streamDetails.fetchedQualities;
+            _selectedApiQualityIndex = streamDetails.selectedQualityIndex;
+          }
+          debugPrint('[WEB] Resolved 7esentv-match stream: $videoUrlToLoad');
         } else {
           // ✅ لأي رابط آخر (M3U8, MP4, إلخ) استخدم Proxy
           videoUrlToLoad = WebProxyService.proxiedUrl(urlToProcess);
@@ -654,6 +700,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
           });
           _showControls();
         }
+        _isPlayerInitializing = false; // ✅ Reset lock so clicking other matches works
         return; // Skip native player initialization
       }
 
@@ -709,6 +756,20 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
           });
         }
       } else if (urlToProcess.startsWith('https://7esentv-match.vercel.app')) {
+        // Guard: Skip if the video ID is empty (e.g. ?id= with no value)
+        final matchUri = Uri.tryParse(urlToProcess);
+        final videoId = matchUri?.queryParameters['id'] ?? '';
+        if (videoId.isEmpty) {
+          debugPrint('[MOBILE] ❌ Empty video ID in match URL, skipping: $urlToProcess');
+          if (mounted) {
+            setState(() {
+              _hasError = true;
+              _isLoading = false;
+            });
+          }
+          _isPlayerInitializing = false;
+          return;
+        }
         final streamDetails = await handleHesenTvStream(urlToProcess);
         videoUrlToLoad = streamDetails.videoUrlToLoad;
         if (mounted) {
@@ -761,7 +822,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
           _mediaKitController ??= VideoController(_mediaKitPlayer!);
 
           // Listen for errors to trigger failover/retry
-          _mediaKitPlayer!.stream.error.listen((error) {
+          _mediaKitErrorSub?.cancel();
+          _mediaKitErrorSub = _mediaKitPlayer!.stream.error.listen((error) {
             debugPrint('[MEDIAKIT ERROR] $error');
             if (mounted && !_isAutoRetrying) {
               _retryMediaKitPlayback(videoUrlToLoad!, httpHeaders);
@@ -827,6 +889,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         _showControls();
       }
     } catch (e) {
+      _isPlayerInitializing = false; // ✅ Reset lock so retries can work
       debugPrint('[HESEN PLAYER] ERROR in _initializePlayerInternal: $e');
       if (mounted) {
         if (_autoRetryAttempt < 1) {
@@ -883,6 +946,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         if (mounted) {
           setState(() {
             _isLoading = false;
+            _currentStreamUrl = url;
             _hasError = false;
             _isAutoRetrying = false;
           });
@@ -1016,35 +1080,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-      _hasError = false;
-      _selectedStreamIndex = newStreamIndex;
-      _currentStreamUrl = newStreamUrl;
-      _playerKey = UniqueKey();
-      _isCurrentStreamApi = _currentStreamUrl!
-              .startsWith('https://7esentv-match.vercel.app') ||
-          _currentStreamUrl!.startsWith('https://okru-api.vercel.app/api') ||
-          _currentStreamUrl!.contains('ok.ru/video/') ||
-          _currentStreamUrl!.contains('ok.ru/live/') ||
-          _currentStreamUrl!.contains('youtube.com') ||
-          _currentStreamUrl!.contains('youtu.be') ||
-          (_currentStreamUrl!.contains('okcdn.ru') &&
-              _currentStreamUrl!.split('?')[0].endsWith('.m3u8'));
-      _fetchedApiQualities = [];
-      _selectedApiQualityIndex = -1;
-    });
-
-    await Future.delayed(const Duration(milliseconds: 50));
-    if (!mounted) {
-      return;
-    }
-
-    // ✅ على الويب: تحديث الرابط مباشرة بدون إعادة تهيئة كاملة
+    // ✅ على الويب: معالجة الرابط أولاً ثم تحديث الحالة لمرة واحدة فقط
     if (kIsWeb) {
       String urlToUse = newStreamUrl;
 
-      // Apply proxy and resolution if needed
+      // Apply proxy and resolution BEFORE setState to avoid double-load
       if (!newStreamUrl.contains('youtube.com') &&
           !newStreamUrl.contains('youtu.be')) {
         if (newStreamUrl.contains('ok.ru/')) {
@@ -1065,17 +1105,33 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         }
       }
 
-      setState(() {
-        _currentStreamUrl = urlToUse;
-        _isLoading = false;
-        _hasError = false;
-      });
-      _showControls();
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = false;
+          _selectedStreamIndex = newStreamIndex;
+          _currentStreamUrl = urlToUse;
+          _playerKey = UniqueKey();
+          _isCurrentStreamApi = _currentStreamUrl!
+                  .startsWith('https://7esentv-match.vercel.app') ||
+              _currentStreamUrl!.startsWith('https://okru-api.vercel.app/api') ||
+              _currentStreamUrl!.contains('ok.ru/video/') ||
+              _currentStreamUrl!.contains('ok.ru/live/') ||
+              _currentStreamUrl!.contains('youtube.com') ||
+              _currentStreamUrl!.contains('youtu.be') ||
+              (_currentStreamUrl!.contains('okcdn.ru') &&
+                  _currentStreamUrl!.split('?')[0].endsWith('.m3u8'));
+          _fetchedApiQualities = [];
+          _selectedApiQualityIndex = -1;
+        });
+        _showControls();
+      }
       return;
     }
 
     // Mobile: Full initialization
-    await _initializePlayerInternal(_currentStreamUrl!, startAt: startAt);
+    _selectedStreamIndex = newStreamIndex;
+    await _initializePlayerInternal(newStreamUrl, startAt: startAt);
   }
 
   Future<void> _changeApiQuality(int newQualityIndex) async {
@@ -1091,6 +1147,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       _showError("Selected quality has no valid URL.");
       return;
     }
+    if (kIsWeb) {
+      setState(() {
+        _selectedApiQualityIndex = newQualityIndex;
+      });
+      _initializePlayerInternal(_currentStreamUrl!,
+          specificQualityUrl: specificQualityUrl, startAt: startAt);
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _hasError = false;
@@ -1204,7 +1269,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
           mainAxisSize: MainAxisSize.min,
           children: _validStreamLinks.asMap().entries.map<Widget>((entry) {
             final index = entry.key;
-            final streamName = entry.value['name']!.toString();
+            final streamName = (entry.value['name'] as String?) ?? 'Stream';
             final isActive = index == _selectedStreamIndex;
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -1714,12 +1779,20 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   Widget _buildVideoPlayer() {
     if (kIsWeb) {
       if (_currentStreamUrl != null) {
-        return SizedBox.expand(
-          child: VidstackPlayerWidget(
-            url: _currentStreamUrl!,
-            streamLinks: _validStreamLinks,
-          ),
-        );
+        // 🔒 FILTER: Never pass API URLs (JSON endpoints) to the player as sources.
+        // Doing so causes an AbortError when we immediately switch to the resolved media URL.
+        final bool isApiUrl = _currentStreamUrl!.contains('7esentv-match.vercel.app') || 
+                              _currentStreamUrl!.contains('okru-api.vercel.app') ||
+                              _currentStreamUrl!.contains('okru-api');
+        
+        if (!isApiUrl) {
+          return SizedBox.expand(
+            child: VidstackPlayerWidget(
+              url: _currentStreamUrl!,
+              streamLinks: _validStreamLinks,
+            ),
+          );
+        }
       }
       return Container(color: Colors.black);
     }

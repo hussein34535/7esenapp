@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hesen/main.dart';
@@ -577,7 +576,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       : null,
                 ),
 
-                if (method['image'] != null && method['image']['url'] != null)
+                if (method['image'] is Map && method['image']['url'] != null)
                   Container(
                     width: 40,
                     height: 40,

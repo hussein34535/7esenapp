@@ -24,15 +24,15 @@ class VidstackPlayerImpl extends StatefulWidget {
 class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
   html.Element? _currentPlayer;
   html.Element? _linksContainer;
-  Timer? _overlayTimer; // MASTER AUTO-HIDE TIMER
-  Timer? _safetyTimer; // Safety timer for black screen
+  Timer? _overlayTimer;
+  Timer? _safetyTimer;
   bool _controlsVisible = true;
-  int _retryCount = 0; // Track retries for current stream
-  bool _usedProxyForCurrentStream =
-      false; // Flag to track if we switched to proxy
-  String _currentUrl = ""; // Track the ACTUAL current playing URL
-  int _loadRequestId = 0; // Prevent race conditions in async load
-  Timer? _retryTimer; // To cancel pending retries
+  int _retryCount = 0;
+  bool _usedProxyForCurrentStream = false;
+  String _currentUrl = "";
+  int _loadRequestId = 0;
+  Timer? _retryTimer;
+  final List<StreamSubscription> _subscriptions = [];
 
   @override
   void initState() {
@@ -59,6 +59,10 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
     _safetyTimer?.cancel();
     _overlayTimer?.cancel();
     _retryTimer?.cancel();
+    for (final sub in _subscriptions) {
+      sub.cancel();
+    }
+    _subscriptions.clear();
     
     if (_currentPlayer != null) {
       try {
@@ -79,13 +83,12 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
   }
 
   void _hideControls() {
-    // Only hide if playing
+    if (_currentPlayer == null) return;
     final isPaused = js_util.getProperty(_currentPlayer!, 'paused') ?? false;
     if (isPaused == true) return;
 
     _controlsVisible = false;
     _currentPlayer?.classes.remove('controls-visible');
-    // Sync with Native Controls
     _currentPlayer?.setAttribute('user-idle', 'true');
     _overlayTimer?.cancel();
   }
@@ -184,9 +187,17 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         print('[VIDSTACK] Wrapped HTTP->HTTPS proxy: $finalUrl');
       }
 
-      // 4. Direct Play with CORS Proxy Fallback
+      // 4. Determine if it's HLS or MP4
+      final lowerRawUrl = rawUrl.toLowerCase();
+      final lowerFinalUrl = finalUrl.toLowerCase();
+      bool isMp4 = lowerRawUrl.contains('.mp4') ||
+                   lowerFinalUrl.contains('.mp4') ||
+                   lowerFinalUrl.contains('type=mp4') ||
+                   lowerFinalUrl.contains('video/mp4');
+
+      // 5. Direct Play with CORS Proxy Fallback
       String sourceToUse = finalUrl;
-      bool shouldProxy = _usedProxyForCurrentStream;
+      bool shouldProxy = _usedProxyForCurrentStream && !isMp4;
 
       if (shouldProxy) {
         print('[VIDSTACK] 🔒 Activate JS Proxy Loader for: $finalUrl');
@@ -198,11 +209,13 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
 
       final srcObj = js_util.newObject();
       js_util.setProperty(srcObj, 'src', sourceToUse);
-      // ALWAYS force HLS for our fake URL or real m3u8
-      js_util.setProperty(srcObj, 'type', 'application/x-mpegurl');
+      js_util.setProperty(srcObj, 'type', isMp4 ? 'video/mp4' : 'application/x-mpegurl');
 
       js_util.setProperty(_currentPlayer!, 'src', srcObj);
-      _currentPlayer!.setAttribute('title', 'Live Stream');
+      _currentPlayer!.setAttribute('title', isMp4 ? 'Video' : 'Live Stream');
+      if (isMp4) {
+        _currentPlayer!.setAttribute('stream-type', 'vod');
+      }
     } catch (e) {
       print('[VIDSTACK] Critical Error in _loadSource: $e');
       _handleErrorLogic();
@@ -454,13 +467,14 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         }, true /* capture */);
 
         // Back Button Logic
-        overlay.querySelector('.vds-back-btn')?.onClick.listen((e) {
+        final backSub = overlay.querySelector('.vds-back-btn')?.onClick.listen((e) {
           e.stopPropagation();
           e.stopPropagation();
           player.setAttribute('user-idle', 'false');
 
           if (mounted) Navigator.of(context).maybePop();
         });
+        if (backSub != null) _subscriptions.add(backSub);
 
         // Initial URL Logic
         String initialUrl = widget.url;
@@ -472,9 +486,9 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         final linksContainer = overlay.querySelector('.vds-links-container');
         if (linksContainer != null) {
           _linksContainer = linksContainer;
-          linksContainer.onClick.listen((e) => e.stopPropagation());
-
-          // (initialUrl logic moved up)
+          _subscriptions.add(
+            linksContainer.onClick.listen((e) => e.stopPropagation()),
+          );
 
           for (var link in widget.streamLinks) {
             final name = link['name'] ?? 'Stream';
@@ -487,13 +501,15 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
 
               if (urlStr == initialUrl) btn.classes.add('active');
 
-              btn.onClick.listen((e) {
-                e.stopPropagation();
-                player.setAttribute('user-idle', 'false');
-                _currentUrl = urlStr;
-                _loadSource(urlStr);
-                _updateActiveButton(urlStr);
-              });
+              _subscriptions.add(
+                btn.onClick.listen((e) {
+                  e.stopPropagation();
+                  player.setAttribute('user-idle', 'false');
+                  _currentUrl = urlStr;
+                  _loadSource(urlStr);
+                  _updateActiveButton(urlStr);
+                }),
+              );
               linksContainer.append(btn);
             }
           }
@@ -513,14 +529,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           setLoader(false);
           _safetyTimer?.cancel();
           _retryCount = 0;
-
-          final isPaused = js_util.getProperty(player, 'paused');
-          if (isPaused == true) {
-            try {
-              js_util.callMethod(player, 'play', []);
-              setLoader(true);
-            } catch (e) {/* ignore */}
-          }
+          // We removed the manual .play() call here to prevent "AbortError"
         });
 
         player.addEventListener('waiting', (event) {
@@ -529,6 +538,15 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
 
         player.addEventListener('playing', (event) {
           setLoader(false);
+          // iOS: Unmute after autoplay starts (muted autoplay workaround)
+          try {
+            if (js_util.getProperty(player, 'muted') == true) {
+              js_util.setProperty(player, 'muted', false);
+              print('[VIDSTACK] Auto-unmuted on playing.');
+            }
+          } catch (e) {
+            print('[VIDSTACK] Auto-unmute failed: $e');
+          }
         });
 
         void handleFullscreenExit(html.Event e) {

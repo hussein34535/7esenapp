@@ -18,6 +18,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   bool _isLoading = true;
   bool _isSubscribed = false;
   Map<String, dynamic>? _userData;
+  int _selectedPackageIndex = 0;
 
   @override
   void initState() {
@@ -204,18 +205,98 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                               child: Text("لا توجد باقات متاحة حالياً",
                                   style: TextStyle(color: Colors.white54)))
                         else
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: _packages.map((pkg) {
-                              return Expanded(
-                                child: Padding(
-                                  padding:
-                                      const EdgeInsets.symmetric(horizontal: 5),
-                                  child: _buildModernPackageCard(pkg),
-                                ),
+                          LayoutBuilder(builder: (context, constraints) {
+                            final isDesktop = constraints.maxWidth > 600;
+                            if (isDesktop) {
+                              return Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: _packages.map((pkg) {
+                                  return Expanded(
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 5),
+                                      child: _buildModernPackageCard(pkg),
+                                    ),
+                                  );
+                                }).toList(),
                               );
-                            }).toList(),
-                          ),
+                            } else {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  // Plan options list (vertical stack of horizontal cards)
+                                  ...List.generate(_packages.length, (index) {
+                                    final pkg = _packages[index];
+                                    final isSelected = index == _selectedPackageIndex;
+                                    return GestureDetector(
+                                      onTap: () {
+                                        setState(() {
+                                          _selectedPackageIndex = index;
+                                        });
+                                      },
+                                      child: _buildPlanOption(pkg, isSelected),
+                                    );
+                                  }),
+                                  const SizedBox(height: 16),
+                                  
+                                  // Premium features list (static, premium looking box)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(alpha: 0.03),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        _buildPremiumFeature(Icons.hd_rounded, "بث بجودة Full HD & 4K بدون تقطيع"),
+                                        const SizedBox(height: 10),
+                                        _buildPremiumFeature(Icons.devices_rounded, "تشغيل على جميع الأجهزة (شاشة، هاتف، كمبيوتر)"),
+                                        const SizedBox(height: 10),
+                                        _buildPremiumFeature(Icons.support_agent_rounded, "دعم فني متواصل على مدار الساعة 24/7"),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  
+                                  // Action Button
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 50,
+                                    child: ElevatedButton(
+                                      onPressed: () async {
+                                        final selectedPkg = _packages[_selectedPackageIndex];
+                                        await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => PaymentScreen(package: selectedPkg),
+                                          ),
+                                        );
+                                        if (mounted) _fetchPackages();
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.purpleAccent,
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(16),
+                                        ),
+                                        elevation: 5,
+                                        shadowColor: Colors.purpleAccent.withValues(alpha: 0.3),
+                                      ),
+                                      child: Text(
+                                        _isSubscribed ? 'إضافة الباقة المختارة' : 'اشترك الآن في الباقة',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }
+                          }),
 
                         const SizedBox(height: 20),
                         // Trust Badge / Footer
@@ -358,13 +439,18 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      pkg['name'] ?? 'باقة',
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold),
+                    Expanded(
+                      child: Text(
+                        pkg['name'] ?? 'باقة',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
@@ -472,13 +558,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   width: double.infinity,
                   height: 50,
                   child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
+                    onPressed: () async {
+                      await Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) => PaymentScreen(package: pkg),
                         ),
                       );
+                      if (mounted) _fetchPackages();
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white10, // Unified Color
@@ -521,6 +608,189 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPremiumFeature(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: Colors.purple.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: Colors.purpleAccent, size: 16),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlanOption(dynamic pkg, bool isSelected) {
+    final salePrice = pkg['sale_price'];
+    bool hasDiscount = salePrice != null &&
+        salePrice.toString() != 'null' &&
+        salePrice.toString() != '0';
+
+    final double originalPrice =
+        num.tryParse(pkg['price'].toString())?.toDouble() ?? 0.0;
+    final double salePriceVal =
+        num.tryParse(salePrice.toString())?.toDouble() ?? originalPrice;
+
+    double discountPercent = 0.0;
+    if (originalPrice > 0 && salePriceVal < originalPrice) {
+      discountPercent = ((originalPrice - salePriceVal) / originalPrice) * 100;
+    }
+
+    final bool isStrongOffer = discountPercent > 25;
+    final Color themeColor = isStrongOffer ? Colors.amber : Colors.purpleAccent;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          margin: const EdgeInsets.symmetric(vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? themeColor.withValues(alpha: 0.08)
+                : Colors.white.withValues(alpha: 0.02),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isSelected ? themeColor : Colors.white.withValues(alpha: 0.08),
+              width: isSelected ? 2.0 : 1.0,
+            ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: themeColor.withValues(alpha: 0.15),
+                      blurRadius: 10,
+                      spreadRadius: 0,
+                    )
+                  ]
+                : [],
+          ),
+          child: Row(
+            children: [
+              // Radio Indicator
+              Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isSelected ? themeColor : Colors.white30,
+                    width: 2.0,
+                  ),
+                ),
+                child: isSelected
+                    ? Center(
+                        child: Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: themeColor,
+                          ),
+                        ),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 16),
+              
+              // Name and Duration
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      pkg['name'] ?? 'باقة',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _getDurationString(pkg['duration_days']),
+                      style: const TextStyle(
+                        color: Colors.white38,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Price
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    CurrencyService.format(hasDiscount ? salePriceVal : originalPrice),
+                    style: TextStyle(
+                      color: isSelected ? themeColor : Colors.white,
+                      fontSize: 18,
+                      fontFamily: 'Roboto',
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  if (hasDiscount)
+                    Text(
+                      CurrencyService.format(originalPrice),
+                      style: const TextStyle(
+                        color: Colors.white38,
+                        fontSize: 12,
+                        decoration: TextDecoration.lineThrough,
+                        decorationColor: Colors.redAccent,
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        
+        // Floating Discount Badge
+        if (hasDiscount)
+          Positioned(
+            top: -3,
+            left: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: themeColor,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                isStrongOffer ? "الأكثر توفيراً 🔥" : "خصم %${discountPercent.round()}",
+                style: TextStyle(
+                  color: isStrongOffer ? Colors.black : Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

@@ -10,6 +10,9 @@ class WebProxyService {
   static String getProxiedUrl(String url, {String? referer}) {
     if (url.isEmpty) return url;
 
+    // 🛡️ GUARD: Prevent double-proxying - if already proxied, return as-is
+    if (url.contains('hi.husseinh2711.workers.dev')) return url;
+
     // تشفير الرابط ضروري جداً لتجنب قطع الروابط التي تحتوي على & أو ?
     final encodedUrl = Uri.encodeComponent(url);
 

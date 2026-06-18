@@ -133,9 +133,9 @@ Future<StreamDetails> handleYoutubeStream(String url) async {
         }
       }
 
-      // Priority 2: Build DASH manifest with separate video + audio (fallback)
-      if (qualitiesMap.isEmpty && videoOnly.isNotEmpty && audioOnly.isNotEmpty) {
-        debugPrint('[YOUTUBE HANDLER] Creating DASH fallback with separate video + audio tracks');
+      // Priority 2: Build DASH manifest with separate video + audio for higher qualities
+      if (videoOnly.isNotEmpty && audioOnly.isNotEmpty) {
+        debugPrint('[YOUTUBE HANDLER] Creating DASH for additional higher qualities');
         final bestAudio = audioOnly.first;
 
         for (final video in videoOnly) {
@@ -191,12 +191,21 @@ Future<StreamDetails> handleYoutubeStream(String url) async {
       final streamsWithAudio = qualities.where((q) => q['hasAudio'] == true).toList();
 
       if (streamsWithAudio.isNotEmpty) {
-        final preferredStream = streamsWithAudio.firstWhere(
-          (q) => (q['height'] as int) <= 480,
-          // If 480p or lower is not found, default to the LOWEST available quality
-          // instead of the highest to ensure performance on older devices.
-          orElse: () => streamsWithAudio.last,
-        );
+        // Prefer muxed streams first to prevent Data URI playback errors in certain media players
+        final muxedStreams = streamsWithAudio.where((q) => q['type'] == 'muxed').toList();
+        Map<String, dynamic> preferredStream;
+        
+        if (muxedStreams.isNotEmpty) {
+          preferredStream = muxedStreams.firstWhere(
+            (q) => (q['height'] as int) <= 480,
+            orElse: () => muxedStreams.first,
+          );
+        } else {
+          preferredStream = streamsWithAudio.firstWhere(
+            (q) => (q['height'] as int) <= 480,
+            orElse: () => streamsWithAudio.last,
+          );
+        }
         videoUrlToLoad = preferredStream['url'] as String?;
         debugPrint('[YOUTUBE HANDLER] Selected stream with audio: ${preferredStream['name']}');
       } else if (qualities.isNotEmpty) {

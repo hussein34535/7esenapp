@@ -262,13 +262,6 @@ class _ChannelBoxState extends State<ChannelBox> {
                       child: hasImage
                           ? CachedNetworkImage(
                               imageUrl: ImageProxy.resolveUrl(widget.category['image'].toString()),
-                              cacheManager: CacheManager(
-                                Config(
-                                  'categoryCache',
-                                  stalePeriod: const Duration(days: 30),
-                                  maxNrOfCacheObjects: 100,
-                                ),
-                              ),
                               fit: BoxFit.contain, // Show FULL image without clipping
                               placeholder: (context, url) => const SizedBox(
                                   width: 30,

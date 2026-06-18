@@ -101,7 +101,8 @@ Future<void> main() async {
 
   // 0. LOAD FONTS FIRST
   try {
-    await GoogleFonts.pendingFonts([GoogleFonts.cairo()]);
+    // Already preloaded in index.html for Web, local assets used for Native
+    // await GoogleFonts.pendingFonts([GoogleFonts.cairo()]);
   } catch (e) {
     debugPrint("Font Loading Error: $e");
   }
@@ -512,15 +513,15 @@ class MyApp extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                textTheme: GoogleFonts.cairoTextTheme(
-                  const TextTheme(
-                    bodyLarge: TextStyle(color: Colors.black),
-                    bodyMedium: TextStyle(color: Colors.black),
-                    bodySmall: TextStyle(color: Colors.black),
-                  ),
+                fontFamily: 'Cairo',
+                textTheme: const TextTheme(
+                  bodyLarge: TextStyle(color: Colors.black),
+                  bodyMedium: TextStyle(color: Colors.black),
+                  bodySmall: TextStyle(color: Colors.black),
                 ),
               ),
               darkTheme: ThemeData(
+                fontFamily: 'Cairo',
                 brightness: Brightness.dark,
                 primaryColor: themeProvider.getPrimaryColor(true),
                 scaffoldBackgroundColor:

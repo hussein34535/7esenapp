@@ -96,6 +96,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   Duration? _lastPosition; // ADDED: To store position before a retry
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   StreamSubscription? _mediaKitErrorSub;
+  StreamSubscription<Duration>? _mediaKitPositionSub;
 
   @override
   void initState() {
@@ -369,6 +370,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     _bufferingRetryTimer?.cancel();
     _connectivitySubscription?.cancel();
     _mediaKitErrorSub?.cancel();
+    _mediaKitPositionSub?.cancel();
     _animationController.dispose();
     if (!kIsWeb) {
       WakelockPlus.disable();
@@ -677,18 +679,48 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
           }
           debugPrint('[WEB] Resolving 7esentv-match API stream...');
           final streamDetails = await handleHesenTvStream(urlToProcess);
-          // RE-ENABLED PROXY: dmcdn.net works direct ONLY in browser tabs, needs proxy for CORS in Web Apps
-          videoUrlToLoad = WebProxyService.proxiedUrl(streamDetails.videoUrlToLoad ?? '');
+          final resolvedUrl = streamDetails.videoUrlToLoad ?? '';
+          final isDailymotion = resolvedUrl.contains('dmcdn.net') || resolvedUrl.contains('dailymotion');
+          if (isDailymotion) {
+            videoUrlToLoad = resolvedUrl;
+            debugPrint('[WEB] Resolved Dailymotion stream - Using direct URL (no proxy): $videoUrlToLoad');
+          } else {
+            videoUrlToLoad = WebProxyService.proxiedUrl(resolvedUrl);
+            debugPrint('[WEB] Resolved stream - Using proxied URL: $videoUrlToLoad');
+          }
           if (mounted) {
             // Store details locally to be applied in the final setState
             _fetchedApiQualities = streamDetails.fetchedQualities;
             _selectedApiQualityIndex = streamDetails.selectedQualityIndex;
           }
           debugPrint('[WEB] Resolved 7esentv-match stream: $videoUrlToLoad');
+        } else if (urlToProcess.contains('youtube.com') || urlToProcess.contains('youtu.be')) {
+          debugPrint('[WEB] Resolving YouTube stream...');
+          final streamDetails = await handleYoutubeStream(urlToProcess);
+          videoUrlToLoad = streamDetails.videoUrlToLoad ?? '';
+          if (mounted) {
+            _fetchedApiQualities = streamDetails.fetchedQualities;
+            _selectedApiQualityIndex = streamDetails.selectedQualityIndex;
+          }
         } else {
-          // ✅ لأي رابط آخر (M3U8, MP4, إلخ) استخدم Proxy
-          videoUrlToLoad = WebProxyService.proxiedUrl(urlToProcess);
-          debugPrint('[WEB] Using proxied URL: $videoUrlToLoad');
+          // Dailymotion, Twitch, or any external embed page - use directly (no proxy needed, Vidstack handles it)
+          // Only proxy actual HLS .m3u8 or direct stream files
+          final isHlsOrStream = (urlToProcess.contains('.m3u8') ||
+              urlToProcess.contains('.ts') ||
+              urlToProcess.contains('manifest') ||
+              urlToProcess.contains('/live/') ||
+              urlToProcess.contains('.mp4')) &&
+              !urlToProcess.contains('dailymotion') &&
+              !urlToProcess.contains('dmcdn.net');
+          
+          if (isHlsOrStream) {
+            videoUrlToLoad = WebProxyService.proxiedUrl(urlToProcess);
+            debugPrint('[WEB] HLS/Stream - Using proxied URL: $videoUrlToLoad');
+          } else {
+            // External embed (Dailymotion, etc.) - Vidstack handles natively
+            videoUrlToLoad = urlToProcess;
+            debugPrint('[WEB] External embed - Using direct URL (no proxy): $videoUrlToLoad');
+          }
         }
 
         // Update state and show Vidstack player
@@ -778,6 +810,16 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
             _selectedApiQualityIndex = streamDetails.selectedQualityIndex;
           });
         }
+      } else if (urlToProcess.contains('youtube.com') || urlToProcess.contains('youtu.be')) {
+        debugPrint('[MOBILE] Resolving YouTube stream...');
+        final streamDetails = await handleYoutubeStream(urlToProcess);
+        videoUrlToLoad = streamDetails.videoUrlToLoad;
+        if (mounted) {
+          setState(() {
+            _fetchedApiQualities = streamDetails.fetchedQualities;
+            _selectedApiQualityIndex = streamDetails.selectedQualityIndex;
+          });
+        }
       } else {
         debugPrint(
             '[HESEN PLAYER] URL did not match any handler. Playing raw URL.');
@@ -827,6 +869,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
             debugPrint('[MEDIAKIT ERROR] $error');
             if (mounted && !_isAutoRetrying) {
               _retryMediaKitPlayback(videoUrlToLoad!, httpHeaders);
+            }
+          });
+
+          // Listen to position changes to update UI progress bar
+          _mediaKitPositionSub?.cancel();
+          _mediaKitPositionSub = _mediaKitPlayer!.stream.position.listen((pos) {
+            if (mounted && _controlsVisible) {
+              setState(() {});
             }
           });
 
@@ -1599,13 +1649,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                     false);
 
         final position = isDesktop
-            ? Duration
-                .zero // MediaKit position tracking would need stream.position.listen
+            ? (_mediaKitPlayer?.state.position ?? Duration.zero)
             : (controller?.value.isInitialized == true
                 ? controller!.value.position
                 : Duration.zero);
         final duration = isDesktop
-            ? Duration.zero // Live streams have no duration
+            ? (_mediaKitPlayer?.state.duration ?? Duration.zero)
             : (controller?.value.isInitialized == true
                 ? controller!.value.duration
                 : Duration.zero);
@@ -1789,7 +1838,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
           return SizedBox.expand(
             child: VidstackPlayerWidget(
               url: _currentStreamUrl!,
-              streamLinks: _validStreamLinks,
+              streamLinks: (_isCurrentStreamApi && _fetchedApiQualities.isNotEmpty)
+                  ? _fetchedApiQualities
+                  : _validStreamLinks,
             ),
           );
         }

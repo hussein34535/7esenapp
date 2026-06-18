@@ -301,7 +301,7 @@ class AuthService {
     }
   }
 
-  /// Activates a one-time 24-hour free trial for the current user.
+  /// Activates a one-time 3-day free trial for the current user.
   Future<bool> startTrial() async {
     if (kIsWeb || !isFirebaseInitialized) {
       debugPrint("startTrial: Not supported on Web or Firebase not init.");
@@ -327,17 +327,17 @@ class AuthService {
         }
 
         final now = DateTime.now();
-        final expiry = now.add(const Duration(hours: 24));
+        final expiry = now.add(const Duration(days: 3));
 
         await docRef.update({
           'isSubscribed': true,
           'subscriptionExpiry': expiry,
-          'subscriptionPlan': 'تجربة مجانية (24 ساعة)',
+          'subscriptionPlan': 'تجربة مجانية (3 أيام)',
           'trialUsed': true,
           'trialStartedAt': FieldValue.serverTimestamp(),
         });
 
-        debugPrint("24-hour trial activated for user: ${user.uid}");
+        debugPrint("3-day trial activated for user: ${user.uid}");
         return true;
       }
       return false;

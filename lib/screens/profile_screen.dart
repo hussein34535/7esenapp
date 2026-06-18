@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:hesen/services/auth_service.dart';
 import 'package:hesen/screens/login_screen.dart';
@@ -31,10 +32,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _fetchUserData() async {
     try {
+      // أولاً: حمّل الكاش فوراً عشان الشاشة تبان بسرعة
+      final cached = await _authService.getCachedUserDataOnly();
+      if (mounted && cached != null) {
+        setState(() {
+          _userData = cached;
+          _isLoading = false; // وقف اللودينج بالكاش
+        });
+      }
+
+      // ثانياً: اجلب البيانات الجديدة في الخلفية
       final user = _authService.currentUser;
       if (user != null) {
         try {
-          await user.reload(); // Force refresh auth token
+          await user.reload();
         } catch (e) {
           debugPrint("Web Auth Warning: $e");
         }
@@ -262,8 +273,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     child: CircleAvatar(
                                       radius: 50,
                                       backgroundColor: const Color(0xFF2A2A2A),
+                                      // استخدام CachedNetworkImage بدل NetworkImage عشان الكاش
                                       backgroundImage: photoUrl != null
-                                          ? NetworkImage(photoUrl)
+                                          ? CachedNetworkImageProvider(photoUrl)
                                           : null,
                                       child: _isUploadingProfile
                                           ? const CircularProgressIndicator(

@@ -4,6 +4,25 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:hesen/utils/image_proxy.dart';
 
+/// Cache Manager مخصص لصور الكاتيجوريز - يحفظ الصور لمدة 7 أيام
+class CategoryImageCacheManager {
+  static const key = 'categoryImageCache';
+  static CacheManager? _instance;
+
+  static CacheManager get instance {
+    _instance ??= CacheManager(
+      Config(
+        key,
+        stalePeriod: const Duration(days: 7),
+        maxNrOfCacheObjects: 200,
+        repo: JsonCacheInfoRepository(databaseName: key),
+        fileService: HttpFileService(),
+      ),
+    );
+    return _instance!;
+  }
+}
+
 class ChannelsSection extends StatefulWidget {
   final List channelCategories;
   final Function(BuildContext, String, List<Map<String, dynamic>>, String,
@@ -261,6 +280,7 @@ class _ChannelBoxState extends State<ChannelBox> {
                       padding: const EdgeInsets.all(16.0),
                       child: hasImage
                           ? CachedNetworkImage(
+                              cacheManager: CategoryImageCacheManager.instance,
                               imageUrl: ImageProxy.resolveUrl(widget.category['image'].toString()),
                               fit: BoxFit.contain, // Show FULL image without clipping
                               placeholder: (context, url) => const SizedBox(
@@ -428,6 +448,7 @@ class _CategoryChannelsScreenState extends State<CategoryChannelsScreen> {
                         width: 50,
                         height: 50,
                         child: CachedNetworkImage(
+                          cacheManager: CategoryImageCacheManager.instance,
                           imageUrl: ImageProxy.resolveUrl(widget.category['image'].toString()),
                           fit: BoxFit.contain,
                           placeholder: (context, url) => const SizedBox(

@@ -59,7 +59,10 @@ Future<StreamDetails> handleYoutubeStream(String url) async {
       debugPrint('[YOUTUBE HANDLER] Getting video metadata...');
       final videoData = await yt.videos.get(videoId); // Get video metadata for duration
       debugPrint('[YOUTUBE HANDLER] Getting stream manifest...');
-      final manifest = await yt.videos.streamsClient.getManifest(videoId);
+      final manifest = await yt.videos.streamsClient.getManifest(videoId, ytClients: [
+        YoutubeApiClient.android,
+        YoutubeApiClient.safari,
+      ]);
       debugPrint('[YOUTUBE HANDLER] Successfully got stream manifest.');
 
       // Helper: codec priority (lower is better)
@@ -105,7 +108,7 @@ Future<StreamDetails> handleYoutubeStream(String url) async {
           return b.bitrate.compareTo(a.bitrate);
         });
 
-      final audioOnly = manifest.audio.toList()
+      final audioOnly = manifest.audioOnly.toList()
         ..sort((a, b) {
           final aIsMp4 = a.container.name.toLowerCase() == 'mp4';
           final bIsMp4 = b.container.name.toLowerCase() == 'mp4';
@@ -135,16 +138,18 @@ Future<StreamDetails> handleYoutubeStream(String url) async {
 
       // Priority 2: Build DASH manifest with separate video + audio for higher qualities
       if (videoOnly.isNotEmpty && audioOnly.isNotEmpty) {
-        debugPrint('[YOUTUBE HANDLER] Creating DASH for additional higher qualities');
+        debugPrint('[YOUTUBE HANDLER] Creating DASH manifests for additional higher qualities');
         final bestAudio = audioOnly.first;
 
         for (final video in videoOnly) {
           final qualityLabel = '${video.videoResolution.height}p';
           if (!qualitiesMap.containsKey(qualityLabel)) {
+            // Use DASH manifest on ALL platforms — MediaKit/MPV handles it
+            // with proper headers, and it avoids the split-stream audio problem
+            // where AudioTrack.uri() can't send User-Agent/Referer to YouTube.
             final manifestUrl =
                 _createDashManifest(video, bestAudio, videoData.duration);
 
-            // Log which codec/container chosen for this height
             debugPrint('[YOUTUBE HANDLER] DASH for $qualityLabel uses codec=${video.videoCodec} container=${video.container.name}');
 
             qualitiesMap[qualityLabel] = {
@@ -186,6 +191,7 @@ Future<StreamDetails> handleYoutubeStream(String url) async {
         ..sort((a, b) => (b['height'] as int).compareTo(a['height'] as int));
 
       String? videoUrlToLoad;
+      String? audioUrlToLoad;
       int selectedQualityIndex = -1;
 
       final streamsWithAudio = qualities.where((q) => q['hasAudio'] == true).toList();
@@ -194,6 +200,7 @@ Future<StreamDetails> handleYoutubeStream(String url) async {
         // Prefer muxed streams first to prevent Data URI playback errors in certain media players
         final muxedStreams = streamsWithAudio.where((q) => q['type'] == 'muxed').toList();
         Map<String, dynamic> preferredStream;
+
         
         if (muxedStreams.isNotEmpty) {
           preferredStream = muxedStreams.firstWhere(
@@ -207,6 +214,7 @@ Future<StreamDetails> handleYoutubeStream(String url) async {
           );
         }
         videoUrlToLoad = preferredStream['url'] as String?;
+        audioUrlToLoad = preferredStream['audioUrl'] as String?;
         debugPrint('[YOUTUBE HANDLER] Selected stream with audio: ${preferredStream['name']}');
       } else if (qualities.isNotEmpty) {
         final preferredStream = qualities.firstWhere(
@@ -214,6 +222,7 @@ Future<StreamDetails> handleYoutubeStream(String url) async {
           orElse: () => qualities.first,
         );
         videoUrlToLoad = preferredStream['url'] as String?;
+        audioUrlToLoad = preferredStream['audioUrl'] as String?;
         debugPrint('[YOUTUBE HANDLER] Selected stream (warning - no audio): ${preferredStream['name']}');
       }
 
@@ -238,6 +247,7 @@ Future<StreamDetails> handleYoutubeStream(String url) async {
 
     return StreamDetails(
       videoUrlToLoad: videoUrlToLoad,
+      audioUrlToLoad: audioUrlToLoad,
       fetchedQualities: qualities,
       selectedQualityIndex: selectedQualityIndex,
     );

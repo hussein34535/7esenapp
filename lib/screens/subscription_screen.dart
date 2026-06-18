@@ -154,50 +154,129 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                         ),
                         const SizedBox(height: 30),
 
-                        // Remaining Days Header (If Subscribed)
-                        if (_isSubscribed &&
-                            _userData != null &&
-                            (_userData!['expiryDate'] != null ||
-                                _userData!['subscriptionExpiry'] != null)) ...[
+                        // ====== Current Plan Info Card ======
+                        if (_isSubscribed && _userData != null) ...[ 
                           Builder(builder: (context) {
-                            final dynamic expiryStamp =
-                                _userData!['expiryDate'] ??
-                                    _userData!['subscriptionExpiry'];
-                            DateTime? expiry;
+                            // --- Plan name ---
+                            final String planName =
+                                _userData!['subscriptionPlan']?.toString() ??
+                                _userData!['planName']?.toString() ??
+                                (_userData!['planId'] != null
+                                    ? 'باقة Premium (Plan ${_userData!['planId']})'
+                                    : 'باقة Premium');
 
+                            // --- Expiry ---
+                            final dynamic expiryStamp =
+                                _userData!['subscriptionEnd'] ??
+                                _userData!['expiryDate'] ??
+                                _userData!['subscriptionExpiry'];
+                            DateTime? expiry;
                             if (expiryStamp is DateTime) {
                               expiry = expiryStamp;
                             } else if (expiryStamp is String) {
                               expiry = DateTime.tryParse(expiryStamp);
                             }
+                            final int remaining = expiry != null
+                                ? expiry.difference(DateTime.now()).inDays
+                                : -1;
+                            final String daysText = remaining > 0
+                                ? '$remaining يوم متبقي'
+                                : remaining == 0
+                                    ? 'ينتهي اليوم'
+                                    : 'منتهي';
 
-                            if (expiry == null) return const SizedBox.shrink();
+                            final bool isActive = remaining >= 0;
 
-                            final remaining =
-                                expiry.difference(DateTime.now()).inDays;
-                            final daysText =
-                                remaining > 0 ? "$remaining يوم" : "منتهي";
+                            // لو الاشتراك منتهي، مش بنعرض أي بانر
+                            if (!isActive) return const SizedBox.shrink();
+
+                            const Color planColor = Colors.green;
 
                             return Container(
-                              margin: const EdgeInsets.only(bottom: 20),
-                              padding: const EdgeInsets.all(15),
+                              margin: const EdgeInsets.only(bottom: 24),
+                              padding: const EdgeInsets.all(18),
                               decoration: BoxDecoration(
-                                color: Colors.blue.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(15),
-                                border: Border.all(color: Colors.blueAccent),
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.green.withValues(alpha: 0.15),
+                                    Colors.green.withValues(alpha: 0.05),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(
+                                    color: planColor.withValues(alpha: 0.4),
+                                    width: 1.2),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: planColor.withValues(alpha: 0.1),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
                               ),
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const Icon(Icons.timer,
-                                      color: Colors.blueAccent),
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    "المتبقي في اشتراكك: $daysText",
-                                    style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold),
+                                  // Icon
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: planColor.withValues(alpha: 0.15),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      Icons.workspace_premium_rounded,
+                                      color: planColor,
+                                      size: 26,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  // Plan info
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'اشتراكك الحالي',
+                                          style: TextStyle(
+                                            color: Colors.white54,
+                                            fontSize: 11,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          planName,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  // Days badge
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: planColor.withValues(alpha: 0.2),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                          color:
+                                              planColor.withValues(alpha: 0.5)),
+                                    ),
+                                    child: Text(
+                                      daysText,
+                                      style: TextStyle(
+                                        color: planColor,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
                                   ),
                                 ],
                               ),

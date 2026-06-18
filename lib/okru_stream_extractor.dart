@@ -26,7 +26,7 @@ Future<String?> getOkruStreamUrl(String videoId) async {
     final res = await http.get(Uri.parse(videoUrl), headers: headers).timeout(const Duration(seconds: 15));
 
     if (res.statusCode != 200) {
-      print('Failed to load ok.ru page: ${res.statusCode}');
+      debugPrint('Failed to load ok.ru page: ${res.statusCode}');
       return null;
     }
 
@@ -43,7 +43,7 @@ Future<String?> getOkruStreamUrl(String videoId) async {
     );
     final match = regex.firstMatch(responseBody);
     if (match == null) {
-      print('Could not find data-options in video page. Trying metadata API...');
+      debugPrint('Could not find data-options in video page. Trying metadata API...');
       // محاولة مباشرة لاستدعاء واجهة الميتاداتا الرسمية
       try {
         final metaApi = Uri.https('ok.ru', '/dk', {
@@ -85,14 +85,14 @@ Future<String?> getOkruStreamUrl(String videoId) async {
           }
         }
       } catch (e) {
-        print('OKRU metadata API fallback failed: $e');
+        debugPrint('OKRU metadata API fallback failed: $e');
       }
       return null;
     }
 
     // الـ JSON بيكون URL-encoded → لازم نفكّه، ثم فك ترميز HTML entities
     final rawDataOptions = match.group(1)!;
-    // print("OKRU_DEBUG: Raw data-options before sanitize and decode: $rawDataOptions");
+    // debugPrint("OKRU_DEBUG: Raw data-options before sanitize and decode: $rawDataOptions");
 
     final unescape = HtmlUnescape();
     // Just unescape HTML entities like &quot; to get a valid JSON string.
@@ -102,7 +102,7 @@ Future<String?> getOkruStreamUrl(String videoId) async {
     try {
       flashvars = json.decode(cleanedDataOptions)['flashvars'];
     } catch (e) {
-      print('Error decoding flashvars: $e');
+      debugPrint('Error decoding flashvars: $e');
       return null;
     }
 
@@ -113,13 +113,13 @@ Future<String?> getOkruStreamUrl(String videoId) async {
     } else if (flashvars['metadataUrl'] != null) {
       try {
         String metaUrlString = flashvars['metadataUrl'];
-        // print("OKRU_DEBUG: metaUrlString before sanitize and parse: $metaUrlString");
+        // debugPrint("OKRU_DEBUG: metaUrlString before sanitize and parse: $metaUrlString");
 
         // The URL for the POST request might also be malformed
         final sanitizedMetaUrl =
             _safeUriDecode(metaUrlString, isDecoding: false);
         if (sanitizedMetaUrl == null) {
-          print(
+          debugPrint(
               'OKRU_ERROR: metadataUrl is malformed and could not be sanitized.');
           return null;
         }
@@ -134,17 +134,17 @@ Future<String?> getOkruStreamUrl(String videoId) async {
             )
             .timeout(const Duration(seconds: 15));
         if (metaRes.statusCode != 200) {
-          print('Failed to load metadata URL: ${metaRes.statusCode}');
+          debugPrint('Failed to load metadata URL: ${metaRes.statusCode}');
           return null;
         }
         metadataJson = utf8.decode(metaRes.bodyBytes,
             allowMalformed: true); // تعديل هنا كمان احتياطي
       } catch (e) {
-        print('Error fetching metadata from URL: $e');
+        debugPrint('Error fetching metadata from URL: $e');
         return null;
       }
     } else {
-      print('No metadata or metadataUrl found.');
+      debugPrint('No metadata or metadataUrl found.');
       return null;
     }
 
@@ -152,7 +152,7 @@ Future<String?> getOkruStreamUrl(String videoId) async {
     try {
       metadata = json.decode(metadataJson);
     } catch (e) {
-      print('Error decoding metadata JSON: $e');
+      debugPrint('Error decoding metadata JSON: $e');
       return null;
     }
 
@@ -204,14 +204,14 @@ Future<String?> getOkruStreamUrl(String videoId) async {
       return Uri.encodeFull(bestUrl);
     }
 
-    print('No HLS or MP4 stream URL found.');
+    debugPrint('No HLS or MP4 stream URL found.');
     return null;
   } catch (e, s) {
-    print('!!!!!!!!!!!!! FATAL ERROR IN getOkruStreamUrl !!!!!!!!!!!!!');
-    print('VIDEO ID: $videoId');
-    print('ERROR: $e');
-    print('STACK TRACE: $s');
-    print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+    debugPrint('!!!!!!!!!!!!! FATAL ERROR IN getOkruStreamUrl !!!!!!!!!!!!!');
+    debugPrint('VIDEO ID: $videoId');
+    debugPrint('ERROR: $e');
+    debugPrint('STACK TRACE: $s');
+    debugPrint('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
     return null;
   }
 }
@@ -232,7 +232,7 @@ String? _safeUriDecode(String source, {bool isDecoding = true}) {
       return sanitized;
     }
   } catch (e) {
-    print("OKRU_ERROR: _safeUriDecode failed for string: $source. Error: $e");
+    debugPrint("OKRU_ERROR: _safeUriDecode failed for string: $source. Error: $e");
     // Return null if any part of the process fails.
     return null;
   }

@@ -8,7 +8,7 @@ final Map<int, html.Element> vidstackViews = {};
 void registerWebVideoPlayerFactory() {
   ui_web.platformViewRegistry.registerViewFactory('vidstack-player',
       (int viewId) {
-    print('[VIDSTACK_FACTORY] Creating viewId: $viewId');
+    debugPrint('[VIDSTACK_FACTORY] Creating viewId: $viewId');
     final div = html.DivElement()
       ..id = 'vidstack-container-$viewId'
       ..style.width = '100%'

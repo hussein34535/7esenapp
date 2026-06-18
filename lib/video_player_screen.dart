@@ -60,6 +60,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   late PipHelper _pipHelper;
   VideoSize _currentVideoSize = VideoSize.fitWidth;
   Timer? _hideControlsTimer;
+  int _premiumRetries = 0;
 
   @override
   void initState() {
@@ -167,13 +168,16 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         );
         _controller.unlockAndPlay();
       } else {
-        if (!mounted) {
-          return;
+        if (!mounted) return;
+        if (_premiumRetries < 1) {
+          _premiumRetries++;
+          _showPremiumDialog();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('تعذر تفعيل التجربة. يرجى المحاولة لاحقاً.')),
+          );
+          if (mounted) Navigator.of(context).pop();
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('عذراً، لا يمكن تفعيل التجربة حالياً.')),
-        );
-        _showPremiumDialog();
       }
     } else if (result == 2) {
       if (!mounted) {

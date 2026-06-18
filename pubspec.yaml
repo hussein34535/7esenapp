@@ -29,7 +29,6 @@ dependencies:
   cached_network_image: ^3.3.1
   wakelock_plus: ^1.2.8
   curved_navigation_bar: ^1.0.6
-  day_night_switch: ^1.0.4
   uuid: ^4.3.3
   shared_preferences: ^2.5.3
   connectivity_plus: ^6.1.5
@@ -50,8 +49,9 @@ dependencies:
   media_kit: ^1.2.6
   media_kit_video: ^2.0.1
   media_kit_libs_windows_video: ^1.0.11
-  media_kit_libs_android_video: ^1.0.12 # Added for Android video support
-  video_thumbnail: ^0.5.3 # Added for extracting video thumbnails on mobile
+  media_kit_libs_android_video: ^1.0.12
+  fvp: ^0.37.2
+  video_thumbnail: ^0.5.3
   sentry_flutter: ^9.12.0
   flutter_cache_manager: ^3.4.1
 

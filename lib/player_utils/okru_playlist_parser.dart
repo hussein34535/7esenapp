@@ -61,7 +61,7 @@ Future<List<Map<String, dynamic>>> parseOkruQualities(String masterPlaylistUrl) 
     return uniqueQualities.values.toList();
     
   } catch (e) {
-    print("Error parsing OK.ru qualities: $e");
+    debugPrint("Error parsing OK.ru qualities: $e");
     return [];
   }
 }

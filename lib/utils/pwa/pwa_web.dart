@@ -38,6 +38,6 @@ void triggerInstallPrompt() {
   try {
     js.context.callMethod('triggerInstallPrompt');
   } catch (e) {
-    print("Install Prompt Error: $e");
+    debugPrint("Install Prompt Error: $e");
   }
 }

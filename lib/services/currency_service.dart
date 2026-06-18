@@ -68,11 +68,11 @@ class CurrencyService {
           _exchangeRate = (fetchedRates[currencyCode] as num).toDouble();
           _currencyCode = currencyCode;
           _currencySymbol = _symbols[countryCode] ?? currencyCode;
-          print('Currency Auto-Init: 1 EGP = $_exchangeRate $_currencyCode');
+          debugPrint('Currency Auto-Init: 1 EGP = $_exchangeRate $_currencyCode');
         }
       }
     } catch (e) {
-      print('Currency init failed: $e');
+      debugPrint('Currency init failed: $e');
     }
   }
 

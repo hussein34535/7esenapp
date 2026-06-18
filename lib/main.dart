@@ -1,6 +1,7 @@
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:media_kit/media_kit.dart'; // MediaKit
+import 'package:fvp/fvp.dart' as fvp;
 import 'package:flutter/material.dart';
 import 'package:hesen/web_utils.dart'
     if (dart.library.io) 'package:hesen/web_utils_stub.dart';
@@ -61,6 +62,12 @@ Future<void> main() async {
     MediaKit.ensureInitialized();
   } catch (e) {
     debugPrint("MediaKit Init Error: $e");
+  }
+
+  // fvp: high-performance video_player backend (lighter than media_kit, FFmpeg-based)
+  // Replaces video_player on all native platforms for better YouTube/DASH support
+  if (!kIsWeb) {
+    fvp.registerWith();
   }
 
   if (!kIsWeb &&

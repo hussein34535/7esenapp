@@ -270,7 +270,7 @@ class ThemeCustomizationScreen extends StatelessWidget {
           bool? result = await ColorPicker(
             color: currentColor,
             onColorChanged: onColorSelected,
-            title: Text('اختر لونًا لـ \$title'),
+            title: Text('اختر لونًا لـ $title'),
             pickersEnabled: const <ColorPickerType, bool>{
               ColorPickerType.both: false,
               ColorPickerType.primary: true,
@@ -304,8 +304,8 @@ class ThemeCustomizationScreen extends StatelessWidget {
                 minHeight: 460, minWidth: 300, maxWidth: 320),
           );
 
-          // If the user canceled the dialog, revert to the original color
-          if (result == false) {
+          // Revert if user canceled OR pressed back (result != true)
+          if (result != true) {
             onColorSelected(colorBeforeDialog);
           }
         },

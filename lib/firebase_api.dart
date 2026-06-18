@@ -13,13 +13,13 @@ class FirebaseApi {
         );
         return null; // Token handling for web is different
       } catch (e) {
-        // print('Web notification error: $e');
+        // debugPrint('Web notification error: $e');
         return null;
       }
     } else {
       await _firebseMessaging.requestPermission();
       String? token = await _firebseMessaging.getToken();
-      print("FCM Token: $token");
+      debugPrint("FCM Token: $token");
       return token;
     }
   }

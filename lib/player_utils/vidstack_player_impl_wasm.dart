@@ -557,10 +557,10 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         try {
           if (overlay != null) {
             element.append(overlay);
-            print('[VIDSTACK_IMPL] Overlay appended to container');
+            debugPrint('[VIDSTACK_IMPL] Overlay appended to container');
           }
         } catch (e) {
-          print('[VIDSTACK_IMPL] Error appending Overlay to container: $e');
+          debugPrint('[VIDSTACK_IMPL] Error appending Overlay to container: $e');
         }
 
         _controlsVisible = true;
@@ -571,14 +571,14 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
               _hideControls();
               player.setAttribute('user-idle', 'true');
             } catch (e) {
-              print('Error in handleToggle hide: $e');
+              debugPrint('Error in handleToggle hide: $e');
             }
           } else {
             try {
               _showControls();
               player.setAttribute('user-idle', 'false');
             } catch (e) {
-              print('Error in handleToggle show: $e');
+              debugPrint('Error in handleToggle show: $e');
             }
           }
         }
@@ -590,9 +590,9 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
                 handleToggle(event);
               }.toJS,
               true.toJS);
-          print('[VIDSTACK_IMPL] pointerup listener added');
+          debugPrint('[VIDSTACK_IMPL] pointerup listener added');
         } catch (e) {
-          print('[VIDSTACK_IMPL] Error adding pointerup listener: $e');
+          debugPrint('[VIDSTACK_IMPL] Error adding pointerup listener: $e');
         }
 
         if (backBtn != null) {
@@ -605,14 +605,14 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
                   try {
                     player.setAttribute('user-idle', 'false');
                   } catch (e) {
-                    print('Error setting idle: $e');
+                    debugPrint('Error setting idle: $e');
                   }
 
                   if (mounted) Navigator.of(context).maybePop();
                 }.toJS);
-            print('[VIDSTACK_IMPL] backBtn listener added');
+            debugPrint('[VIDSTACK_IMPL] backBtn listener added');
           } catch (e) {
-            print('[VIDSTACK_IMPL] Error adding backBtn listener: $e');
+            debugPrint('[VIDSTACK_IMPL] Error adding backBtn listener: $e');
           }
         }
 
@@ -630,13 +630,13 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
                 (web.Event e) {
                   e.stopPropagation();
                 }.toJS);
-            print('[VIDSTACK_IMPL] linksContainer listener added');
+            debugPrint('[VIDSTACK_IMPL] linksContainer listener added');
           } catch (e) {
-            print('[VIDSTACK_IMPL] Error adding linksContainer listener: $e');
+            debugPrint('[VIDSTACK_IMPL] Error adding linksContainer listener: $e');
           }
 
           try {
-            print('[VIDSTACK_IMPL] Processing streamLinks...');
+            debugPrint('[VIDSTACK_IMPL] Processing streamLinks...');
             for (var link in widget.streamLinks) {
               final name = link['name'] ?? 'Stream';
               final urlStr = link['url']?.toString();

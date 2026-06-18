@@ -451,7 +451,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 children: [
                   if (_isCouponValid || hasSale)
                     Text(
-                      "$original",
+                      CurrencyService.format(original),
                       style: const TextStyle(
                         color: Colors.grey,
                         decoration: TextDecoration.lineThrough,

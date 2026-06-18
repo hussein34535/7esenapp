@@ -9,7 +9,7 @@ class CryptoUtils {
     const String secret = String.fromEnvironment('CRYPTO_SECRET');
 
     if (secret.isEmpty || base64Encrypted.isEmpty) {
-      print('Decryption failed: Secret key or encrypted data is missing.');
+      debugPrint('Decryption failed: Secret key or encrypted data is missing.');
       return '';
     }
 
@@ -29,7 +29,7 @@ class CryptoUtils {
       
       return decrypted;
     } catch (e) {
-      print('Decryption failed: $e');
+      debugPrint('Decryption failed: $e');
       return '';
     }
   }

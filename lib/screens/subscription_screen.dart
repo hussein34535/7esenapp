@@ -45,6 +45,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         setState(() {
           _packages = packages;
           _isLoading = false;
+          // Set default selection to the featured package
+          final fIndex = _getFeaturedPackageIndex();
+          if (fIndex != -1) {
+            _selectedPackageIndex = fIndex;
+          }
         });
       }
     } catch (e) {
@@ -207,20 +212,40 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                         else
                           LayoutBuilder(builder: (context, constraints) {
                             final isDesktop = constraints.maxWidth > 600;
+                            final featuredIndex = _getFeaturedPackageIndex();
                             if (isDesktop) {
                               return Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                children: _packages.map((pkg) {
+                                children: List.generate(_packages.length, (index) {
+                                  final pkg = _packages[index];
+                                  final isFeatured = index == featuredIndex;
                                   return Expanded(
                                     child: Padding(
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 5),
-                                      child: _buildModernPackageCard(pkg),
+                                      child: _buildModernPackageCard(pkg, isFeatured),
                                     ),
                                   );
-                                }).toList(),
+                                }),
                               );
                             } else {
+                              // Calculate theme for the dynamically selected package button
+                              Color selectedButtonColor = Colors.purpleAccent;
+                              bool isSelectedStrong = false;
+                              if (_packages.isNotEmpty && _selectedPackageIndex < _packages.length) {
+                                final selectedPkg = _packages[_selectedPackageIndex];
+                                final selectedSalePrice = selectedPkg['sale_price'];
+                                final int selectedDiscountMonths = int.tryParse(selectedPkg['discount_months']?.toString() ?? '0') ?? 0;
+                                final double selectedOriginalPrice = num.tryParse(selectedPkg['price'].toString())?.toDouble() ?? 0.0;
+                                final double selectedSalePriceVal = num.tryParse(selectedSalePrice.toString())?.toDouble() ?? selectedOriginalPrice;
+                                double selectedDiscountPercent = 0.0;
+                                if (selectedOriginalPrice > 0 && selectedSalePriceVal < selectedOriginalPrice) {
+                                  selectedDiscountPercent = ((selectedOriginalPrice - selectedSalePriceVal) / selectedOriginalPrice) * 100;
+                                }
+                                isSelectedStrong = selectedDiscountPercent > 25 || selectedDiscountMonths > 0;
+                                selectedButtonColor = isSelectedStrong ? Colors.amber : Colors.purpleAccent;
+                              }
+
                               return Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
@@ -228,13 +253,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                   ...List.generate(_packages.length, (index) {
                                     final pkg = _packages[index];
                                     final isSelected = index == _selectedPackageIndex;
+                                    final isFeatured = index == featuredIndex;
                                     return GestureDetector(
                                       onTap: () {
                                         setState(() {
                                           _selectedPackageIndex = index;
                                         });
                                       },
-                                      child: _buildPlanOption(pkg, isSelected),
+                                      child: _buildPlanOption(pkg, isSelected, isFeatured),
                                     );
                                   }),
                                   const SizedBox(height: 16),
@@ -266,6 +292,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                     height: 50,
                                     child: ElevatedButton(
                                       onPressed: () async {
+                                        if (_packages.isEmpty) return;
                                         final selectedPkg = _packages[_selectedPackageIndex];
                                         await Navigator.push(
                                           context,
@@ -276,13 +303,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                         if (mounted) _fetchPackages();
                                       },
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.purpleAccent,
-                                        foregroundColor: Colors.white,
+                                        backgroundColor: selectedButtonColor,
+                                        foregroundColor: isSelectedStrong ? Colors.black : Colors.white,
                                         shape: RoundedRectangleBorder(
                                           borderRadius: BorderRadius.circular(16),
                                         ),
                                         elevation: 5,
-                                        shadowColor: Colors.purpleAccent.withValues(alpha: 0.3),
+                                        shadowColor: selectedButtonColor.withValues(alpha: 0.3),
                                       ),
                                       child: Text(
                                         _isSubscribed ? 'إضافة الباقة المختارة' : 'اشترك الآن في الباقة',
@@ -320,6 +347,44 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     );
   }
 
+  int _getFeaturedPackageIndex() {
+    if (_packages.isEmpty) return -1;
+    int featuredIndex = -1;
+    
+    // 1. Check for highest discount_months > 0
+    int maxDiscountMonths = 0;
+    for (int i = 0; i < _packages.length; i++) {
+      final dMonths = int.tryParse(_packages[i]['discount_months']?.toString() ?? '0') ?? 0;
+      if (dMonths > maxDiscountMonths) {
+        maxDiscountMonths = dMonths;
+        featuredIndex = i;
+      }
+    }
+    
+    // 2. Check for highest discount percentage
+    if (featuredIndex == -1) {
+      double maxDiscountPercent = 0.0;
+      for (int i = 0; i < _packages.length; i++) {
+        final double originalPrice = num.tryParse(_packages[i]['price']?.toString() ?? '0')?.toDouble() ?? 0.0;
+        final double salePriceVal = num.tryParse(_packages[i]['sale_price']?.toString() ?? '0')?.toDouble() ?? originalPrice;
+        if (originalPrice > 0 && salePriceVal < originalPrice) {
+          double percent = ((originalPrice - salePriceVal) / originalPrice) * 100;
+          if (percent > maxDiscountPercent) {
+            maxDiscountPercent = percent;
+            featuredIndex = i;
+          }
+        }
+      }
+    }
+    
+    // 3. Fallback to the middle package
+    if (featuredIndex == -1) {
+      featuredIndex = _packages.length ~/ 2;
+    }
+    
+    return featuredIndex;
+  }
+
   String _getDurationString(dynamic days) {
     int d = int.tryParse(days.toString()) ?? 30;
     if (d == 30) return "شهر";
@@ -330,14 +395,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     return "$d يوم";
   }
 
-  Widget _buildModernPackageCard(dynamic pkg) {
+  Widget _buildModernPackageCard(dynamic pkg, bool isFeatured) {
     // Logic: Define variables first
     final salePrice = pkg['sale_price'];
+    final int discountMonths = int.tryParse(pkg['discount_months']?.toString() ?? '0') ?? 0;
 
     // Check if discount exists and is valid (not 0, not null)
-    bool hasDiscount = salePrice != null &&
+    bool hasDiscount = (salePrice != null &&
         salePrice.toString() != 'null' &&
-        salePrice.toString() != '0';
+        salePrice.toString() != '0') || discountMonths > 0;
 
     // Logic: Calculate Discount Percentage
     final double originalPrice =
@@ -351,58 +417,79 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     }
 
     // Determine Theme Color based on Discount Strength
-    // Strong Discount (> 25%): Amber (Gold)
+    // Strong Discount (> 25% or has free months): Amber (Gold)
     // Weak/Normal Discount: PurpleAccent
-    final bool isStrongOffer = discountPercent > 25;
-    final Color themeColor = isStrongOffer ? Colors.amber : Colors.purpleAccent;
+    final bool isStrongOffer = discountPercent > 25 || discountMonths > 0;
+    final Color themeColor = isFeatured 
+        ? Colors.amberAccent 
+        : (isStrongOffer ? Colors.cyanAccent : Colors.white24);
 
     return Container(
       margin: const EdgeInsets.only(
-          bottom: 20, top: 10), // Added top margin for badge space
+          bottom: 20, top: 15), // Added top margin for badge space
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
-        gradient: hasDiscount
-            ? LinearGradient(
-                colors: isStrongOffer
-                    ? [
-                        const Color(0xFF2E0249),
-                        const Color(0xFF570A57)
-                      ] // Deep Purple/Gold mix
-                    : [
-                        const Color(0xFF1A1A1A),
-                        const Color(0xFF2D2D2D)
-                      ], // Darker for weak
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              )
-            : LinearGradient(
+        gradient: isFeatured
+            ? const LinearGradient(
                 colors: [
-                  Colors.white.withValues(alpha: 0.05),
-                  Colors.white.withValues(alpha: 0.02)
+                  Color(0xFF2E0249),
+                  Color(0xFF190033),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-              ),
+              )
+            : (hasDiscount
+                ? LinearGradient(
+                    colors: isStrongOffer
+                        ? [
+                            const Color(0xFF001A33),
+                            const Color(0xFF000D1A)
+                          ]
+                        : [
+                            const Color(0xFF1A1A1A),
+                            const Color(0xFF2D2D2D)
+                          ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : LinearGradient(
+                    colors: [
+                      Colors.white.withValues(alpha: 0.05),
+                      Colors.white.withValues(alpha: 0.02)
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )),
         border: Border.all(
-          color: hasDiscount ? themeColor : Colors.white10,
-          width: hasDiscount ? 2 : 1,
+          color: isFeatured 
+              ? Colors.amberAccent 
+              : (hasDiscount ? themeColor : Colors.white10),
+          width: isFeatured ? 2.5 : (hasDiscount ? 1.5 : 1),
         ),
-        boxShadow: hasDiscount
+        boxShadow: isFeatured
             ? [
                 BoxShadow(
-                  color: themeColor.withValues(
-                      alpha: isStrongOffer ? 0.3 : 0.15), // Reduced opacity
-                  blurRadius: 15, // Reduced blur
-                  spreadRadius: 1, // Reduced spread
+                  color: Colors.amberAccent.withValues(alpha: 0.25),
+                  blurRadius: 20,
+                  spreadRadius: 2,
                   offset: const Offset(0, 0),
                 )
               ]
-            : [],
+            : (hasDiscount
+                ? [
+                    BoxShadow(
+                      color: themeColor.withValues(alpha: 0.15),
+                      blurRadius: 15,
+                      spreadRadius: 1,
+                      offset: const Offset(0, 0),
+                    )
+                  ]
+                : []),
       ),
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          if (hasDiscount)
+          if (isFeatured || hasDiscount)
             Positioned(
               top: -12,
               left: 0,
@@ -412,22 +499,60 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                   decoration: BoxDecoration(
-                    color: themeColor,
+                    color: isFeatured ? Colors.amber : themeColor,
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                          color: themeColor.withValues(
-                              alpha: 0.3), // Reduced badge shadow
+                          color: (isFeatured ? Colors.amber : themeColor).withValues(
+                              alpha: 0.3),
                           blurRadius: 8)
                     ],
                   ),
                   child: Text(
-                    isStrongOffer ? "عرض قوي 🔥" : "خصم خاص ✨",
+                    isFeatured
+                        ? "الخصم الأكبر 🔥"
+                        : (isStrongOffer ? "عرض قوي ⚡" : "خصم خاص ✨"),
                     style: TextStyle(
-                        color: isStrongOffer ? Colors.black : Colors.white,
+                        color: (isFeatured || isStrongOffer) ? Colors.black : Colors.white,
                         fontWeight: FontWeight.bold,
                         fontSize: 12),
                   ),
+                ),
+              ),
+            ),
+          if (discountMonths > 0)
+            Positioned(
+              top: -14,
+              left: 16,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.greenAccent.shade700,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.greenAccent, width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                        color: Colors.greenAccent.withValues(alpha: 0.4),
+                        blurRadius: 10)
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.card_giftcard, color: Colors.white, size: 14),
+                    const SizedBox(width: 4),
+                    Text(
+                      discountMonths == 1
+                          ? "+ شهر مجاناً"
+                          : discountMonths == 2
+                              ? "+ شهرين مجاناً"
+                              : "+ $discountMonths شهور مجاناً",
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -458,10 +583,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
-                        hasDiscount
-                            ? (isStrongOffer ? Icons.star : Icons.local_offer)
-                            : Icons.check,
-                        color: hasDiscount ? themeColor : Colors.white70,
+                        isFeatured 
+                            ? Icons.star 
+                            : (hasDiscount ? Icons.local_offer : Icons.check),
+                        color: isFeatured 
+                            ? Colors.amberAccent 
+                            : (hasDiscount ? themeColor : Colors.white70),
                         size: 20,
                       ),
                     )
@@ -503,7 +630,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                               style: const TextStyle(
                                   color: Colors.white54,
                                   fontSize: 14,
-                                  height: 1.5, // Align baseline
+                                  height: 1.5,
                                   fontWeight: FontWeight.w500),
                             ),
                             TextSpan(
@@ -511,8 +638,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                               style: const TextStyle(
                                   color: Colors.greenAccent,
                                   fontSize: 32,
-                                  fontFamily:
-                                      'Roboto', // Enforce font for numbers
+                                  fontFamily: 'Roboto',
                                   fontWeight: FontWeight.bold),
                             ),
                           ],
@@ -531,7 +657,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                           style: const TextStyle(
                               color: Colors.white54,
                               fontSize: 14,
-                              height: 1.5, // Align baseline
+                              height: 1.5,
                               fontWeight: FontWeight.w500),
                         ),
                         TextSpan(
@@ -557,29 +683,49 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 SizedBox(
                   width: double.infinity,
                   height: 50,
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => PaymentScreen(package: pkg),
+                  child: Container(
+                    decoration: isFeatured
+                        ? BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Colors.purpleAccent, Colors.blueAccent],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.purpleAccent.withValues(alpha: 0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              )
+                            ],
+                          )
+                        : null,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => PaymentScreen(package: pkg),
+                          ),
+                        );
+                        if (mounted) _fetchPackages();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isFeatured ? Colors.transparent : Colors.white10,
+                        shadowColor: isFeatured ? Colors.transparent : null,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
                         ),
-                      );
-                      if (mounted) _fetchPackages();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white10, // Unified Color
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        elevation: 0,
                       ),
-                      elevation: 0,
-                    ),
-                    child: Text(
-                      _isSubscribed ? 'إضافة الباقة' : 'اشتراك الآن',
-                      style: const TextStyle(
-                        color: Colors.white, // Unified Text Color
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                      child: Text(
+                        _isSubscribed ? 'إضافة الباقة' : 'اشتراك الآن',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
@@ -640,11 +786,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     );
   }
 
-  Widget _buildPlanOption(dynamic pkg, bool isSelected) {
+  Widget _buildPlanOption(dynamic pkg, bool isSelected, bool isFeatured) {
     final salePrice = pkg['sale_price'];
-    bool hasDiscount = salePrice != null &&
+    final int discountMonths = int.tryParse(pkg['discount_months']?.toString() ?? '0') ?? 0;
+
+    bool hasDiscount = (salePrice != null &&
         salePrice.toString() != 'null' &&
-        salePrice.toString() != '0';
+        salePrice.toString() != '0') || discountMonths > 0;
 
     final double originalPrice =
         num.tryParse(pkg['price'].toString())?.toDouble() ?? 0.0;
@@ -656,8 +804,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       discountPercent = ((originalPrice - salePriceVal) / originalPrice) * 100;
     }
 
-    final bool isStrongOffer = discountPercent > 25;
-    final Color themeColor = isStrongOffer ? Colors.amber : Colors.purpleAccent;
+    final bool isStrongOffer = discountPercent > 25 || discountMonths > 0;
+    final Color themeColor = isFeatured 
+        ? Colors.amberAccent 
+        : (isStrongOffer ? Colors.cyanAccent : Colors.white24);
 
     return Stack(
       clipBehavior: Clip.none,
@@ -669,11 +819,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           decoration: BoxDecoration(
             color: isSelected
                 ? themeColor.withValues(alpha: 0.08)
-                : Colors.white.withValues(alpha: 0.02),
+                : (isFeatured ? Colors.purpleAccent.withValues(alpha: 0.03) : Colors.white.withValues(alpha: 0.02)),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: isSelected ? themeColor : Colors.white.withValues(alpha: 0.08),
-              width: isSelected ? 2.0 : 1.0,
+              color: isSelected 
+                  ? themeColor 
+                  : (isFeatured ? Colors.amberAccent.withValues(alpha: 0.5) : (isStrongOffer ? Colors.cyanAccent.withValues(alpha: 0.4) : Colors.white.withValues(alpha: 0.08))),
+              width: isSelected ? 2.0 : (isFeatured || isStrongOffer ? 1.5 : 1.0),
             ),
             boxShadow: isSelected
                 ? [
@@ -735,6 +887,36 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                         fontSize: 12,
                       ),
                     ),
+                    if (discountMonths > 0) ...[
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.greenAccent.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.2)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.card_giftcard, color: Colors.greenAccent, size: 12),
+                            const SizedBox(width: 4),
+                            Text(
+                              discountMonths == 1
+                                  ? "خصم شهر كامل مجاناً"
+                                  : discountMonths == 2
+                                      ? "خصم شهرين مجاناً"
+                                      : "خصم $discountMonths أشهر مجانية",
+                              style: const TextStyle(
+                                color: Colors.greenAccent,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -770,20 +952,22 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         ),
         
         // Floating Discount Badge
-        if (hasDiscount)
+        if (isFeatured || hasDiscount)
           Positioned(
             top: -3,
             left: 16,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: themeColor,
+                color: isFeatured ? Colors.amber : themeColor,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                isStrongOffer ? "الأكثر توفيراً 🔥" : "خصم %${discountPercent.round()}",
+                isFeatured
+                    ? (discountMonths > 0 ? "الخصم الأكبر 🔥" : "الأكثر طلباً ⭐")
+                    : (isStrongOffer ? "الأكثر توفيراً 🔥" : "خصم %${discountPercent.round()}"),
                 style: TextStyle(
-                  color: isStrongOffer ? Colors.black : Colors.white,
+                  color: (isFeatured || isStrongOffer) ? Colors.black : Colors.white,
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
                 ),

@@ -29,13 +29,13 @@ String _createDashManifest(
     <AdaptationSet mimeType="video/mp4" contentType="video" segmentAlignment="true">
       <Representation id="1" codecs="${videoStream.videoCodec}" bandwidth="${videoStream.bitrate.bitsPerSecond}">
         <BaseURL>${videoUrl}</BaseURL>
-        <SegmentBase indexRange="0-${videoStream.size.totalBytes - 1}"/>
+        <SegmentBase/>
       </Representation>
     </AdaptationSet>
     <AdaptationSet mimeType="audio/mp4" contentType="audio" segmentAlignment="true">
       <Representation id="2" codecs="mp4a.40.2" bandwidth="${audioStream.bitrate.bitsPerSecond}">
         <BaseURL>${audioUrl}</BaseURL>
-        <SegmentBase indexRange="0-${audioStream.size.totalBytes - 1}"/>
+        <SegmentBase/>
       </Representation>
     </AdaptationSet>
   </Period>

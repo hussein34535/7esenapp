@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:path/path.dart' as p;
 
 Future<String> writeDashManifestToTemp(String dataUrl) async {
   try {
@@ -11,7 +12,7 @@ Future<String> writeDashManifestToTemp(String dataUrl) async {
     final List<int> xmlBytes = base64.decode(base64Content.trim());
     
     final tempDir = Directory.systemTemp;
-    final file = File('${tempDir.path}/youtube_manifest.mpd');
+    final file = File(p.join(tempDir.path, 'youtube_manifest.mpd'));
     await file.writeAsBytes(xmlBytes, flush: true);
     
     debugPrint('[DASH HELPER] Wrote YouTube DASH manifest to temp file: ${file.path}');

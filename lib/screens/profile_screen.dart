@@ -198,8 +198,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // ... (Login Prompt - unchanged)
-                  Icon(FontAwesomeIcons.circleUser,
+                  FaIcon(FontAwesomeIcons.circleUser,
                       size: 80, color: Colors.grey.withValues(alpha: 0.5)),
                   const SizedBox(height: 20),
                   Text(
@@ -281,7 +280,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           ? const CircularProgressIndicator(
                                               color: Colors.white)
                                           : (photoUrl == null
-                                              ? Icon(FontAwesomeIcons.user,
+                                              ? FaIcon(FontAwesomeIcons.user,
                                                   size: 40, color: accentColor)
                                               : null),
                                     ),

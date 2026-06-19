@@ -147,7 +147,9 @@ class PlayerControls extends StatelessWidget {
                 borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(20.0),
                     topRight: Radius.circular(20.0))),
-            child: Column(
+            child: Material(
+              color: Colors.transparent,
+              child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -193,6 +195,7 @@ class PlayerControls extends StatelessWidget {
               ],
             ),
           ),
+        ),
         );
       },
     );

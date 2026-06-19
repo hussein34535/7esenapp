@@ -1,5 +1,6 @@
 import 'dart:ui_web' as ui_web;
 import 'dart:html' as html;
+import 'package:flutter/foundation.dart';
 
 /// Global registry for Vidstack views to bypass shadow DOM isolation issues.
 final Map<int, html.Element> vidstackViews = {};

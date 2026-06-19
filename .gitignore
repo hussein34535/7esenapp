@@ -55,3 +55,6 @@ app.*.map.json
 /android/app/release
 .vercel
 .sentry-native/
+
+# Windows build dependencies (binary files downloaded from media_kit/ANGLE)
+windows/deps/

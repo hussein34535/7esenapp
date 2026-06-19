@@ -1,5 +1,5 @@
 import 'dart:html' as html;
-import 'dart:js_util' as js_util;
+import 'package:hesen/utils/js_util_compat.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:hesen/player_utils/video_player_web.dart';
@@ -66,7 +66,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
     
     if (_currentPlayer != null) {
       try {
-        js_util.callMethod(_currentPlayer!, 'destroy', []);
+        JsUtil.callMethod(_currentPlayer!, 'destroy', []);
       } catch (e) {
         debugPrint('[VIDSTACK] Ignored destroy error: $e');
       }
@@ -84,7 +84,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
 
   void _hideControls() {
     if (_currentPlayer == null) return;
-    final isPaused = js_util.getProperty(_currentPlayer!, 'paused') ?? false;
+    final isPaused = JsUtil.getProperty(_currentPlayer!, 'paused') ?? false;
     if (isPaused == true) return;
 
     _controlsVisible = false;
@@ -152,8 +152,8 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           final request = await html.HttpRequest.request(proxyJsonUrl);
           if (myRequestId != _loadRequestId) return;
 
-          final jsonResponse = js_util.callMethod(
-              js_util.getProperty(js_util.globalThis, 'JSON'),
+          final jsonResponse = JsUtil.callMethod(
+              JsUtil.getProperty(JsUtil.globalThis, 'JSON'),
               'parse',
               [request.responseText]);
           if (jsonResponse['url'] != null) {
@@ -201,17 +201,17 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
 
       if (shouldProxy) {
         debugPrint('[VIDSTACK] 🔒 Activate JS Proxy Loader for: $finalUrl');
-        js_util.setProperty(js_util.globalThis, 'currentStreamUrl', finalUrl);
+        JsUtil.setProperty(JsUtil.globalThis, 'currentStreamUrl', finalUrl);
         sourceToUse = 'https://proxy-live-stream/index.m3u8';
       }
 
       debugPrint('[VIDSTACK] Final Source URL: $sourceToUse');
 
-      final srcObj = js_util.newObject();
-      js_util.setProperty(srcObj, 'src', sourceToUse);
-      js_util.setProperty(srcObj, 'type', isMp4 ? 'video/mp4' : 'application/x-mpegurl');
+      final srcObj = JsUtil.newObject();
+      JsUtil.setProperty(srcObj, 'src', sourceToUse);
+      JsUtil.setProperty(srcObj, 'type', isMp4 ? 'video/mp4' : 'application/x-mpegurl');
 
-      js_util.setProperty(_currentPlayer!, 'src', srcObj);
+      JsUtil.setProperty(_currentPlayer!, 'src', srcObj);
       _currentPlayer!.setAttribute('title', isMp4 ? 'Video' : 'Live Stream');
       if (isMp4) {
         _currentPlayer!.setAttribute('stream-type', 'vod');
@@ -540,8 +540,8 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           setLoader(false);
           // iOS: Unmute after autoplay starts (muted autoplay workaround)
           try {
-            if (js_util.getProperty(player, 'muted') == true) {
-              js_util.setProperty(player, 'muted', false);
+            if (JsUtil.getProperty(player, 'muted') == true) {
+              JsUtil.setProperty(player, 'muted', false);
               debugPrint('[VIDSTACK] Auto-unmuted on playing.');
             }
           } catch (e) {
@@ -550,12 +550,12 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         });
 
         void handleFullscreenExit(html.Event e) {
-          final isPaused = js_util.getProperty(player, 'paused');
+          final isPaused = JsUtil.getProperty(player, 'paused');
           if (isPaused == true) {
             debugPrint(
                 '[VIDSTACK] iOS Fullscreen Exit Detected - Resuming Playback');
             try {
-              js_util.callMethod(player, 'play', []);
+              JsUtil.callMethod(player, 'play', []);
               setLoader(true);
             } catch (e) {/* ignore */}
           }
@@ -585,7 +585,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         // LISTEN TO USER IDLE CHANGE
         player.addEventListener('user-idle-change', (html.Event event) {
           // Strictly sync our overlay with Vidstack's idle state
-          final isIdle = js_util.getProperty(event, 'detail') as bool;
+          final isIdle = JsUtil.getProperty(event, 'detail') as bool;
           if (isIdle) {
             _hideControls();
           } else {
@@ -602,7 +602,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         });
 
         player.addEventListener('error', (event) {
-          final detail = js_util.getProperty(event, 'detail');
+          final detail = JsUtil.getProperty(event, 'detail');
           debugPrint('[VIDSTACK] Error Event: $detail');
           setLoader(true);
           _handleErrorLogic();

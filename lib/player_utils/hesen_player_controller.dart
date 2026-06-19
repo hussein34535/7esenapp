@@ -9,7 +9,6 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:http/http.dart' as http;
-import 'package:hesen/utils/pip_helper.dart';
 import 'package:hesen/services/auth_service.dart';
 import 'package:hesen/player_utils/player_stream_resolver.dart';
 import 'package:hesen/player_utils/stream_details.dart';
@@ -246,6 +245,12 @@ class HesenPlayerController extends ChangeNotifier {
       debugPrint('[HESEN PLAYER] ⚠️ Already initializing, skipping duplicate call for: $sourceUrl');
       return;
     }
+    // Guard against re-initializing the same URL while a player is already active
+    // Only when NOT changing quality (specificQualityUrl is null)
+    if (specificQualityUrl == null && currentStreamUrl == sourceUrl && !hasError && mediaKitPlayer != null) {
+      debugPrint('[HESEN PLAYER] ⚠️ Already playing this URL, skipping duplicate call for: $sourceUrl');
+      return;
+    }
     isPlayerInitializing = true;
 
 
@@ -254,6 +259,71 @@ class HesenPlayerController extends ChangeNotifier {
     }
 
     debugPrint('[HESEN PLAYER] Initializing player with sourceUrl: $sourceUrl');
+
+    // Quality change shortcut on desktop: reuse existing MediaKit player
+    // to avoid native MPV crash from dispose+recreate cycle.
+    if (specificQualityUrl != null &&
+        mediaKitPlayer != null &&
+        !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.windows ||
+            defaultTargetPlatform == TargetPlatform.linux ||
+            defaultTargetPlatform == TargetPlatform.macOS)) {
+      var urlToLoad = specificQualityUrl;
+      if (urlToLoad.startsWith('data:application/dash+xml;base64,')) {
+        urlToLoad = await writeDashManifestToTemp(urlToLoad);
+      }
+
+      final Map<String, String> qHeaders = {
+        'User-Agent': userAgent,
+        'Referer': 'https://7esentv.com/',
+      };
+      if (urlToLoad.contains('googlevideo.com') ||
+          specificQualityUrl.contains('googlevideo.com')) {
+        qHeaders['Referer'] = 'https://www.youtube.com/';
+      }
+
+      try {
+        await mediaKitPlayer!.open(
+          Media(urlToLoad, httpHeaders: qHeaders),
+          play: true,
+        );
+
+        if (specificAudioUrl != null &&
+            specificAudioUrl.isNotEmpty &&
+            specificAudioUrl.startsWith('http')) {
+          try {
+            final audioPath =
+                await _downloadAudioToTemp(specificAudioUrl, qHeaders);
+            if (audioPath != null) {
+              await mediaKitPlayer!.setAudioTrack(AudioTrack.uri(audioPath));
+              debugPrint('[HESEN PLAYER] External audio track set on quality change.');
+            }
+          } catch (e) {
+            debugPrint('[HESEN PLAYER] External audio failed (non-fatal): $e');
+          }
+        }
+
+        if (startAt != null && startAt > Duration.zero) {
+          await Future.delayed(const Duration(milliseconds: 500));
+          await mediaKitPlayer!.seek(startAt);
+        }
+
+        selectedApiQualityIndex =
+            specificQualityIndex ?? selectedApiQualityIndex;
+        isLoading = false;
+        hasError = false;
+        isPlayerInitializing = false;
+        notifyListeners();
+      } catch (e) {
+        debugPrint('[MEDIAKIT QUALITY CHANGE ERROR] $e');
+        isPlayerInitializing = false;
+        hasError = true;
+        isLoading = false;
+        notifyListeners();
+      }
+      return;
+    }
+
     await releaseControllers();
     await Future.delayed(const Duration(milliseconds: 250));
 
@@ -331,8 +401,16 @@ class HesenPlayerController extends ChangeNotifier {
               (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS))) {
         debugPrint('[HESEN PLAYER] Desktop detected - Using MediaKit');
         try {
+          final bool isNewPlayer = mediaKitPlayer == null;
           mediaKitPlayer ??= Player();
           mediaKitController ??= VideoController(mediaKitPlayer!);
+
+          if (isNewPlayer) {
+            // Rebuild widget tree so the Video widget attaches to the
+            // texture before MPV tries to render to it (prevents native segfault).
+            notifyListeners();
+            await Future.delayed(const Duration(milliseconds: 300));
+          }
 
           mediaKitErrorSub?.cancel();
           mediaKitErrorSub = mediaKitPlayer!.stream.error.listen((error) {
@@ -505,9 +583,13 @@ class HesenPlayerController extends ChangeNotifier {
     }
 
     if (mediaKitPlayer != null) {
+      mediaKitErrorSub?.cancel();
+      mediaKitPositionSub?.cancel();
       await mediaKitPlayer!.dispose();
       mediaKitPlayer = null;
       mediaKitController = null;
+      // Give MPV native resources time to fully release before creating a new player
+      await Future.delayed(const Duration(milliseconds: 500));
     }
 
     // Clean up temp audio files

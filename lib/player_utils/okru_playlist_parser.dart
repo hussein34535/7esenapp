@@ -1,6 +1,7 @@
 // file: player_utils/okru_playlist_parser.dart
 
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:http/http.dart' as http;
 
 const String _userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64-x64)';

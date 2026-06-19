@@ -1,3 +1,0 @@
-{"dsn":"https://497e74778a74137c33499f17b57c3efa@o4510853875826688.ingest.de.sentry.io/4510853923012688"}
-{"type":"session","length":210}
-{"init":true,"sid":"eab757d2-1b12-46bb-f960-71f71df120b2","status":"crashed","errors":1,"started":"2026-06-18T12:57:34.803927Z","duration":50.031094,"attrs":{"release":"7eSen TV@4.0.0+1","environment":"debug"}}

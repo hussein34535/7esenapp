@@ -1,6 +1,6 @@
 import 'package:hesen/navigation.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 
 class FirebaseApi {
   final _firebseMessaging = FirebaseMessaging.instance;

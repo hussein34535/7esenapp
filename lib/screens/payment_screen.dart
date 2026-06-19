@@ -602,7 +602,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     ),
                     child: method['is_telegram'] == true
                         ? const Center(
-                            child: Icon(FontAwesomeIcons.telegram,
+                            child: FaIcon(FontAwesomeIcons.telegram,
                                 color: Colors.blue, size: 24))
                         : const Icon(Icons.payment, color: Colors.white70),
                   ),

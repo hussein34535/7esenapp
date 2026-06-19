@@ -17,7 +17,7 @@ dependencies:
   firebase_core:
   firebase_auth:
   cloud_firestore:
-  firebase_storage: ^13.0.2 # Added for receipt uploads
+  firebase_storage: 13.0.2 # Pinned: 13.1.0+ uses UseEmulator not in Flutter 3.44.2's firebase_cpp_sdk
   image_picker: ^1.0.7 # Added for selecting receipts
   http: ^1.2.1
   video_player: ^2.8.6
@@ -25,7 +25,7 @@ dependencies:
   intl: any
   permission_handler: ^12.0.0+1
   url_launcher: ^6.2.5
-  font_awesome_flutter: ^10.9.1
+  font_awesome_flutter: 11.0.0 # Patched: IconData wrapper instead of extends (Flutter 3.44.2 final class)
   cached_network_image: ^3.3.1
   wakelock_plus: ^1.2.8
   curved_navigation_bar: ^1.0.6
@@ -34,6 +34,7 @@ dependencies:
   connectivity_plus: ^6.1.5
   timezone: ^0.10.1 # Add timezone package
   crypto: ^3.0.3 # Added for Cloudinary signature generation
+  path: ^1.9.0 # Used by dash_helper_io.dart for cross-platform path joining
 
   web: ^1.0.0
   android_pip: ^2.0.1

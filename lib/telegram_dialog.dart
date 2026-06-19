@@ -104,7 +104,7 @@ void showTelegramDialog(BuildContext context, {String? userName}) {
                     } catch (_) {}
                     Navigator.of(context).pop();
                   },
-                  icon: const Icon(FontAwesomeIcons.telegram, size: 18),
+                  icon: const FaIcon(FontAwesomeIcons.telegram, size: 18),
                   label: const Text('انضم للتيليجرام'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: secondaryColor,

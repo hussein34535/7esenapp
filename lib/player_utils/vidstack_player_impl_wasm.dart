@@ -13,10 +13,12 @@ import 'dart:convert'; // For jsonDecode
 class VidstackPlayerImpl extends StatefulWidget {
   final String url;
   final List<Map<String, dynamic>> streamLinks;
+  final int selectedStreamIndex;
 
   const VidstackPlayerImpl({
     required this.url,
     this.streamLinks = const [],
+    this.selectedStreamIndex = 0,
     Key? key,
   }) : super(key: key);
 
@@ -54,7 +56,9 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
       _isPlayerInitializing = false;
       _safetyTimer?.cancel();
       _loadSource(widget.url);
-      _updateActiveButton(widget.url);
+      _updateActiveButtonByIndex(widget.selectedStreamIndex);
+    } else if (widget.selectedStreamIndex != oldWidget.selectedStreamIndex && _currentPlayer != null) {
+      _updateActiveButtonByIndex(widget.selectedStreamIndex);
     }
   }
 
@@ -234,26 +238,34 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         // Even if HTTPS, proxy ok.ru to bypass CORS and set referer
         finalUrl = WebProxyService.getProxiedUrl(finalUrl, referer: 'https://ok.ru/');
       }
-      // 4. Determine if it's HLS or MP4 for correct player behavior
+      // 4. Determine if it's HLS or MP4 or YouTube for correct player behavior
       final lowerRawUrl = rawStreamUrl.toLowerCase();
       final lowerFinalUrl = finalUrl.toLowerCase();
+      
+      bool isYoutube = lowerRawUrl.contains('youtube.com') || lowerRawUrl.contains('youtu.be');
       bool isMp4 = lowerRawUrl.contains('.mp4') ||
                    lowerFinalUrl.contains('.mp4') ||
                    lowerFinalUrl.contains('type=mp4') ||
                    lowerFinalUrl.contains('video/mp4') ||
                    lowerFinalUrl.contains('type=video/mp4');
 
-      String type = isMp4 ? 'video/mp4' : 'application/x-mpegurl';
+      String type;
+      if (isYoutube) {
+        type = 'youtube';
+      } else if (isMp4) {
+        type = 'video/mp4';
+      } else {
+        type = 'application/x-mpegurl';
+      }
 
       // 5. Decide whether to use the JS Interceptor (Only for HLS)
       String sourceToUse = finalUrl;
       bool isProxied = finalUrl.contains('workers.dev');
       bool shouldProxy = _usedProxyForCurrentStream || isActualIptv || isProxied;
 
-
       // We ONLY use the JS Interceptor for HLS because it rewrites playlists.
-      // If it's an MP4, the interceptor would try to parse binary as text and fail.
-      bool shouldUseInterceptor = !isMp4 && shouldProxy;
+      // If it's an MP4 or YouTube, the interceptor would try to parse binary/html as text and fail.
+      bool shouldUseInterceptor = !isMp4 && !isYoutube && shouldProxy;
 
       if (shouldUseInterceptor) {
         // Set global variables using js_interop for the interceptor
@@ -273,9 +285,15 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
       
       try {
         (_currentPlayer as JSObject).setProperty('src'.toJS, srcMap.jsify());
+        try {
+          (_currentPlayer as JSObject).callMethod('play'.toJS, JSArray());
+        } catch (e) {}
       } catch (e) {
         // Fallback setting attribute
         _currentPlayer!.setAttribute('src', sourceToUse);
+        try {
+          (_currentPlayer as JSObject).callMethod('play'.toJS, JSArray());
+        } catch (e) {}
       }
       
       // 🏁 Set title and stream type (Live vs VOD)
@@ -350,26 +368,25 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           if (mounted) {
             _currentUrl = nextUrl;
             _loadSource(nextUrl);
-            _updateActiveButton(nextUrl);
+            _updateActiveButtonByIndex(currentIndex + 1);
           }
         }
       }
     }
   }
 
-  void _updateActiveButton(String currentUrl) {
+  void _updateActiveButtonByIndex(int index) {
     if (_linksContainer == null) return;
+    int btnIndex = 0;
     for (int i = 0; i < _linksContainer!.children.length; i++) {
       final child = _linksContainer!.children.item(i) as web.HTMLElement;
       if (child.tagName == 'BUTTON') {
-        if (child.hasAttribute('data-raw-url')) {
-          final btnUrl = child.getAttribute('data-raw-url');
-          if (btnUrl == currentUrl) {
-            child.classList.add('active');
-          } else {
-            child.classList.remove('active');
-          }
+        if (btnIndex == index) {
+          child.classList.add('active');
+        } else {
+          child.classList.remove('active');
         }
+        btnIndex++;
       }
     }
   }
@@ -403,11 +420,20 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             width: 100%; height: 100%; background-color: #000; overflow: hidden;
             --media-brand: #7C52D8;
             --media-focus-ring: 0 0 0 3px rgba(124, 82, 216, 0.5);
+            --video-object-fit: contain;
+            --video-object-position: center;
             position: absolute; 
             top: 0; left: 0;
             z-index: 0; 
             transform: translateZ(0); 
             will-change: transform;
+          }
+          .vds-player video,
+          .vds-player iframe {
+            object-fit: contain !important;
+            object-position: center !important;
+            width: 100% !important;
+            height: 100% !important;
           }
           media-icon { width: 28px; height: 28px; }
           
@@ -637,6 +663,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
 
           try {
             debugPrint('[VIDSTACK_IMPL] Processing streamLinks...');
+            int indexCounter = 0;
             for (var link in widget.streamLinks) {
               final name = link['name'] ?? 'Stream';
               final urlStr = link['url']?.toString();
@@ -647,8 +674,9 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
                 btn.textContent = name;
                 btn.setAttribute('data-raw-url', urlStr);
 
-                if (urlStr == initialUrl) btn.classList.add('active');
+                if (indexCounter == widget.selectedStreamIndex) btn.classList.add('active');
 
+                final currentBtnIndex = indexCounter;
                 btn.addEventListener(
                     'click',
                     (web.Event e) {
@@ -656,9 +684,10 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
                       player.setAttribute('user-idle', 'false');
                       _currentUrl = urlStr;
                       _loadSource(urlStr);
-                      _updateActiveButton(urlStr);
+                      _updateActiveButtonByIndex(currentBtnIndex);
                     }.toJS);
                 linksContainer.append(btn);
+                indexCounter++;
               }
             }
             // streamLinks processed

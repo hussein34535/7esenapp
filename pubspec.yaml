@@ -22,7 +22,7 @@ dependencies:
   http: ^1.2.1
   video_player: ^2.8.6
   chewie: ^1.7.5
-  intl: any
+  intl: ^0.20.2
   permission_handler: ^12.0.0+1
   url_launcher: ^6.2.5
   font_awesome_flutter: 11.0.0 # Patched: IconData wrapper instead of extends (Flutter 3.44.2 final class)
@@ -37,14 +37,11 @@ dependencies:
   path: ^1.9.0 # Used by dash_helper_io.dart for cross-platform path joining
 
   web: ^1.0.0
-  android_pip: ^2.0.1
   provider: ^6.1.2
   flex_color_picker: ^3.7.1
-  webview_flutter: ^4.7.0
   flutter_inappwebview: ^6.0.0 # Added for improved WebView functionality
   html_unescape: ^2.0.0 # Added for HTML entity decoding
   youtube_explode_dart: ^3.1.0
-  google_fonts: ^6.2.1
   video_player_win: ^3.2.2
   window_manager: ^0.5.1
   media_kit: ^1.2.6
@@ -61,7 +58,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0
+  flutter_lints: ^5.0.0
   flutter_native_splash: ^2.4.0
   flutter_launcher_icons: "^0.14.3"
 
@@ -93,11 +90,5 @@ flutter:
     - assets/icon/
     - assets/goal.png
     - assets/table.png
-
-  fonts:
-    - family: Cairo
-      fonts:
-        - asset: assets/fonts/Cairo-Regular.ttf
-          weight: 400
-        - asset: assets/fonts/Cairo-Bold.ttf
-          weight: 700
+    - assets/fawry_logo.png
+    - assets/wallets_combined.png

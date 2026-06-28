@@ -12,7 +12,20 @@
           "package_name": "tv.hesen.com"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "555639744428-p46uvc56glbc4of1530rt6dp3mt83mvv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "tv.hesen.com",
+            "certificate_hash": "368280854563fa490084cbfa7bc7145e9d7165b1"
+          }
+        },
+        {
+          "client_id": "555639744428-2het36r8lubtdobpeoo4vp4dul68sjji.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAKwpXThAROTbtOjmGN7KgYERHvUaKdDGw"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "555639744428-2het36r8lubtdobpeoo4vp4dul68sjji.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "555639744428-nqu7pdvr0icm8s3or03ob7t0qvev2rj2.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.tv.hesen"
+              }
+            }
+          ]
         }
       }
     }

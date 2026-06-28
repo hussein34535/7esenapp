@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:hesen/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:hesen/services/resend_service.dart';
 
 class AuthService {
   // 🛑 Static flag set by main.dart on successful init
@@ -55,18 +56,25 @@ class AuthService {
       if (user == null) throw Exception("User creation succeeded but user is null");
 
       if (!kIsWeb) {
-        await _firestore.collection('users').doc(user.uid).set({
-          'name': displayName,
-          'email': email,
-          'createdAt': FieldValue.serverTimestamp(),
-          'isSubscribed': false,
-          'platform': defaultTargetPlatform.toString(),
-          if (deviceId != null) 'activeDeviceId': deviceId,
-          'image_url': imageUrl,
-          'photoUrl': imageUrl,
-        });
+        try {
+          await _firestore.collection('users').doc(user.uid).set({
+            'name': displayName,
+            'email': email,
+            'createdAt': FieldValue.serverTimestamp(),
+            'isSubscribed': false,
+            'platform': defaultTargetPlatform.toString(),
+            if (deviceId != null) 'activeDeviceId': deviceId,
+            'image_url': imageUrl,
+            'photoUrl': imageUrl,
+          });
+        } catch (e) {
+          debugPrint("Firestore SignUp Error: $e");
+        }
       }
       await user.updateDisplayName(displayName);
+      if (user.email != null) {
+        ApiService.registerUser(user.uid, user.email!);
+      }
       ApiService.sendTelemetry(user.uid);
       return result;
     } catch (e) {
@@ -89,12 +97,19 @@ class AuthService {
       );
       final user = cred.user;
       if (user != null) {
+        if (user.email != null) {
+          ApiService.registerUser(user.uid, user.email!);
+        }
         ApiService.sendTelemetry(user.uid);
         if (deviceId != null && !kIsWeb) {
-          await _firestore
-              .collection('users')
-              .doc(user.uid)
-              .set({'activeDeviceId': deviceId}, SetOptions(merge: true));
+          try {
+            await _firestore
+                .collection('users')
+                .doc(user.uid)
+                .set({'activeDeviceId': deviceId}, SetOptions(merge: true));
+          } catch (e) {
+            debugPrint("Firestore SignIn DeviceId Error: $e");
+          }
         }
       }
       return cred;
@@ -188,17 +203,30 @@ class AuthService {
         return finalData;
       }
 
-      final doc = await _firestore
-          .collection('users')
-          .doc(user.uid)
-          .get()
-          .timeout(const Duration(seconds: 10));
+      final docRef = _firestore.collection('users').doc(user.uid);
+      final doc = await docRef.get().timeout(const Duration(seconds: 10));
       if (doc.exists && doc.data() != null) {
         final firestoreData = doc.data()!;
+        
+        // Auto-save activeDeviceId if missing/different
+        final deviceId = prefs.getString('device_id');
+        if (deviceId != null && firestoreData['activeDeviceId'] != deviceId) {
+          docRef.set({'activeDeviceId': deviceId}, SetOptions(merge: true)).catchError((e) {
+            debugPrint("Error auto-updating activeDeviceId in getUserData: $e");
+          });
+          firestoreData['activeDeviceId'] = deviceId; // Update local map too
+        }
+
         final merged = <String, dynamic>{};
         merged.addAll(firestoreData); // Base
         if (apiData != null) {
           merged.addAll(apiData); // API overrides
+          
+          // Smart merge: if either says subscribed, then user is subscribed.
+          // This prevents stale API responses from overriding a fresh Firestore update.
+          if (firestoreData['isSubscribed'] == true || apiData['isSubscribed'] == true) {
+            merged['isSubscribed'] = true;
+          }
         }
         finalData = merged;
       }
@@ -302,15 +330,71 @@ class AuthService {
   }
 
   /// Activates a one-time 3-day free trial for the current user.
+  /// Works on both Web (via API) and Native (via Firestore).
   Future<bool> startTrial() async {
-    if (kIsWeb || !isFirebaseInitialized) {
-      debugPrint("startTrial: Not supported on Web or Firebase not init.");
-      return false;
-    }
+    if (!isFirebaseInitialized) return false;
     User? user = currentUser;
     if (user == null) return false;
 
+    // ✅ On Web: Use backend API to activate trial
+    if (kIsWeb) {
+      try {
+        final token = await user.getIdToken();
+        if (token == null) return false;
+
+        final response = await http.post(
+          Uri.parse('https://7esentvbackend.vercel.app/api/mobile/start-trial'),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({'uid': user.uid}),
+        ).timeout(const Duration(seconds: 15));
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          if (data['success'] == true) {
+            debugPrint("3-day trial activated via API for: ${user.uid}");
+            return true;
+          } else {
+            debugPrint("startTrial API error: ${data['error']}");
+            return false;
+          }
+        } else if (response.statusCode == 409) {
+          // 409 = Trial already used
+          debugPrint("Trial already used (409): ${response.body}");
+          return false;
+        }
+        debugPrint("startTrial API HTTP error: ${response.statusCode}");
+        return false;
+      } catch (e) {
+        debugPrint("startTrial Web Error: $e");
+        return false;
+      }
+    }
+
+    // ✅ On Native: Use Firestore directly
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final deviceId = prefs.getString('device_id');
+
+      // 1. Strict Device Check: Has ANY account on this device used a trial?
+      if (deviceId != null) {
+        final deviceDocs = await _firestore
+            .collection('users')
+            .where('activeDeviceId', isEqualTo: deviceId)
+            .get();
+            
+        for (var d in deviceDocs.docs) {
+          final dData = d.data();
+          if (dData['trialUsed'] == true) {
+            debugPrint("Trial already used on this device by account: ${d.id}");
+            return false; // Block trial for new account on same device!
+          }
+        }
+      }
+
+      // 2. Account Check: Has this specific account used it?
       final docRef = _firestore.collection('users').doc(user.uid);
       final doc = await docRef.get();
 
@@ -355,17 +439,164 @@ class AuthService {
       // 1. Update Firebase Auth Photo URL
       await user.updatePhotoURL(url);
 
-      // 2. Update Firestore User Document (Skip on Web)
-      if (!kIsWeb) {
-        await _firestore.collection('users').doc(user.uid).update({
-          'photoUrl': url,
-          'image_url': url,
-        });
-      }
+      // 2. Update Firestore User Document
+      await _firestore.collection('users').doc(user.uid).update({
+        'photoUrl': url,
+        'image_url': url,
+      });
 
       ApiService.sendTelemetry(user.uid);
     } catch (e) {
       debugPrint("Update Profile Picture Error: $e");
+      rethrow;
+    }
+  }
+
+  /// Cancels subscription at any time.
+  /// Works on both Web (clears local cache and triggers backend API) and Native (directly updates Firestore).
+  Future<bool> cancelSubscription() async {
+    if (!isFirebaseInitialized) return false;
+    User? user = currentUser;
+    if (user == null) return false;
+
+    // 1. Send cancellation email
+    if (user.email != null) {
+      try {
+        await ResendService.sendSubscriptionCancellationConfirmation(email: user.email!);
+      } catch (e) {
+        debugPrint("Error sending cancellation email: $e");
+      }
+    }
+
+    // 2. Web specific logic
+    if (kIsWeb) {
+      try {
+        final token = await user.getIdToken();
+        if (token == null) return false;
+
+        final response = await http.post(
+          Uri.parse('https://7esentvbackend.vercel.app/api/mobile/cancel-subscription'),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({'uid': user.uid}),
+        ).timeout(const Duration(seconds: 15));
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          if (data['success'] == true) {
+            debugPrint("Subscription cancelled via API for: ${user.uid}");
+          }
+        }
+      } catch (e) {
+        debugPrint("cancelSubscription API error: $e");
+      }
+    }
+
+    // 3. Update Firestore (Native) or fall back
+    try {
+      if (!kIsWeb) {
+        final docRef = _firestore.collection('users').doc(user.uid);
+        await docRef.update({
+          'isSubscribed': false,
+          'subscriptionExpiry': null,
+          'subscriptionPlan': null,
+        });
+      }
+
+      // Clear local cache to force status update
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_userCacheKey);
+
+      debugPrint("Subscription cancelled successfully for: ${user.uid}");
+      return true;
+    } catch (e) {
+      debugPrint("cancelSubscription Error: $e");
+      return false;
+    }
+  }
+
+  /// Sign in with Google using Firebase Auth Provider.
+  Future<UserCredential?> signInWithGoogle() async {
+    if (!isFirebaseInitialized) throw Exception("Firebase not initialized");
+    try {
+      final googleProvider = GoogleAuthProvider();
+      UserCredential cred;
+      if (kIsWeb) {
+        cred = await _auth!.signInWithPopup(googleProvider);
+      } else {
+        cred = await _auth!.signInWithProvider(googleProvider);
+      }
+      final user = cred.user;
+      if (user != null) {
+        if (user.email != null) {
+          ApiService.registerUser(user.uid, user.email!);
+        }
+        ApiService.sendTelemetry(user.uid);
+        // Create Firestore user record if native and it does not exist
+        if (!kIsWeb) {
+          final docRef = _firestore.collection('users').doc(user.uid);
+          final doc = await docRef.get();
+          if (!doc.exists) {
+            await docRef.set({
+              'name': user.displayName ?? 'Google User',
+              'email': user.email,
+              'createdAt': FieldValue.serverTimestamp(),
+              'isSubscribed': false,
+              'platform': defaultTargetPlatform.toString(),
+            });
+            try {
+              await startTrial();
+            } catch (_) {}
+          }
+        }
+      }
+      return cred;
+    } catch (e) {
+      debugPrint("signInWithGoogle Error: $e");
+      rethrow;
+    }
+  }
+
+  /// Sign in with Apple using Firebase Auth Provider.
+  Future<UserCredential?> signInWithApple() async {
+    if (!isFirebaseInitialized) throw Exception("Firebase not initialized");
+    try {
+      final appleProvider = AppleAuthProvider();
+      UserCredential cred;
+      if (kIsWeb) {
+        cred = await _auth!.signInWithPopup(appleProvider);
+      } else {
+        cred = await _auth!.signInWithProvider(appleProvider);
+      }
+      final user = cred.user;
+      if (user != null) {
+        if (user.email != null) {
+          ApiService.registerUser(user.uid, user.email!);
+        }
+        ApiService.sendTelemetry(user.uid);
+        // Create Firestore user record if native and it does not exist
+        if (!kIsWeb) {
+          final docRef = _firestore.collection('users').doc(user.uid);
+          final doc = await docRef.get();
+          if (!doc.exists) {
+            await docRef.set({
+              'name': user.displayName ?? 'Apple User',
+              'email': user.email,
+              'createdAt': FieldValue.serverTimestamp(),
+              'isSubscribed': false,
+              'platform': defaultTargetPlatform.toString(),
+            });
+            try {
+              await startTrial();
+            } catch (_) {}
+          }
+        }
+      }
+      return cred;
+    } catch (e) {
+      debugPrint("signInWithApple Error: $e");
       rethrow;
     }
   }

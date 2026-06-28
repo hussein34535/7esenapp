@@ -45,12 +45,25 @@ mixin HomePageDataMixin on State<HomePage> {
       _highlightsHasError = false;
     });
 
+    await _loadSectionsFromCache();
+
     String? token;
     try {
       final user = AuthService.isFirebaseInitialized
           ? FirebaseAuth.instance.currentUser
           : null;
       if (user != null) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final deviceId = prefs.getString('device_id');
+          final cachedData = await AuthService().getCachedUserDataOnly();
+          if (cachedData != null && mounted) {
+            _updateAppStateWithUserData(cachedData, deviceId);
+          }
+        } catch (e) {
+          debugPrint("Error loading cache in _initData: $e");
+        }
+
         token = await user.getIdToken();
 
         if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
@@ -120,6 +133,11 @@ mixin HomePageDataMixin on State<HomePage> {
             if (difference > 0) { daysRemaining = '$difference يوم متبقي'; }
             else if (difference == 0) { daysRemaining = 'ينتهي اليوم'; }
             else { daysRemaining = 'منتهي'; }
+
+            // Trigger subscription expiry warning email if difference is 3, 2, 1, or 0 days
+            if (difference <= 3 && difference >= 0 && user.email != null) {
+              _triggerSubscriptionExpiryWarning(user.email!, user.uid, difference);
+            }
           }
           setState(() {
             _isSubscribed = isSub;
@@ -151,6 +169,7 @@ mixin HomePageDataMixin on State<HomePage> {
               _isLoading = false;
               if (kIsWeb) removeWebSplash();
             });
+            _saveSectionsToCache(processedData);
           }
         } catch (e) {
           debugPrint('Error processing data: $e');
@@ -190,6 +209,7 @@ mixin HomePageDataMixin on State<HomePage> {
           _isLoading = false;
           if (kIsWeb) removeWebSplash();
         });
+        _saveSectionsToCache(processedData);
       }
     } catch (e) {
       debugPrint('Error processing data: $e');
@@ -265,6 +285,7 @@ mixin HomePageDataMixin on State<HomePage> {
           } catch (e) { if (mounted) { setState(() { _highlightsHasError = true; highlights = []; }); } }
           break;
       }
+      _saveCurrentListsToCache();
     } catch (e) {
       debugPrint('Refresh section error: $e');
     }
@@ -548,6 +569,19 @@ mixin HomePageDataMixin on State<HomePage> {
   }
 
   Future<void> _startInitializationSequence() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastIndex = prefs.getInt('last_selected_index');
+      if (lastIndex != null && lastIndex >= 0 && lastIndex < 5) {
+        if (mounted) {
+          setState(() {
+            _selectedIndex = lastIndex;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Error loading last selected index: $e");
+    }
     await _initData();
     await _initNotifications();
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
@@ -572,6 +606,9 @@ mixin HomePageDataMixin on State<HomePage> {
   }
 
   Future<void> checkForUpdate() async {
+    final prefs = await SharedPreferences.getInstance();
+    final hideDialog = prefs.getBool('hide_telegram_dialog') ?? false;
+
     try {
       final response = await http.get(
         Uri.parse('https://raw.githubusercontent.com/hussein34535/forceupdate/refs/heads/main/update.json'),
@@ -584,9 +621,15 @@ mixin HomePageDataMixin on State<HomePage> {
         if (latestVersion != null && updateUrl != null && compareVersions(currentVersion, latestVersion) < 0) {
           WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) { _showUpdateDialog(updateUrl); } });
         } else {
-          WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) { showTelegramDialog(context, userName: _userName); } });
+          if (!(hideDialog && _isSubscribed)) {
+            WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) { showTelegramDialog(context, userName: _userName, isSubscribed: _isSubscribed); } });
+          }
         }
-      } else if (mounted) { showTelegramDialog(context, userName: _userName); }
+      } else if (mounted) {
+        if (!(hideDialog && _isSubscribed)) {
+          showTelegramDialog(context, userName: _userName, isSubscribed: _isSubscribed);
+        }
+      }
     } catch (e) {
       if (e is http.ClientException || e.toString().contains('SocketException')) {
         if (mounted && !_isLoading) {
@@ -644,5 +687,113 @@ mixin HomePageDataMixin on State<HomePage> {
         );
       },
     );
+  }
+
+  Future<void> _saveSectionsToCache(Map<String, dynamic> processedData) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cacheMap = <String, dynamic>{
+        'channels': processedData['channels'],
+        'news': processedData['news'],
+        'goals': processedData['goals'],
+        'matches': (processedData['matches'] as List<Match>?)?.map((m) => m.toJson()).toList(),
+        'highlights': (processedData['highlights'] as List<Highlight>?)?.map((h) => h.toJson()).toList(),
+      };
+      await prefs.setString('home_sections_cache', jsonEncode(cacheMap));
+      debugPrint("Saved home sections to cache.");
+    } catch (e) {
+      debugPrint("Error saving sections to cache: $e");
+    }
+  }
+
+  Future<void> _saveCurrentListsToCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cacheMap = <String, dynamic>{
+        'channels': channels,
+        'news': news,
+        'goals': goals,
+        'matches': matches.map((m) => m.toJson()).toList(),
+        'highlights': highlights.map((h) => h.toJson()).toList(),
+      };
+      await prefs.setString('home_sections_cache', jsonEncode(cacheMap));
+      debugPrint("Updated home sections cache.");
+    } catch (e) {
+      debugPrint("Error updating sections cache: $e");
+    }
+  }
+
+  Future<void> _loadSectionsFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedString = prefs.getString('home_sections_cache');
+      if (cachedString != null) {
+        final Map<String, dynamic> cacheMap = jsonDecode(cachedString);
+        
+        final List<dynamic> rawChannels = cacheMap['channels'] ?? [];
+        final List<dynamic> rawNews = cacheMap['news'] ?? [];
+        final List<dynamic> rawGoals = cacheMap['goals'] ?? [];
+        
+        final List<Match> cachedMatches = [];
+        if (cacheMap['matches'] is List) {
+          for (var item in cacheMap['matches']) {
+            try {
+              cachedMatches.add(Match.fromJson(Map<String, dynamic>.from(item)));
+            } catch (e) {
+              debugPrint("Match cache parse error: $e");
+            }
+          }
+        }
+
+        final List<Highlight> cachedHighlights = [];
+        if (cacheMap['highlights'] is List) {
+          for (var item in cacheMap['highlights']) {
+            try {
+              cachedHighlights.add(Highlight.fromJson(Map<String, dynamic>.from(item)));
+            } catch (e) {
+              debugPrint("Highlight cache parse error: $e");
+            }
+          }
+        }
+
+        if (mounted) {
+          setState(() {
+            channels = rawChannels;
+            news = rawNews;
+            goals = rawGoals;
+            matches = cachedMatches;
+            highlights = cachedHighlights;
+            _filteredChannels = channels;
+            if (channels.isNotEmpty || news.isNotEmpty || matches.isNotEmpty || goals.isNotEmpty || highlights.isNotEmpty) {
+              _isLoading = false;
+            }
+          });
+          debugPrint("Loaded home sections from cache. Total channels: ${channels.length}");
+        }
+      }
+    } catch (e) {
+      debugPrint("Error loading sections from cache: $e");
+    }
+  }
+
+  /// Sends a warning email if it hasn't been sent yet for this remaining day milestone.
+  Future<void> _triggerSubscriptionExpiryWarning(String email, String uid, int daysLeft) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String lastSentKey = 'last_expiry_warning_sent_${uid}_$daysLeft';
+      final bool alreadySent = prefs.getBool(lastSentKey) ?? false;
+      if (!alreadySent) {
+        final success = await ResendService.sendSubscriptionExpiringWarning(
+          email: email,
+          daysRemaining: daysLeft,
+        );
+        if (success) {
+          await prefs.setBool(lastSentKey, true);
+          debugPrint('[SUBSCRIPTION WARNING] Expiry warning email successfully sent to $email for $daysLeft days left.');
+        }
+      }
+    } catch (e) {
+      debugPrint('Error triggering expiry warning email: $e');
+    }
   }
 }

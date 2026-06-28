@@ -1,17 +1,13 @@
 package tv.hesen.com
 
-// Remove the default FlutterActivity import if present
-// import io.flutter.embedding.android.FlutterActivity
-
-// Import the wrapper class from the android_pip package
-import com.thesparks.android_pip.PipCallbackHelperActivityWrapper
+import io.flutter.embedding.android.FlutterActivity
 import android.os.Bundle // Required for onCreate
 import com.unity3d.ads.IUnityAdsInitializationListener
 import com.unity3d.ads.IUnityAdsLoadListener
 import com.unity3d.ads.UnityAds
 
 // Change FlutterActivity to PipCallbackHelperActivityWrapper
-class MainActivity: PipCallbackHelperActivityWrapper(), IUnityAdsInitializationListener {
+class MainActivity: FlutterActivity(), IUnityAdsInitializationListener {
 
     private val UNITY_GAME_ID = "5862917" // Replace with your Game ID
     private val AD_UNIT_ID_INTERSTITIAL = "Interstitial_Android" // Replace with your Ad Unit ID

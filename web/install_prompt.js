@@ -27,7 +27,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      font-family: 'Cairo', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       text-align: center;
       padding: 20px;
       box-sizing: border-box;

@@ -20,6 +20,7 @@ import 'package:hesen/services/data_processor.dart';
 import 'package:hesen/theme_customization_screen.dart';
 import 'package:hesen/screens/home_page.dart';
 import 'package:hesen/app.dart';
+import 'package:hesen/services/notification_service.dart';
 
 final GlobalKey<HomePageState> homeKey = GlobalKey<HomePageState>();
 
@@ -27,7 +28,15 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
 Future<void> main() async {
-  SentryWidgetsFlutterBinding.ensureInitialized();
+  // On web, SentryWidgetsFlutterBinding causes MissingPluginException
+  // (internally uses path_provider which is not supported on web)
+  if (kIsWeb) {
+    WidgetsFlutterBinding.ensureInitialized();
+  } else {
+    SentryWidgetsFlutterBinding.ensureInitialized();
+  }
+  await NotificationService.init();
+
 
   try {
     MediaKit.ensureInitialized();
@@ -110,7 +119,7 @@ Future<void> main() async {
   }
 
   try {
-    if (!Sentry.isEnabled) {
+    if (!kIsWeb && !Sentry.isEnabled) {
       // Clean up stale crashpad state from previous crashes to prevent
       // interference with the new run.
       try {
@@ -138,7 +147,9 @@ Future<void> main() async {
     if (kIsWeb) {
       try {
         registerVidstackPlayer();
-        removeWebSplash();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          removeWebSplash();
+        });
       } catch (e) {
         debugPrint("Vidstack Reg/Splash Remove Error: $e");
       }
@@ -153,7 +164,9 @@ Future<void> main() async {
     );
     if (kIsWeb) {
       registerVidstackPlayer();
-      removeWebSplash();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        removeWebSplash();
+      });
     }
   }
 }

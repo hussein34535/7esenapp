@@ -257,6 +257,68 @@ class ApiService {
     }
   }
 
+  /// Creates a Paymob payment session and returns the checkout URL.
+  static Future<Map<String, dynamic>> createPaymobSession(
+      String uid, int packageId, {String? couponCode}) async {
+    final url = '$baseUrl/paymob/create-session';
+    final requestBody = {
+      'uid': uid,
+      'packageId': packageId,
+      if (couponCode != null && couponCode.isNotEmpty) 'couponCode': couponCode,
+    };
+
+    final response = await _safePost(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(requestBody),
+    ).timeout(const Duration(seconds: 30));
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return json.decode(response.body);
+    } else {
+      try {
+        final Map<String, dynamic> errorData = json.decode(response.body);
+        throw Exception(
+            errorData['error'] ?? 'Failed to create payment session: ${response.statusCode}');
+      } catch (_) {
+        throw Exception('Failed to create payment session: ${response.statusCode}');
+      }
+    }
+  }
+
+  static Future<Map<String, dynamic>> createFawaterakSession(
+      String uid, int packageId, String paymentMethod, {String? couponCode, String? phone}) async {
+    final url = '$baseUrl/fawaterak/create-session';
+    final requestBody = {
+      'uid': uid,
+      'packageId': packageId,
+      'paymentMethod': paymentMethod,
+      if (couponCode != null && couponCode.isNotEmpty) 'couponCode': couponCode,
+      if (phone != null && phone.isNotEmpty) 'phone': phone,
+    };
+
+    final response = await _safePost(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(requestBody),
+    ).timeout(const Duration(seconds: 30));
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return json.decode(response.body);
+    } else {
+      String errorMessage = 'Failed to create Fawaterak session: ${response.statusCode}';
+      try {
+        final Map<String, dynamic> errorData = json.decode(response.body);
+        if (errorData['error'] != null) {
+          errorMessage = errorData['error'];
+        }
+      } catch (_) {
+        // Ignore json parse errors and use default message
+      }
+      throw Exception(errorMessage);
+    }
+  }
+
   static Future<void> sendTelemetry(String uid) async {
     final url = '$baseUrl/telemetry';
     try {
@@ -267,6 +329,19 @@ class ApiService {
       ).timeout(const Duration(seconds: 5));
     } catch (e) {
       debugPrint('Telemetry error: $e');
+    }
+  }
+
+  static Future<void> registerUser(String uid, String email) async {
+    final url = '$baseUrl/register';
+    try {
+      await _safePost(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'uid': uid, 'email': email}),
+      ).timeout(const Duration(seconds: 5));
+    } catch (e) {
+      debugPrint('Register User API Error: $e');
     }
   }
 

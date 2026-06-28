@@ -430,6 +430,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       isPlaying: isPlaying,
       progressBarColor: widget.progressBarColor,
       currentVideoSize: _currentVideoSize,
+      volume: isDesktop
+          ? (_controller.mediaKitPlayer?.state.volume ?? 100.0) / 100.0
+          : (controller?.value.volume ?? 1.0),
+      downloadProgress: _controller.downloadProgress,
+      onVolumeChanged: (v) {
+        if (isDesktop) {
+          _controller.mediaKitPlayer?.setVolume(v * 100.0);
+        } else {
+          controller?.setVolume(v);
+        }
+      },
       onPlayPauseToggle: () {
         if (isDesktop) {
           if (_controller.mediaKitPlayer != null) {
@@ -566,6 +577,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                 currentVideoSize: _currentVideoSize,
                 playerKey: _playerKey,
                 screenAspectRatio: MediaQuery.of(context).size.aspectRatio,
+                selectedStreamIndex: _controller.selectedStreamIndex,
+                selectedApiQualityIndex: _controller.selectedApiQualityIndex,
               ),
               _buildPlayerControls(context),
               if (_controller.isLoading && !_controller.hasError)

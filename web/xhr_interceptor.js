@@ -16,6 +16,9 @@
                 // 🛡️ SAFETY: If already proxied, do not proxy again
                 if (url.startsWith(PROXY_PREFIX)) {
                     this._url = url;
+                    if (window.isProxyMode && url.includes('is_manifest=1')) {
+                        this._isProxyRequest = true;
+                    }
                     return super.open(method, url, ...args);
                 }
 
@@ -53,7 +56,8 @@
             let interceptRewrite = false;
             
             if (this._isProxyRequest) {
-                if (this._url.includes('proxy-live-stream') || this._url.includes('.m3u8') || this._url.includes('m3u8')) {
+                // Intercept ONLY the initial dummy URL or URLs explicitly marked as manifests
+                if (this._url.includes('proxy-live-stream') || this._url.includes('is_manifest=1')) {
                     interceptRewrite = true;
                 }
             }
@@ -108,7 +112,8 @@
                     const refParam = refMatch ? '&ref=' + refMatch[1] : '';
                     const uaSuffix = '&ua=VLC%2F3.0.18%20LibVLC%2F3.0.18';
 
-                    const isM3u8 = text.includes('#EXTM3U');
+                    const isM3u8 = text.includes('#EXTM3U') || text.includes('#EXTINF') || text.includes('#EXT-X-STREAM-INF');
+                    const isMaster = !text.includes('#EXTINF:');
                     let responseData = text;
 
                     if (isM3u8) {
@@ -124,7 +129,8 @@
                                         // Ignore data URIs
                                         if (uri.startsWith('data:')) return m;
                                         if (!uri.startsWith('http')) uri = new URL(uri, baseUrl).toString();
-                                        return 'URI="' + PROXY_PREFIX + encodeURIComponent(uri) + uaSuffix + refParam + '"';
+                                        const extra = isMaster ? '&is_manifest=1' : '';
+                                        return 'URI="' + PROXY_PREFIX + encodeURIComponent(uri) + uaSuffix + refParam + extra + '"';
                                     });
                                 }
                                 rewritten.push(line);
@@ -134,7 +140,8 @@
                                     seg = new URL(seg, baseUrl).toString();
                                 }
                                 if (!seg.startsWith('data:')) {
-                                    rewritten.push(PROXY_PREFIX + encodeURIComponent(seg) + uaSuffix + refParam);
+                                    const extra = isMaster ? '&is_manifest=1' : '';
+                                    rewritten.push(PROXY_PREFIX + encodeURIComponent(seg) + uaSuffix + refParam + extra);
                                 } else {
                                     rewritten.push(seg);
                                 }
@@ -179,12 +186,12 @@
             url = input.toString(); // Fallback for custom objects
         }
         
-        console.log('[Fetch Interceptor] incoming request. type:', typeof input, 'url resolved to:', url);
+        
 
         const isLocal = url && (url.includes('localhost') || url.includes('127.0.0.1'));
         
         // 🔴 CRITICAL: Bypass all Firebase/Google services to prevent breaking Auth/Firestore
-        if (url && (url.includes('firebase') || url.includes('googleapis') || url.includes('firestore'))) {
+        if (url && (url.includes('firebase') || url.includes('googleapis') || url.includes('firestore') || url.includes('gstatic'))) {
             return originalFetch(input, init);
         }
 

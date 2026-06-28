@@ -6,10 +6,12 @@ import 'vidstack_player_impl_stub.dart'
 class VidstackPlayerWidget extends StatelessWidget {
   final String url;
   final List<Map<String, dynamic>> streamLinks;
+  final int selectedStreamIndex;
 
   const VidstackPlayerWidget({
     required this.url,
     this.streamLinks = const [],
+    this.selectedStreamIndex = 0,
     Key? key,
   }) : super(key: key);
 
@@ -18,6 +20,7 @@ class VidstackPlayerWidget extends StatelessWidget {
     return impl.VidstackPlayerImpl(
       url: url,
       streamLinks: streamLinks,
+      selectedStreamIndex: selectedStreamIndex,
     );
   }
 }

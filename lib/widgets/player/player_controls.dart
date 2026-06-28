@@ -23,6 +23,8 @@ class PlayerControls extends StatelessWidget {
   final bool isPlaying;
   final Color progressBarColor;
   final VideoSize currentVideoSize;
+  final double volume; // 0.0-1.0
+  final double downloadProgress; // 0.0-1.0 for fast-start downloads
 
   // Callbacks
   final VoidCallback onPlayPauseToggle;
@@ -35,6 +37,7 @@ class PlayerControls extends StatelessWidget {
   final ValueChanged<double> onSeek;
   final VoidCallback onSeekStart;
   final VoidCallback onSeekEnd;
+  final ValueChanged<double>? onVolumeChanged;
 
   const PlayerControls({
     Key? key,
@@ -57,6 +60,8 @@ class PlayerControls extends StatelessWidget {
     required this.isPlaying,
     required this.progressBarColor,
     required this.currentVideoSize,
+    this.volume = 1.0,
+    this.downloadProgress = 1.0,
     required this.onPlayPauseToggle,
     required this.onBackPress,
     required this.onStreamChanged,
@@ -67,6 +72,7 @@ class PlayerControls extends StatelessWidget {
     required this.onSeek,
     required this.onSeekStart,
     required this.onSeekEnd,
+    this.onVolumeChanged,
   }) : super(key: key);
 
   String _formatDuration(Duration? duration) {
@@ -293,6 +299,40 @@ class PlayerControls extends StatelessWidget {
           ],
           qualityButton,
           pipButton,
+          // Volume button + slider
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 80,
+                child: SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    trackHeight: 2.0,
+                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 4.0),
+                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 10.0),
+                    activeTrackColor: Colors.white,
+                    inactiveTrackColor: Colors.white30,
+                    thumbColor: Colors.white,
+                    overlayColor: Colors.white.withValues(alpha: 0.2),
+                  ),
+                  child: Slider(
+                    value: volume,
+                    min: 0.0,
+                    max: 1.0,
+                    onChanged: onVolumeChanged ?? (_) {},
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: Icon(
+                  volume <= 0.0 ? Icons.volume_off : Icons.volume_up,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                onPressed: () => onVolumeChanged?.call(volume > 0.0 ? 0.0 : 1.0),
+              ),
+            ],
+          ),
           IconButton(
             icon: const Icon(Icons.aspect_ratio, color: Colors.white),
             onPressed: onAspectRatioChanged,
@@ -367,6 +407,26 @@ class PlayerControls extends StatelessWidget {
                       ),
                     ),
             ),
+            // Download progress indicator
+            if (downloadProgress < 1.0)
+              Positioned(
+                bottom: 80,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      'جاري التحميل... ${(downloadProgress * 100).toInt()}%',
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                    ),
+                  ),
+                ),
+              ),
 
             // Bottom controls bar
             Positioned(

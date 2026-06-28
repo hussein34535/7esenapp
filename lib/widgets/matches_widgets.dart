@@ -4,6 +4,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hesen/utils/image_proxy.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:hesen/services/notification_service.dart';
+
 
 class MatchesSection extends StatelessWidget {
   final Future<List<Match>> matches;
@@ -156,6 +159,85 @@ class MatchBox extends StatefulWidget {
 
 class _MatchBoxState extends State<MatchBox> {
   bool _isHovered = false;
+  bool _hasReminder = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkReminderStatus();
+  }
+
+  Future<void> _checkReminderStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _hasReminder = prefs.getBool('reminder_${widget.match.id}') ?? false;
+      });
+    }
+  }
+
+  Future<void> _toggleReminder(DateTime matchTime) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_hasReminder) {
+      await NotificationService.cancelReminder(widget.match.id);
+      await prefs.setBool('reminder_${widget.match.id}', false);
+      if (mounted) {
+        setState(() {
+          _hasReminder = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم إلغاء التنبيه للمباراة'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } else {
+      final reminderTime = matchTime.subtract(const Duration(minutes: 15));
+      if (reminderTime.isBefore(DateTime.now())) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('المباراة ستبدأ قريباً جداً أو بدأت بالفعل!'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      final success = await NotificationService.scheduleMatchReminder(
+        id: widget.match.id,
+        title: 'مباراة قادمة بعد قليل ⚽',
+        body: 'تبدأ مباراة ${widget.match.teamA} ضد ${widget.match.teamB} بعد 15 دقيقة، لا تفوت المشاهدة!',
+        scheduledTime: reminderTime,
+      );
+
+      if (success) {
+        await prefs.setBool('reminder_${widget.match.id}', true);
+        if (mounted) {
+          setState(() {
+            _hasReminder = true;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تم تفعيل التنبيه قبل المباراة بـ 15 دقيقة 🔔'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('فشل تفعيل التنبيه، يرجى المحاولة لاحقاً'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -335,13 +417,36 @@ class _MatchBoxState extends State<MatchBox> {
                                 ),
                                 child: Text(
                                   timeStatus,
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 13,
                                     color: Colors.white,
                                   ),
                                 ),
                               ),
+                              if (timeStatus != 'مباشر' && timeStatus != 'انتهت') ...[
+                                const SizedBox(height: 6),
+                                InkWell(
+                                  onTap: () => _toggleReminder(matchDateTimeWithToday),
+                                  borderRadius: BorderRadius.circular(15),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: _hasReminder
+                                          ? Colors.green.withValues(alpha: 0.2)
+                                          : Colors.white.withValues(alpha: 0.1),
+                                    ),
+                                    child: Icon(
+                                      _hasReminder
+                                          ? Icons.notifications_active_rounded
+                                          : Icons.notifications_none_rounded,
+                                      color: _hasReminder ? Colors.greenAccent : Colors.grey[400],
+                                      size: 20,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
 

@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 
 /// Match model for the 7esen TV API.
 /// Supports both premium and free content with nullable URLs.
-class Match {
+final class Match {
   final int id;
   final String teamA;
   final String teamB;
@@ -124,7 +124,7 @@ class Match {
 
 /// Stream link model with premium support.
 /// If `isPremium` is true and `url` is null, the user needs to unlock via Premium API.
-class StreamLink {
+final class StreamLink {
   final String name;
   final String? url; // null if premium and user not subscribed
   final bool isPremium;
@@ -165,7 +165,7 @@ class StreamLink {
 }
 
 /// Channel model for the 7esen TV API.
-class Channel {
+final class Channel {
   final int id;
   final String name;
   final String? logoUrl;
@@ -242,7 +242,7 @@ class Channel {
 }
 
 /// Category model for the 7esen TV API.
-class Category {
+final class Category {
   final int id;
   final String name;
   final bool isPremium;

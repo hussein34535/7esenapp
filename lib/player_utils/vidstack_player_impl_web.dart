@@ -10,10 +10,12 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 class VidstackPlayerImpl extends StatefulWidget {
   final String url;
   final List<Map<String, dynamic>> streamLinks;
+  final int selectedStreamIndex;
 
   const VidstackPlayerImpl({
     required this.url,
     this.streamLinks = const [],
+    this.selectedStreamIndex = 0,
     Key? key,
   }) : super(key: key);
 
@@ -49,7 +51,9 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
       _usedProxyForCurrentStream = false; // direct first
       _currentUrl = widget.url;
       _loadSource(widget.url);
-      _updateActiveButton(widget.url);
+      _updateActiveButtonByIndex(widget.selectedStreamIndex);
+    } else if (widget.selectedStreamIndex != oldWidget.selectedStreamIndex && _currentPlayer != null) {
+      _updateActiveButtonByIndex(widget.selectedStreamIndex);
     }
   }
 
@@ -279,23 +283,24 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           if (mounted) {
             _currentUrl = nextUrl;
             _loadSource(nextUrl);
-            _updateActiveButton(nextUrl);
+            _updateActiveButtonByIndex(currentIndex + 1);
           }
         }
       }
     }
   }
 
-  void _updateActiveButton(String currentUrl) {
+  void _updateActiveButtonByIndex(int index) {
     if (_linksContainer == null) return;
+    int btnIndex = 0;
     for (var child in _linksContainer!.children) {
       if (child is html.ButtonElement) {
-        final btnUrl = child.dataset['raw-url'];
-        if (btnUrl == currentUrl) {
+        if (btnIndex == index) {
           child.classes.add('active');
         } else {
           child.classes.remove('active');
         }
+        btnIndex++;
       }
     }
   }
@@ -322,9 +327,20 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             width: 100%; height: 100%; background-color: #000; overflow: hidden;
             --media-brand: #7C52D8;
             --media-focus-ring: 0 0 0 3px rgba(124, 82, 216, 0.5);
+            --video-object-fit: contain;
+            --video-object-position: center;
             position: absolute; /* Absolute within container */
             top: 0; left: 0;
             z-index: 0; 
+            transform: translateZ(0); 
+            will-change: transform;
+          }
+          .vds-player video,
+          .vds-player iframe {
+            object-fit: contain !important;
+            object-position: center !important;
+            width: 100% !important;
+            height: 100% !important;
           }
           media-icon { width: 28px; height: 28px; }
           
@@ -490,6 +506,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             linksContainer.onClick.listen((e) => e.stopPropagation()),
           );
 
+          int indexCounter = 0;
           for (var link in widget.streamLinks) {
             final name = link['name'] ?? 'Stream';
             final urlStr = link['url']?.toString();
@@ -499,18 +516,20 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
                 ..innerText = name
                 ..dataset['raw-url'] = urlStr;
 
-              if (urlStr == initialUrl) btn.classes.add('active');
+              if (indexCounter == widget.selectedStreamIndex) btn.classes.add('active');
 
+              final currentBtnIndex = indexCounter;
               _subscriptions.add(
                 btn.onClick.listen((e) {
                   e.stopPropagation();
                   player.setAttribute('user-idle', 'false');
                   _currentUrl = urlStr;
                   _loadSource(urlStr);
-                  _updateActiveButton(urlStr);
+                  _updateActiveButtonByIndex(currentBtnIndex);
                 }),
               );
               linksContainer.append(btn);
+              indexCounter++;
             }
           }
         }

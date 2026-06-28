@@ -18,9 +18,63 @@ class MyApp extends StatelessWidget {
       future: initFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const MaterialApp(
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
             home: Scaffold(
-              backgroundColor: Colors.black,
+              backgroundColor: const Color(0xFF0D0D1A),
+              body: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF7C52D8).withValues(alpha: 0.4),
+                            blurRadius: 30,
+                            spreadRadius: 5,
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: Image.asset(
+                          'assets/icon/logo.png',
+                          width: 100,
+                          height: 100,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Icon(
+                            Icons.tv,
+                            size: 60,
+                            color: Color(0xFF7C52D8),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      '7eSen TV',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    const SizedBox(
+                      width: 36,
+                      height: 36,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF7C52D8)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           );
         }
@@ -59,15 +113,22 @@ class MyApp extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                fontFamily: 'Cairo',
                 textTheme: const TextTheme(
                   bodyLarge: TextStyle(color: Colors.black),
                   bodyMedium: TextStyle(color: Colors.black),
                   bodySmall: TextStyle(color: Colors.black),
                 ),
+                fontFamily: 'sans-serif',
+                fontFamilyFallback: const [
+                  'Segoe UI',
+                  'Tahoma',
+                  'Arial',
+                  '-apple-system',
+                  'BlinkMacSystemFont',
+                  'sans-serif',
+                ],
               ),
               darkTheme: ThemeData(
-                fontFamily: 'Cairo',
                 brightness: Brightness.dark,
                 primaryColor: themeProvider.getPrimaryColor(true),
                 scaffoldBackgroundColor:
@@ -96,6 +157,15 @@ class MyApp extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+                fontFamily: 'sans-serif',
+                fontFamilyFallback: const [
+                  'Segoe UI',
+                  'Tahoma',
+                  'Arial',
+                  '-apple-system',
+                  'BlinkMacSystemFont',
+                  'sans-serif',
+                ],
               ),
               initialRoute: '/',
               routes: {

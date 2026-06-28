@@ -3,7 +3,6 @@
 
 # Build & Dependency Artifacts
 .dart_tool/
-build/
 .pub-cache/
 .flutter-plugins
 .flutter-plugins-dependencies

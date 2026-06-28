@@ -52,24 +52,49 @@ mixin HomePageUIMixin on HomePageDataMixin {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               ),
               icon: const Icon(Icons.workspace_premium_rounded, color: Colors.black87, size: 18),
-              label: const Text('اشترك الآن', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 13, fontFamily: 'Cairo')),
+              label: const Text('اشترك الآن', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 13)),
             ),
           ),
         ),
       );
     }
 
-    Color packageColor = Colors.amber.shade400;
+    Color packageColor = const Color(0xFFDFBA73); // Muted Champagne Gold
     if (_subscriptionPlan != null) {
       final plan = _subscriptionPlan!.toLowerCase();
-      if (plan.contains('شهري') || plan.contains('month')) { packageColor = Colors.blue.shade400; }
-      else if (plan.contains('سنوي') || plan.contains('year')) { packageColor = Colors.amber.shade400; }
-      else if (plan.contains('اسبوع') || plan.contains('week')) { packageColor = Colors.green.shade400; }
+      if (plan.contains('ultra') || plan.contains('الترا') || plan.contains('ألترا')) {
+        packageColor = const Color(0xFF9F7AEA); // Premium Soft Purple/Violet for Ultra
+      } else if (plan.contains('pro') || plan.contains('برو')) {
+        packageColor = const Color(0xFF00F0FF); // Cyan for Pro
+      } else if (plan.contains('شهري') || plan.contains('month')) {
+        packageColor = const Color(0xFF759CD8); // Soft Pastel Slate Blue
+      } else if (plan.contains('سنوي') || plan.contains('year')) {
+        packageColor = const Color(0xFFDFBA73); // Muted Champagne Gold
+      } else if (plan.contains('اسبوع') || plan.contains('week')) {
+        packageColor = const Color(0xFF7FB08A); // Soft Sage Green
+      }
+    }
+
+    String planDisplayName = 'مميز';
+    if (_subscriptionPlan != null) {
+      final planLower = _subscriptionPlan!.toLowerCase();
+      if (planLower.contains('شهري') || planLower.contains('month')) {
+        planDisplayName = 'شهري';
+      } else if (planLower.contains('سنوي') || planLower.contains('year')) {
+        planDisplayName = 'سنوي';
+      } else if (planLower.contains('اسبوع') || planLower.contains('week')) {
+        planDisplayName = 'أسبوعي';
+      } else {
+        planDisplayName = _subscriptionPlan!;
+      }
     }
 
     actions.add(
       Padding(
-        padding: EdgeInsets.only(left: (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) ? 10.0 : 8.0, right: (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) ? 10.0 : 8.0, bottom: 12.0),
+        padding: EdgeInsets.symmetric(
+          horizontal: (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) ? 10.0 : 8.0,
+          vertical: 4.0,
+        ),
         child: InkWell(
           customBorder: const CircleBorder(),
           onTap: () { Navigator.of(context).push(MaterialPageRoute(builder: (context) => const ProfileScreen())); },
@@ -88,26 +113,39 @@ mixin HomePageUIMixin on HomePageDataMixin {
                     ),
                   ),
                   child: CircleAvatar(
-                    radius: 28, backgroundColor: const Color(0xFF121212),
+                    radius: (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) ? 24 : 19.5,
+                    backgroundColor: const Color(0xFF121212),
                     backgroundImage: _userProfileImage != null ? CachedNetworkImageProvider(_userProfileImage!) : null,
                     child: _userProfileImage != null ? null
                         : (_userName != null && _userName!.isNotEmpty
-                            ? Text(_userName![0].toUpperCase(), style: TextStyle(color: _isSubscribed ? packageColor : Colors.white, fontWeight: FontWeight.bold, fontSize: (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) ? 18 : 12))
-                            : Icon(Icons.person, color: _isSubscribed ? packageColor : Colors.white, size: (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) ? 24 : 16)),
+                            ? Text(_userName![0].toUpperCase(), style: TextStyle(color: _isSubscribed ? packageColor : Colors.white, fontWeight: FontWeight.bold, fontSize: (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) ? 20 : 15))
+                            : Icon(Icons.person, color: _isSubscribed ? packageColor : Colors.white, size: (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) ? 26 : 21)),
                   ),
                 ),
-                if (_isSubscribed && _subscriptionExpiryDays != null)
+                if (_isSubscribed)
                   Positioned(
-                    bottom: -10, left: -2,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF00C853), borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white, width: 2),
-                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 4, offset: const Offset(0, 2))],
+                    bottom: -5,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF121212),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: packageColor, width: 1.2),
+                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 4, offset: const Offset(0, 1.5))],
+                        ),
+                        child: Text(
+                          planDisplayName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            height: 1.0,
+                          ),
+                        ),
                       ),
-                      constraints: const BoxConstraints(minWidth: 24), alignment: Alignment.center,
-                      child: Text('${_subscriptionExpiryDays!.replaceAll(RegExp(r'[^0-9]'), '')} يوم', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900, height: 1.0)),
                     ),
                   ),
               ],
@@ -181,71 +219,399 @@ mixin HomePageUIMixin on HomePageDataMixin {
               icon: const Icon(Icons.menu_rounded, color: Colors.white, size: 28),
               onPressed: () {
                 showModalBottomSheet(
-                  context: context, backgroundColor: Theme.of(context).cardColor,
-                  shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+                  context: context,
+                  backgroundColor: Colors.transparent,
+                  isScrollControlled: true,
                   builder: (BuildContext context) {
-                    return Material(
-                      color: Colors.transparent,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 16.0),
+                    final theme = Theme.of(context);
+                    final isLight = theme.brightness == Brightness.light;
+                    final secondaryColor = theme.colorScheme.secondary;
+                    
+                    return Directionality(
+                      textDirection: TextDirection.rtl,
+                      child: Container(
+                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                        decoration: BoxDecoration(
+                          color: theme.cardColor,
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.2),
+                              blurRadius: 15,
+                              spreadRadius: 5,
+                            )
+                          ],
+                        ),
                         child: SingleChildScrollView(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                            if (_userName != null)
-                              ListTile(
-                                leading: Icon(Icons.person, color: Theme.of(context).colorScheme.secondary, size: 28),
-                                title: Text(_userName ?? 'المستخدم', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                trailing: IconButton(icon: const Icon(Icons.edit, size: 20), onPressed: () { Navigator.pop(context); _showEditNameDialog(); }),
-                              ),
-                            const Divider(),
-                            ListTile(
-                              leading: Icon(_isDarkMode ? Icons.dark_mode : Icons.light_mode, color: Colors.amber),
-                              title: const Text('وضع التشغيل'),
-                              trailing: Transform.scale(
-                                scale: 0.7,
-                                child: Switch(
-                                  value: _isDarkMode, activeThumbColor: Colors.purple,
-                                  onChanged: (value) { setState(() { _isDarkMode = value; }); widget.onThemeChanged(value); Navigator.pop(context); },
+                              // Drag Handle
+                              Container(
+                                width: 40,
+                                height: 4,
+                                decoration: BoxDecoration(
+                                  color: theme.textTheme.bodyLarge?.color?.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(10),
                                 ),
                               ),
-                            ),
-                            ListTile(leading: const Icon(Icons.notifications_active_outlined, color: Colors.blue), title: const Text('التنبيهات'), onTap: () { Navigator.pop(context); }),
-                            ListTile(
-                              leading: const Icon(Icons.diamond, color: Colors.amber),
-                              title: const Text('الاشتراك المميز', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amber)),
-                              onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (context) => const SubscriptionScreen())); },
-                            ),
-                            ListTile(
-                              leading: Icon(Icons.color_lens, color: Theme.of(context).colorScheme.secondary),
-                              title: Text('تخصيص الألوان', style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyLarge?.color ?? Colors.white)),
-                              onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (context) => const ThemeCustomizationScreen())); },
-                            ),
-                            ListTile(
-                              leading: FaIcon(FontAwesomeIcons.telegram, color: Theme.of(context).colorScheme.secondary),
-                              title: Text('Telegram', style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyLarge?.color ?? Colors.white)),
-                              onTap: () async {
-                                Navigator.pop(context);
-                                final Uri telegramUri = Uri.parse('https://t.me/tv_7esen');
-                                try {
-                                  if (await canLaunchUrl(telegramUri)) { await launchUrl(telegramUri, mode: LaunchMode.externalApplication); }
-                                  else if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لا يمكن فتح رابط التحديث.'))); }
-                                } catch (e) { if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('حدث خطأ عند فتح الرابط.'))); } }
-                              },
-                            ),
-                            ListTile(
-                              leading: Icon(Icons.search, color: Theme.of(context).colorScheme.secondary),
-                              title: Text('البحث', style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyLarge?.color ?? Colors.white)),
-                              onTap: () { Navigator.pop(context); setState(() { _isSearchBarVisible = true; }); },
-                            ),
-                            ListTile(
-                              leading: Icon(Icons.privacy_tip_rounded, color: Theme.of(context).colorScheme.secondary),
-                              title: Text('سياسة الخصوصية', style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyLarge?.color ?? Colors.white)),
-                              onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (context) => PrivacyPolicyPage())); },
-                            ),
-                          ],
+                              const SizedBox(height: 20),
+                              
+                              // Profile Header Card
+                              if (_userName != null)
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: isLight 
+                                          ? [Colors.grey.shade100, Colors.grey.shade200]
+                                          : [theme.scaffoldBackgroundColor, theme.scaffoldBackgroundColor.withValues(alpha: 0.6)],
+                                    ),
+                                    borderRadius: BorderRadius.circular(24),
+                                    border: Border.all(
+                                      color: theme.dividerColor.withValues(alpha: 0.08),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      // User Avatar
+                                      Container(
+                                        width: 50,
+                                        height: 50,
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: _isSubscribed 
+                                                ? [const Color(0xFFFFD700), const Color(0xFFFFA500)]
+                                                : [secondaryColor, secondaryColor.withValues(alpha: 0.6)],
+                                          ),
+                                          shape: BoxShape.circle,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: (_isSubscribed ? const Color(0xFFFFA500) : secondaryColor).withValues(alpha: 0.2),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 3),
+                                            )
+                                          ],
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            _userName!.isNotEmpty ? _userName![0].toUpperCase() : 'U',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 20,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      // Name and Plan Details
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              _userName ?? 'المستخدم',
+                                              style: const TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            // Plan tag
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: _isSubscribed 
+                                                    ? Colors.amber.withValues(alpha: 0.15)
+                                                    : Colors.grey.withValues(alpha: 0.15),
+                                                borderRadius: BorderRadius.circular(10),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    _isSubscribed ? Icons.star_rounded : Icons.star_border_rounded,
+                                                    size: 14,
+                                                    color: _isSubscribed ? Colors.amber.shade700 : Colors.grey,
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    _isSubscribed ? 'عضوية PRO المميزة' : 'باقة مجانية',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: _isSubscribed ? Colors.amber.shade800 : Colors.grey.shade600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      // Edit button
+                                      Material(
+                                        color: Colors.transparent,
+                                        child: IconButton(
+                                          icon: Icon(Icons.edit_rounded, color: secondaryColor, size: 22),
+                                          onPressed: () {
+                                            Navigator.pop(context);
+                                            _showEditNameDialog();
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              
+                              const SizedBox(height: 16),
+                              
+                              // Premium Promotion Card (Only for non-subscribers)
+                              if (!_isSubscribed)
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [Color(0xFF8E2DE2), Color(0xFF4A00E0)], // Deep violet gradient
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(24),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFF4A00E0).withValues(alpha: 0.3),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      )
+                                    ],
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withValues(alpha: 0.15),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(Icons.diamond_rounded, color: Colors.amber, size: 30),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            const Text(
+                                              'ترقية إلى Hesen PRO',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              'افتح مميزات حصرية وتجربة أسرع بدون إعلانات',
+                                              style: TextStyle(
+                                                color: Colors.white.withValues(alpha: 0.8),
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      ElevatedButton(
+                                        onPressed: () {
+                                          Navigator.pop(context);
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(builder: (context) => const SubscriptionScreen()),
+                                          );
+                                        },
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.amber,
+                                          foregroundColor: Colors.black87,
+                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(14),
+                                          ),
+                                          elevation: 0,
+                                        ),
+                                        child: const Text(
+                                          'اشتراك',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              
+                              if (!_isSubscribed) const SizedBox(height: 20),
+                              
+                              // Section Title
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: Text(
+                                  'الإعدادات والخيارات',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: theme.textTheme.bodyLarge?.color?.withValues(alpha: 0.5),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              
+                              // Options Grid
+                              Row(
+                                children: [
+                                  // Theme Customization Card
+                                  Expanded(
+                                    child: _buildMenuCard(
+                                      context: context,
+                                      icon: Icons.color_lens_rounded,
+                                      iconColor: secondaryColor,
+                                      title: 'تخصيص الألوان',
+                                      subtitle: 'تغيير ثيم التطبيق',
+                                      onTap: () {
+                                        Navigator.pop(context);
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(builder: (context) => const ThemeCustomizationScreen()),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  // Dark Mode Card
+                                  Expanded(
+                                    child: _buildDarkModeCard(context),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  // Notifications Card
+                                  Expanded(
+                                    child: _buildMenuCard(
+                                      context: context,
+                                      icon: Icons.notifications_active_rounded,
+                                      iconColor: Colors.blue.shade600,
+                                      title: 'التنبيهات',
+                                      subtitle: 'إعدادات الإشعارات',
+                                      onTap: () {
+                                        Navigator.pop(context);
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  // Telegram Card
+                                  Expanded(
+                                    child: _buildMenuCard(
+                                      context: context,
+                                      icon: FontAwesomeIcons.telegram,
+                                      iconColor: const Color(0xFF229ED9),
+                                      title: 'تيليجرام',
+                                      subtitle: 'مجتمع القناة الرسمي',
+                                      onTap: () async {
+                                        Navigator.pop(context);
+                                        final Uri telegramUri = Uri.parse('https://t.me/he_s_en');
+                                        try {
+                                          if (await canLaunchUrl(telegramUri)) {
+                                            await launchUrl(telegramUri, mode: LaunchMode.externalApplication);
+                                          } else if (context.mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لا يمكن فتح رابط التحديث.')));
+                                          }
+                                        } catch (e) {
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('حدث خطأ عند فتح الرابط.')));
+                                          }
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  // Search Card
+                                  Expanded(
+                                    child: _buildMenuCard(
+                                      context: context,
+                                      icon: Icons.search_rounded,
+                                      iconColor: Colors.teal.shade600,
+                                      title: 'البحث السريع',
+                                      subtitle: 'ابحث عن القنوات والمباريات',
+                                      onTap: () {
+                                        Navigator.pop(context);
+                                        setState(() {
+                                          _isSearchBarVisible = true;
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  // Privacy Policy Card
+                                  Expanded(
+                                    child: _buildMenuCard(
+                                      context: context,
+                                      icon: Icons.privacy_tip_rounded,
+                                      iconColor: Colors.blueGrey.shade600,
+                                      title: 'سياسة الخصوصية',
+                                      subtitle: 'شروط الاستخدام والأمان',
+                                      onTap: () {
+                                        Navigator.pop(context);
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(builder: (context) => PrivacyPolicyPage()),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              
+                              if (_isSubscribed) ...[
+                                const SizedBox(height: 20),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [Colors.amber.shade700.withValues(alpha: 0.1), Colors.orange.shade700.withValues(alpha: 0.1)],
+                                    ),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: Colors.amber.shade500.withValues(alpha: 0.3),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.workspace_premium_rounded, color: Colors.amber.shade700),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'أنت تستمتع بجميع مميزات Hesen PRO الفاخرة ✨',
+                                        style: TextStyle(
+                                          color: Colors.amber.shade900,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
-                      ),
                       ),
                     );
                   },
@@ -261,7 +627,7 @@ mixin HomePageUIMixin on HomePageDataMixin {
                         ? RichText(
                             textAlign: Directionality.of(context) == TextDirection.rtl ? TextAlign.right : TextAlign.left,
                             text: TextSpan(
-                              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white, fontFamily: 'Cairo'),
+                               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
                               children: [
                                 const TextSpan(text: 'أهلاً بك '),
                                 TextSpan(
@@ -294,11 +660,12 @@ mixin HomePageUIMixin on HomePageDataMixin {
       body: _isSearchBarVisible ? _buildSearchBar()
           : Builder(
               builder: (context) {
-                if (_isLoading && channels.isEmpty) {
-                  return const Center(child: CircularProgressIndicator());
-                } else if (_hasError) {
-                  return _buildGeneralErrorWidget();
-                } else {
+        if (_isLoading && channels.isEmpty) {
+          return _buildShimmerPlaceholder();
+        } else if (_hasError) {
+          return _buildGeneralErrorWidget();
+        } else {
+
                   return RefreshIndicator(
                     color: Theme.of(context).colorScheme.secondary,
                     backgroundColor: Theme.of(context).cardColor,
@@ -326,16 +693,62 @@ mixin HomePageUIMixin on HomePageDataMixin {
         buttonBackgroundColor: Theme.of(context).cardColor,
         animationDuration: const Duration(milliseconds: 300),
         items: [
-          const Icon(Icons.tv, size: 30, color: Colors.white),
-          Image.asset('assets/replay.png', width: 30, height: 30, color: Colors.white),
-          Image.asset('assets/goal.png', width: 30, height: 30, color: Colors.white),
-          Image.asset('assets/table.png', width: 30, height: 30, color: Colors.white),
-          const Icon(Icons.video_library_rounded, size: 30, color: Colors.white),
+          _buildNavItem(0, Icons.tv, 'قنوات'),
+          _buildNavItem(1, 'assets/replay.png', 'أخبار'),
+          _buildNavItem(2, 'assets/goal.png', 'أهداف'),
+          _buildNavItem(3, 'assets/table.png', 'مباريات'),
+          _buildNavItem(4, Icons.video_library_rounded, 'ملخصات'),
         ],
         index: _selectedIndex,
-        onTap: (index) { if (!mounted) return; setState(() { _selectedIndex = index; }); },
+        onTap: (index) {
+          if (!mounted) return;
+          setState(() { _selectedIndex = index; });
+          SharedPreferences.getInstance().then((prefs) {
+            prefs.setInt('last_selected_index', index);
+          });
+        },
         height: 60,
       ),
+    );
+  }
+
+  Widget _buildNavItem(int index, dynamic iconDataOrPath, String label) {
+    final bool isSelected = _selectedIndex == index;
+    final Color activeColor = Theme.of(context).brightness == Brightness.dark
+        ? Colors.white
+        : Theme.of(context).primaryColor;
+    final Color inactiveColor = Colors.white.withValues(alpha: 0.7);
+    final Color itemColor = isSelected ? activeColor : inactiveColor;
+
+    Widget iconWidget;
+    if (iconDataOrPath is IconData) {
+      iconWidget = Icon(iconDataOrPath, size: isSelected ? 24 : 30, color: itemColor);
+    } else {
+      iconWidget = Image.asset(
+        iconDataOrPath as String,
+        width: isSelected ? 24 : 30,
+        height: isSelected ? 24 : 30,
+        color: itemColor,
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        iconWidget,
+        if (isSelected) ...[
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(
+              color: itemColor,
+              fontSize: 9,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -442,136 +855,199 @@ mixin HomePageUIMixin on HomePageDataMixin {
   }
 
   Widget _buildSubscriptionBanner() {
-    final bool isDesktop = (defaultTargetPlatform == TargetPlatform.windows || 
-                           defaultTargetPlatform == TargetPlatform.linux || 
-                           defaultTargetPlatform == TargetPlatform.macOS) && !kIsWeb;
-    final double maxBannerWidth = isDesktop ? 1200 : double.infinity;
+    return const SizedBox.shrink();
+  }
 
-    return Center(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxBannerWidth),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final isWide = constraints.maxWidth > 600;
+  Widget _buildShimmerPlaceholder() {
 
-              if (!_isSubscribed) {
-                return Container(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF7C52D8), Color(0xFF4A148C), Color(0xFF311B92)],
-                      begin: Alignment.topLeft, end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [BoxShadow(color: Colors.purple.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 4))],
+    final bool isWindows = defaultTargetPlatform == TargetPlatform.windows && !kIsWeb;
+    
+    // Grid of Category Boxes
+    if (_selectedIndex == 0) {
+      return Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isWindows ? 1500 : 900),
+          child: GridView.builder(
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.symmetric(
+              horizontal: isWindows ? 30 : 16,
+              vertical: 20,
+            ),
+            gridDelegate: isWindows
+                ? const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 500,
+                    mainAxisExtent: 160,
+                    crossAxisSpacing: 25,
+                    mainAxisSpacing: 25,
+                  )
+                : const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 1,
+                    mainAxisExtent: 90,
+                    mainAxisSpacing: 10,
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: Stack(
-                      children: [
-                        Positioned(right: -30, top: -30, child: Container(width: 150, height: 150, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.05)))),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 18.0),
-                          child: Flex(
-                            direction: isWide ? Axis.horizontal : Axis.vertical,
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween, crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Expanded(
-                                flex: isWide ? 3 : 0,
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(10),
-                                      decoration: BoxDecoration(color: Colors.amber.withValues(alpha: 0.2), shape: BoxShape.circle),
-                                      child: const Icon(Icons.workspace_premium_rounded, color: Colors.amber, size: 32),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          const Text('اشترك في الباقة المميزة لـ حسن TV 👑', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'Cairo')),
-                                          const SizedBox(height: 4),
-                                          Text('شاهد كافة القنوات، بدون إعلانات، بجودة عالية وبث مستقر!', style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12, fontFamily: 'Cairo')),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              if (!isWide) const SizedBox(height: 16),
-                              ElevatedButton(
-                                onPressed: () { Navigator.push(context, MaterialPageRoute(builder: (context) => const SubscriptionScreen())); },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.amber, foregroundColor: Colors.black87,
-                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)), elevation: 3,
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Text('اشترك الآن', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, fontFamily: 'Cairo')),
-                                    const SizedBox(width: 8),
-                                    Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.black87),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              } else {
-                return Container(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [Color(0xFF00695C), Color(0xFF00897B)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [BoxShadow(color: Colors.teal.withValues(alpha: 0.2), blurRadius: 8, offset: const Offset(0, 2))],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.check_circle_rounded, color: Color(0xFF00E676), size: 24),
-                            const SizedBox(width: 12),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('اشتراكك نشط: ${_subscriptionPlan ?? "الباقة المميزة"} 💎', style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold, fontFamily: 'Cairo')),
-                                if (_subscriptionExpiryDays != null) ...[
-                                  const SizedBox(height: 2),
-                                  Text(_subscriptionExpiryDays!, style: const TextStyle(color: Color(0xFFB9F6CA), fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'Cairo')),
-                                ],
-                              ],
-                            ),
-                          ],
-                        ),
-                        TextButton(
-                          onPressed: () { Navigator.push(context, MaterialPageRoute(builder: (context) => const SubscriptionScreen())); },
-                          style: TextButton.styleFrom(foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6)),
-                          child: Row(
-                            children: [
-                              const Text('التفاصيل', style: TextStyle(fontSize: 12, fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
-                              const SizedBox(width: 4),
-                              Icon(Icons.arrow_forward_ios_rounded, size: 10, color: Colors.white),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }
+            itemCount: 8,
+            itemBuilder: (context, index) {
+              return const ShimmerLoading(
+                width: double.infinity,
+                height: double.infinity,
+                borderRadius: BorderRadius.all(Radius.circular(24.0)),
+              );
             },
+          ),
+        ),
+      );
+    }
+    
+    // List for news, goals, matches, highlights
+    return ListView.builder(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(16),
+      itemCount: 5,
+      itemBuilder: (context, index) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16.0),
+          child: ShimmerLoading(
+            width: double.infinity,
+            height: _selectedIndex == 3 ? 140 : 180,
+            borderRadius: const BorderRadius.all(Radius.circular(16.0)),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMenuCard({
+    required BuildContext context,
+    required dynamic icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    final theme = Theme.of(context);
+    final isLight = theme.brightness == Brightness.light;
+    return Container(
+      decoration: BoxDecoration(
+        color: isLight ? Colors.grey.shade50 : theme.cardColor.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: theme.dividerColor.withValues(alpha: 0.05),
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: iconColor.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: icon is IconData
+                      ? Icon(icon, color: iconColor, size: 24)
+                      : FaIcon(icon, color: iconColor, size: 24),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.5),
+                    fontSize: 11,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+
+  Widget _buildDarkModeCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final isLight = theme.brightness == Brightness.light;
+    return Container(
+      decoration: BoxDecoration(
+        color: isLight ? Colors.grey.shade50 : theme.cardColor.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: theme.dividerColor.withValues(alpha: 0.05),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    _isDarkMode ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                    color: Colors.amber,
+                    size: 24,
+                  ),
+                ),
+                Transform.scale(
+                  scale: 0.8,
+                  child: Switch(
+                    value: _isDarkMode,
+                    activeThumbColor: Colors.deepPurple,
+                    onChanged: (value) {
+                      setState(() {
+                        _isDarkMode = value;
+                      });
+                      widget.onThemeChanged(value);
+                      Navigator.pop(context);
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'المظهر المظلم',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _isDarkMode ? 'مفعل الآن' : 'غير مفعل',
+              style: TextStyle(
+                color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.5),
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
+

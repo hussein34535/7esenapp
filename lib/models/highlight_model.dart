@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-class Highlight {
+final class Highlight {
   final int id;
   final String title;
   final String? imageUrl;
@@ -76,7 +76,7 @@ class Highlight {
   }
 }
 
-class SourceServer {
+final class SourceServer {
   final String name;
   final String url;
 

@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 import 'package:hesen/services/cloudinary_service.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -96,6 +97,11 @@ class _LoginScreenState extends State<LoginScreen> {
         deviceId: deviceId,
         imageUrl: imageUrl,
       );
+      try {
+        await _authService.startTrial();
+      } catch (e) {
+        debugPrint("Error starting trial automatically: $e");
+      }
       await _authService.sendEmailVerification();
 
       if (mounted) {
@@ -168,12 +174,67 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _handleSocialLogin(Future<UserCredential?> Function() loginMethod) async {
+    setState(() => _isLoading = true);
+    try {
+      final cred = await loginMethod();
+      if (cred != null && mounted) {
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('فشل تسجيل الدخول: $e', textAlign: TextAlign.center),
+            backgroundColor: Colors.red.shade900,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Widget _buildSocialButton({
+    required String text,
+    required Widget iconWidget,
+    required Color backgroundColor,
+    required Color foregroundColor,
+    Color? borderColor,
+    required VoidCallback onPressed,
+  }) {
+    return SizedBox(
+      height: 52,
+      child: OutlinedButton.icon(
+        onPressed: _isLoading ? null : onPressed,
+        icon: iconWidget,
+        label: Text(
+          text,
+          style: TextStyle(
+            color: foregroundColor,
+            fontWeight: FontWeight.bold,
+            fontSize: 15,
+          ),
+        ),
+        style: OutlinedButton.styleFrom(
+          backgroundColor: backgroundColor,
+          side: BorderSide(color: borderColor ?? Colors.transparent, width: borderColor != null ? 1 : 0),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          elevation: 2,
+          shadowColor: Colors.black.withValues(alpha: 0.1),
+        ),
+      ),
+    );
   }
 
   @override
@@ -190,7 +251,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 400),
             child: Form(
@@ -199,12 +260,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Logo or Title
                   const Text(
                     '7eSen TV',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontFamily: 'Cairo', // Assuming you use Cairo
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
@@ -223,7 +282,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       color: Colors.grey,
                     ),
                   ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 20),
 
                   // Profile Image Picker (Only for Signup)
                   if (!_isLogin && !_isForgotPassword) ...[
@@ -260,7 +319,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 12),
                   ],
 
                   // Name Field (Only for Signup & Not verifying)
@@ -296,7 +355,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 12),
                   ],
 
                   // Email Field
@@ -333,7 +392,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 12),
 
                   // Password Field (Only for Login/Signup)
                   if (!_isForgotPassword) ...[
@@ -385,7 +444,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   color: Colors.grey, fontSize: 13)),
                         ),
                       ),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 16),
                   ],
 
                   // Action Button
@@ -420,7 +479,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 12),
 
                   // Toggle Button
                   TextButton(
@@ -444,6 +503,30 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: const TextStyle(color: Colors.purpleAccent),
                     ),
                   ),
+
+                  // Divider "or"
+                  const SizedBox(height: 12),
+                  const Row(
+                    children: [
+                      Expanded(child: Divider(color: Colors.white24, thickness: 1)),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        child: Text('أو', style: TextStyle(color: Colors.grey, fontSize: 14)),
+                      ),
+                      Expanded(child: Divider(color: Colors.white24, thickness: 1)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Google Sign In Button
+                  _buildSocialButton(
+                    text: 'تسجيل الدخول بواسطة Google',
+                    iconWidget: const FaIcon(FontAwesomeIcons.google, color: Colors.redAccent, size: 22),
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.black87,
+                    onPressed: () => _handleSocialLogin(AuthService().signInWithGoogle),
+                  ),
+                  const SizedBox(height: 12),
                 ],
               ),
             ),

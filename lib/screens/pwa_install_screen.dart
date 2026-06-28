@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:hesen/utils/pwa/pwa_helper.dart'; // Import helper
 
 class PwaInstallScreen extends StatefulWidget {
@@ -61,7 +61,7 @@ class _PwaInstallScreenState extends State<PwaInstallScreen> {
               Text(
                 'تثبيت التطبيق مطلوب',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.cairo(
+                style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -71,7 +71,7 @@ class _PwaInstallScreenState extends State<PwaInstallScreen> {
               Text(
                 'للحصول على أفضل تجربة ومشاهدة القنوات، يرجى تثبيت التطبيق على هاتفك.',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.cairo(
+                style: TextStyle(
                   fontSize: 16,
                   color: Colors.grey[400],
                   height: 1.5,
@@ -113,7 +113,7 @@ class _PwaInstallScreenState extends State<PwaInstallScreen> {
                         const SizedBox(width: 12),
                         Text(
                           'تثبيت التطبيق',
-                          style: GoogleFonts.cairo(
+                          style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -128,7 +128,7 @@ class _PwaInstallScreenState extends State<PwaInstallScreen> {
                   'أو اضغط على القائمة (Three Dots) واختر "Install App"',
                   textAlign: TextAlign.center,
                   style:
-                      GoogleFonts.cairo(fontSize: 14, color: Colors.grey[600]),
+                      TextStyle(fontSize: 14, color: Colors.grey[600]),
                 ),
               ],
             ],
@@ -152,7 +152,7 @@ class _PwaInstallScreenState extends State<PwaInstallScreen> {
           ),
           const SizedBox(width: 12),
           Text(text,
-              style: GoogleFonts.cairo(color: Colors.white, fontSize: 16)),
+              style: const TextStyle(color: Colors.white, fontSize: 16)),
           const SizedBox(width: 8),
           Icon(icon, color: Colors.white70, size: 20),
         ],

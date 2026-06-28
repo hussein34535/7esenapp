@@ -62,6 +62,19 @@ class PremiumDialog extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12)),
               ),
               onPressed: trialUsed ? null : () => Navigator.pop(context, 1),
+            )
+          else
+            ElevatedButton.icon(
+              icon: const Icon(Icons.person_add_alt_1, size: 18),
+              label: const Text('سجل حساباً للحصول على 3 أيام مجاناً'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.amber.shade700,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () => Navigator.pop(context, 2),
             ),
           const SizedBox(height: 12),
           // Option 2: Subscribe

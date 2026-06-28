@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart'; // Import FontAwesome
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:hesen/screens/subscription_screen.dart';
 
-void showTelegramDialog(BuildContext context, {String? userName}) {
+void showTelegramDialog(BuildContext context, {String? userName, bool isSubscribed = false}) {
   final theme = Theme.of(context);
   final secondaryColor = theme.colorScheme.secondary;
+  bool dontShowAgain = false;
 
   showDialog(
     context: context,
@@ -21,47 +24,142 @@ void showTelegramDialog(BuildContext context, {String? userName}) {
         ),
         contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
         content: Directionality(
-          textDirection:
-              TextDirection.rtl, // Correct Arabic flow and punctuation
+          textDirection: TextDirection.rtl, // Correct Arabic flow and punctuation
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment:
-                CrossAxisAlignment.end, // Aligns to the physical LEFT in RTL
+            crossAxisAlignment: CrossAxisAlignment.end, // Aligns to the physical LEFT in RTL
             children: [
               // Welcome Message
-              RichText(
-                textAlign: TextAlign.center, // Center text
-                text: TextSpan(
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.normal,
-                    color: theme.textTheme.bodyLarge?.color,
-                    fontFamily: 'Cairo', // Use app font
-                  ),
-                  children: [
-                    const TextSpan(text: 'كيف حالك يا '),
-                    TextSpan(
-                      text: userName ?? 'صديقي',
-                      style: TextStyle(
-                        color: secondaryColor,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 26,
-                      ),
+              Center(
+                child: RichText(
+                  textAlign: TextAlign.center, // Center text
+                  text: TextSpan(
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.normal,
+                      color: theme.textTheme.bodyLarge?.color,
                     ),
-                    const TextSpan(text: '؟'),
-                  ],
+                    children: [
+                      const TextSpan(text: 'كيف حالك يا '),
+                      TextSpan(
+                        text: userName ?? 'صديقي',
+                        style: TextStyle(
+                          color: secondaryColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 26,
+                        ),
+                      ),
+                      const TextSpan(text: '؟'),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
-              Text(
-                'أتمنى أن تكون بخير وفي أفضل حال ❤️\nصل على النبي',
-                textAlign: TextAlign.center, // Center text
-                style: TextStyle(
-                  fontSize: 16,
-                  color:
-                      theme.textTheme.bodyLarge?.color?.withValues(alpha: 0.7),
-                  height: 1.5,
+              Center(
+                child: Text(
+                  'أتمنى أن تكون بخير وفي أفضل حال ❤️\nصل على النبي',
+                  textAlign: TextAlign.center, // Center text
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: theme.textTheme.bodyLarge?.color?.withValues(alpha: 0.7),
+                    height: 1.5,
+                  ),
                 ),
+              ),
+              const SizedBox(height: 20),
+              StatefulBuilder(
+                builder: (context, setState) {
+                  return InkWell(
+                    onTap: () async {
+                      if (isSubscribed) {
+                        setState(() {
+                          dontShowAgain = !dontShowAgain;
+                        });
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setBool('hide_telegram_dialog', dontShowAgain);
+                      } else {
+                        if (context.mounted) {
+                          _showProRequiredBottomSheet(context);
+                        }
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
+                      decoration: BoxDecoration(
+                        color: theme.scaffoldBackgroundColor.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: theme.dividerColor.withValues(alpha: 0.1),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        children: [
+                          SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: Checkbox(
+                              value: dontShowAgain,
+                              activeColor: secondaryColor,
+                              checkColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              onChanged: (val) async {
+                                if (isSubscribed) {
+                                  setState(() {
+                                    dontShowAgain = val ?? false;
+                                  });
+                                  final prefs = await SharedPreferences.getInstance();
+                                  await prefs.setBool('hide_telegram_dialog', dontShowAgain);
+                                } else {
+                                  if (context.mounted) {
+                                    _showProRequiredBottomSheet(context);
+                                  }
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'عدم العرض مرة أخرى',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
+                              ),
+                            ),
+                          ),
+                          if (!isSubscribed)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.diamond_rounded, size: 14, color: Colors.amber.shade700),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'PRO',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.amber.shade800,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -83,8 +181,7 @@ void showTelegramDialog(BuildContext context, {String? userName}) {
                   child: Text(
                     'إغلاق',
                     style: TextStyle(
-                      color: theme.textTheme.bodyLarge?.color
-                          ?.withValues(alpha: 0.5),
+                      color: theme.textTheme.bodyLarge?.color?.withValues(alpha: 0.5),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -95,14 +192,15 @@ void showTelegramDialog(BuildContext context, {String? userName}) {
                 flex: 2,
                 child: ElevatedButton.icon(
                   onPressed: () async {
-                    final telegramUrl = Uri.parse('https://t.me/tv_7esen');
+                    final telegramUrl = Uri.parse('https://t.me/he_s_en');
                     try {
                       if (await canLaunchUrl(telegramUrl)) {
-                        await launchUrl(telegramUrl,
-                            mode: LaunchMode.externalApplication);
+                        await launchUrl(telegramUrl, mode: LaunchMode.externalApplication);
                       }
                     } catch (_) {}
-                    Navigator.of(context).pop();
+                    if (context.mounted) {
+                      Navigator.of(context).pop();
+                    }
                   },
                   icon: const FaIcon(FontAwesomeIcons.telegram, size: 18),
                   label: const Text('انضم للتيليجرام'),
@@ -120,6 +218,154 @@ void showTelegramDialog(BuildContext context, {String? userName}) {
             ],
           ),
         ],
+      );
+    },
+  );
+}
+
+void _showProRequiredBottomSheet(BuildContext context) {
+  final theme = Theme.of(context);
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (BuildContext context) {
+      return Container(
+        padding: const EdgeInsets.fromLTRB(24.0, 12.0, 24.0, 24.0),
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.3),
+              blurRadius: 15,
+              spreadRadius: 5,
+            )
+          ],
+        ),
+        child: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Drag handle
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: theme.textTheme.bodyLarge?.color?.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              const SizedBox(height: 24),
+              // Premium Icon Container
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: ShaderMask(
+                  shaderCallback: (bounds) => const LinearGradient(
+                    colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+                  ).createShader(bounds),
+                  child: const Icon(
+                    Icons.diamond_rounded,
+                    size: 52,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'ميزة حصرية لـ Hesen PRO',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'خيار "عدم العرض مرة أخرى" للنوافذ الترحيبية هو ميزة مخصصة لمشتركي باقة PRO المميزة لتوفير تجربة تصفح أسرع وأكثر سلاسة.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 15,
+                  height: 1.6,
+                  color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
+                ),
+              ),
+              const SizedBox(height: 28),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: Text(
+                        'إلغاء',
+                        style: TextStyle(
+                          color: theme.textTheme.bodyLarge?.color?.withValues(alpha: 0.5),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF8E2DE2), Color(0xFF4A00E0)], // Purple premium gradient
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF4A00E0).withValues(alpha: 0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const SubscriptionScreen(),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          foregroundColor: Colors.white,
+                          shadowColor: Colors.transparent,
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: const Text(
+                          'اشترك في PRO الآن',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       );
     },
   );

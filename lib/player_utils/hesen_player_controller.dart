@@ -13,12 +13,18 @@ import 'package:hesen/services/auth_service.dart';
 import 'package:hesen/player_utils/player_stream_resolver.dart';
 import 'package:hesen/player_utils/stream_details.dart';
 import 'package:hesen/player_utils/dash_helper.dart';
+
 import 'package:hesen/player_utils/video_player_creator.dart';
 
 Future<String?> _downloadAudioToTemp(String audioUrl, Map<String, String> headers) async {
   try {
     debugPrint('[HESEN PLAYER] Downloading audio track with headers to temp file...');
-    final response = await http.get(Uri.parse(audioUrl), headers: headers).timeout(
+    // Add browser-like headers to avoid YouTube 403
+    final fullHeaders = Map<String, String>.from(headers);
+    fullHeaders.putIfAbsent('Accept', () => '*/*');
+    fullHeaders.putIfAbsent('Accept-Encoding', () => 'identity');
+    fullHeaders.putIfAbsent('Connection', () => 'keep-alive');
+    final response = await http.get(Uri.parse(audioUrl), headers: fullHeaders).timeout(
       const Duration(seconds: 30),
     );
     if (response.statusCode != 200) {
@@ -63,6 +69,8 @@ class HesenPlayerController extends ChangeNotifier {
   int selectedApiQualityIndex = -1;
   bool isAutoRetrying = false;
   bool isPlayerInitializing = false;
+  double currentVolume = 1.0; // 0.0-1.0 mapped for both backends
+  double downloadProgress = 1.0; // 0.0-1.0 for chunked download
 
   // Timers and Subscriptions
   Timer? hideControlsTimer;
@@ -89,6 +97,12 @@ class HesenPlayerController extends ChangeNotifier {
       isLoading = true;
       validStreamLinks = List<Map<String, dynamic>>.from(streamLinks);
       currentStreamUrl = initialUrl;
+      if (currentStreamUrl != null && validStreamLinks.isNotEmpty) {
+        selectedStreamIndex = validStreamLinks.indexWhere((l) => l['url'] == currentStreamUrl);
+        if (selectedStreamIndex == -1) selectedStreamIndex = 0;
+      } else {
+        selectedStreamIndex = -1;
+      }
       // Defer player init to let page transition animation complete
       Future.delayed(const Duration(milliseconds: 400), () {
         if (currentStreamUrl != null) {
@@ -168,6 +182,7 @@ class HesenPlayerController extends ChangeNotifier {
         if (newStreamLinks.isNotEmpty) {
           validStreamLinks = newStreamLinks;
           currentStreamUrl = newStreamLinks[0]['url']?.toString();
+          selectedStreamIndex = 0;
           isAccessBlocked = false;
           notifyListeners();
 
@@ -260,72 +275,10 @@ class HesenPlayerController extends ChangeNotifier {
 
     debugPrint('[HESEN PLAYER] Initializing player with sourceUrl: $sourceUrl');
 
-    // Quality change shortcut on desktop: reuse existing MediaKit player
-    // to avoid native MPV crash from dispose+recreate cycle.
-    if (specificQualityUrl != null &&
-        mediaKitPlayer != null &&
-        !kIsWeb &&
-        (defaultTargetPlatform == TargetPlatform.windows ||
-            defaultTargetPlatform == TargetPlatform.linux ||
-            defaultTargetPlatform == TargetPlatform.macOS)) {
-      var urlToLoad = specificQualityUrl;
-      if (urlToLoad.startsWith('data:application/dash+xml;base64,')) {
-        urlToLoad = await writeDashManifestToTemp(urlToLoad);
-      }
-
-      final Map<String, String> qHeaders = {
-        'User-Agent': userAgent,
-        'Referer': 'https://7esentv.com/',
-      };
-      if (urlToLoad.contains('googlevideo.com') ||
-          specificQualityUrl.contains('googlevideo.com')) {
-        qHeaders['Referer'] = 'https://www.youtube.com/';
-      }
-
-      try {
-        await mediaKitPlayer!.open(
-          Media(urlToLoad, httpHeaders: qHeaders),
-          play: true,
-        );
-
-        if (specificAudioUrl != null &&
-            specificAudioUrl.isNotEmpty &&
-            specificAudioUrl.startsWith('http')) {
-          try {
-            final audioPath =
-                await _downloadAudioToTemp(specificAudioUrl, qHeaders);
-            if (audioPath != null) {
-              await mediaKitPlayer!.setAudioTrack(AudioTrack.uri(audioPath));
-              debugPrint('[HESEN PLAYER] External audio track set on quality change.');
-            }
-          } catch (e) {
-            debugPrint('[HESEN PLAYER] External audio failed (non-fatal): $e');
-          }
-        }
-
-        if (startAt != null && startAt > Duration.zero) {
-          await Future.delayed(const Duration(milliseconds: 500));
-          await mediaKitPlayer!.seek(startAt);
-        }
-
-        selectedApiQualityIndex =
-            specificQualityIndex ?? selectedApiQualityIndex;
-        isLoading = false;
-        hasError = false;
-        isPlayerInitializing = false;
-        notifyListeners();
-      } catch (e) {
-        debugPrint('[MEDIAKIT QUALITY CHANGE ERROR] $e');
-        isPlayerInitializing = false;
-        hasError = true;
-        isLoading = false;
-        notifyListeners();
-      }
-      return;
-    }
-
     await releaseControllers();
-    await Future.delayed(const Duration(milliseconds: 250));
+    if (_isDisposed) return;
+    await Future.delayed(const Duration(milliseconds: 1500));
+    if (_isDisposed) return;
 
     if (!isLoading) {
       isLoading = true;
@@ -349,6 +302,7 @@ class HesenPlayerController extends ChangeNotifier {
         );
       } else {
         streamDetails = await PlayerStreamResolver.resolve(urlToProcess, isWeb: kIsWeb);
+        if (_isDisposed) return;
       }
 
       var videoUrlToLoad = streamDetails.videoUrlToLoad;
@@ -365,6 +319,7 @@ class HesenPlayerController extends ChangeNotifier {
       // Write manifest data URL to temp file for native platforms
       if (!kIsWeb && videoUrlToLoad.startsWith('data:application/dash+xml;base64,')) {
         videoUrlToLoad = await writeDashManifestToTemp(videoUrlToLoad);
+        if (_isDisposed) return;
       }
 
       final String finalVideoUrl = videoUrlToLoad;
@@ -410,6 +365,7 @@ class HesenPlayerController extends ChangeNotifier {
             // texture before MPV tries to render to it (prevents native segfault).
             notifyListeners();
             await Future.delayed(const Duration(milliseconds: 300));
+            if (_isDisposed) return;
           }
 
           mediaKitErrorSub?.cancel();
@@ -431,30 +387,52 @@ class HesenPlayerController extends ChangeNotifier {
             Media(finalVideoUrl, httpHeaders: httpHeaders),
             play: true,
           );
+          if (_isDisposed) return;
 
           if (audioUrlToLoad != null && audioUrlToLoad.isNotEmpty) {
             debugPrint('[HESEN PLAYER] Setting external audio track: $audioUrlToLoad');
-            mediaKitErrorSub?.cancel();
 
-            String? audioPath;
+            // Delay to avoid YouTube rate-limiting after open()
+            await Future.delayed(const Duration(milliseconds: 2000));
+            if (_isDisposed) return;
+
+            // Pre-cache audio URL headers so MPV's on_load hook finds them
             if (audioUrlToLoad.startsWith('http')) {
-              audioPath = await _downloadAudioToTemp(audioUrlToLoad, httpHeaders);
-            } else {
-              audioPath = audioUrlToLoad;
+              Media(audioUrlToLoad, httpHeaders: httpHeaders);
             }
 
-            if (audioPath != null) {
+            // Try direct URL first; MPV's native HTTP client may handle it better
+            if (audioUrlToLoad.startsWith('http')) {
               try {
                 await mediaKitPlayer!.setAudioTrack(
-                  AudioTrack.uri(audioPath),
+                  AudioTrack.uri(audioUrlToLoad),
                 );
-                debugPrint('[HESEN PLAYER] Audio track set successfully.');
+                if (_isDisposed) return;
+                debugPrint('[HESEN PLAYER] Audio track set from URL.');
               } catch (e) {
-                debugPrint('[HESEN PLAYER] Audio track failed (non-fatal): $e');
+                debugPrint('[HESEN PLAYER] Audio track from URL failed, trying download: $e');
+                String? audioPath;
+                if (audioUrlToLoad.startsWith('http')) {
+                  audioPath = await _downloadAudioToTemp(audioUrlToLoad, httpHeaders);
+                  if (_isDisposed) return;
+                } else {
+                  audioPath = audioUrlToLoad;
+                }
+                if (audioPath != null) {
+                  await mediaKitPlayer!.setAudioTrack(
+                    AudioTrack.uri(audioPath),
+                  );
+                  if (_isDisposed) return;
+                  debugPrint('[HESEN PLAYER] Audio track set from temp file.');
+                }
               }
             } else {
-              debugPrint('[HESEN PLAYER] Audio download failed, continuing without external audio.');
+              // Local file, no headers needed
+              await mediaKitPlayer!.setAudioTrack(
+                  AudioTrack.uri(audioUrlToLoad));
+              if (_isDisposed) return;
             }
+          }
 
             await Future.delayed(const Duration(seconds: 3));
             if (!_isDisposed) {
@@ -466,7 +444,6 @@ class HesenPlayerController extends ChangeNotifier {
                 }
               });
             }
-          }
 
           isLoading = false;
           hasError = false;
@@ -489,7 +466,9 @@ class HesenPlayerController extends ChangeNotifier {
           formatHint: formatHint);
       videoPlayerController!.addListener(videoPlayerListener);
       await videoPlayerController!.initialize();
+      if (_isDisposed) return;
       await videoPlayerController!.setLooping(false);
+      if (_isDisposed) return;
 
       final aspectRatio = videoPlayerController!.value.aspectRatio;
       chewieController = ChewieController(
@@ -588,17 +567,23 @@ class HesenPlayerController extends ChangeNotifier {
       await mediaKitPlayer!.dispose();
       mediaKitPlayer = null;
       mediaKitController = null;
-      // Give MPV native resources time to fully release before creating a new player
-      await Future.delayed(const Duration(milliseconds: 500));
+      // Give MPV native resources + YouTube time to fully release
+      await Future.delayed(const Duration(milliseconds: 1500));
     }
 
-    // Clean up temp audio files
+    // Clean up temp files
     try {
       final tempDir = Directory.systemTemp;
       final entries = tempDir.listSync();
       for (final entry in entries) {
-        if (entry is File && entry.path.contains('hesen_audio_')) {
-          await entry.delete();
+        if (entry is File) {
+          final name = entry.path.split(Platform.pathSeparator).last;
+          if (name.startsWith('hesen_audio_') ||
+              name.startsWith('hesen_vid_') ||
+              name.startsWith('hesen_aud_') ||
+              name.contains('youtube_manifest')) {
+            await entry.delete();
+          }
         }
       }
     } catch (_) {}
@@ -681,9 +666,13 @@ class HesenPlayerController extends ChangeNotifier {
     }
 
     if (kIsWeb) {
-      final streamDetails = await PlayerStreamResolver.resolve(newStreamUrl, isWeb: kIsWeb);
-      isLoading = false;
+      isLoading = true;
       hasError = false;
+      notifyListeners();
+
+      final streamDetails = await PlayerStreamResolver.resolve(newStreamUrl, isWeb: kIsWeb);
+      if (_isDisposed) return;
+
       selectedStreamIndex = newStreamIndex;
       currentStreamUrl = streamDetails.videoUrlToLoad;
       isCurrentStreamApi = currentStreamUrl != null && (
@@ -699,6 +688,13 @@ class HesenPlayerController extends ChangeNotifier {
       fetchedApiQualities = streamDetails.fetchedQualities;
       selectedApiQualityIndex = streamDetails.selectedQualityIndex;
       notifyListeners();
+
+      Future.delayed(const Duration(seconds: 15), () {
+        if (!_isDisposed && isLoading) {
+          isLoading = false;
+          notifyListeners();
+        }
+      });
       return;
     }
 
@@ -729,6 +725,8 @@ class HesenPlayerController extends ChangeNotifier {
       return;
     }
 
+
+
     isLoading = true;
     hasError = false;
     selectedApiQualityIndex = newQualityIndex;
@@ -745,6 +743,13 @@ class HesenPlayerController extends ChangeNotifier {
   }
 
   bool _isDisposed = false;
+
+  @override
+  void notifyListeners() {
+    if (_isDisposed) return;
+    super.notifyListeners();
+  }
+
   @override
   void dispose() {
     _isDisposed = true;

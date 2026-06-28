@@ -9,7 +9,8 @@ class CategoryImageCacheManager {
   static const key = 'categoryImageCache';
   static CacheManager? _instance;
 
-  static CacheManager get instance {
+  static CacheManager? get instance {
+    if (kIsWeb) return null;
     _instance ??= CacheManager(
       Config(
         key,
@@ -19,7 +20,7 @@ class CategoryImageCacheManager {
         fileService: HttpFileService(),
       ),
     );
-    return _instance!;
+    return _instance;
   }
 }
 
@@ -277,22 +278,28 @@ class _ChannelBoxState extends State<ChannelBox> {
                 Positioned.fill(
                   child: Center(
                     child: Padding(
-                      padding: const EdgeInsets.all(16.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                       child: hasImage
-                          ? CachedNetworkImage(
-                              cacheManager: CategoryImageCacheManager.instance,
-                              imageUrl: ImageProxy.resolveUrl(widget.category['image'].toString()),
-                              fit: BoxFit.contain, // Show FULL image without clipping
-                              placeholder: (context, url) => const SizedBox(
-                                  width: 30,
-                                  height: 30,
-                                  child: Center(
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 1.5))),
-                              errorWidget: (context, url, error) => Icon(
-                                  iconData,
-                                  color: Colors.white,
-                                  size: isDesktop ? 60 : 45),
+                          ? SizedBox(
+                              height: isDesktop ? 120 : 74,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: CachedNetworkImage(
+                                  cacheManager: CategoryImageCacheManager.instance,
+                                  imageUrl: ImageProxy.resolveUrl(widget.category['image'].toString()),
+                                  fit: BoxFit.fitHeight, // Allow width to scale proportionally to match aspect ratio
+                                  placeholder: (context, url) => const SizedBox(
+                                      width: 30,
+                                      height: 30,
+                                      child: Center(
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 1.5))),
+                                  errorWidget: (context, url, error) => Icon(
+                                      iconData,
+                                      color: Colors.white,
+                                      size: isDesktop ? 60 : 45),
+                                ),
+                              ),
                             )
                           : Container(
                               width: isDesktop ? 90 : 60,
@@ -450,7 +457,9 @@ class _CategoryChannelsScreenState extends State<CategoryChannelsScreen> {
                         child: CachedNetworkImage(
                           cacheManager: CategoryImageCacheManager.instance,
                           imageUrl: ImageProxy.resolveUrl(widget.category['image'].toString()),
-                          fit: BoxFit.contain,
+                          fit: BoxFit.cover,
+                          memCacheWidth: 100,
+                          memCacheHeight: 100,
                           placeholder: (context, url) => const SizedBox(
                             width: 20,
                             height: 20,

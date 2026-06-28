@@ -17,6 +17,8 @@ class PlayerVideoView extends StatelessWidget {
   final VideoSize currentVideoSize;
   final UniqueKey playerKey;
   final double screenAspectRatio;
+  final int selectedStreamIndex;
+  final int selectedApiQualityIndex;
 
   const PlayerVideoView({
     Key? key,
@@ -30,6 +32,8 @@ class PlayerVideoView extends StatelessWidget {
     required this.currentVideoSize,
     required this.playerKey,
     required this.screenAspectRatio,
+    required this.selectedStreamIndex,
+    required this.selectedApiQualityIndex,
   }) : super(key: key);
 
   double _getAspectRatioForSize(VideoSize size, double videoAspectRatio) {
@@ -64,6 +68,9 @@ class PlayerVideoView extends StatelessWidget {
               streamLinks: (isCurrentStreamApi && fetchedApiQualities.isNotEmpty)
                   ? fetchedApiQualities
                   : validStreamLinks,
+              selectedStreamIndex: (isCurrentStreamApi && fetchedApiQualities.isNotEmpty)
+                  ? selectedApiQualityIndex
+                  : selectedStreamIndex,
             ),
           );
         }

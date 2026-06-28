@@ -87,6 +87,11 @@ class CurrencyService {
   static String format(dynamic amountInEGP) {
     double val = double.tryParse(amountInEGP.toString()) ?? 0.0;
     double converted = convert(val);
-    return '${converted.toStringAsFixed(converted < 10 && _currencyCode != "KWD" ? 1 : 0)} $_currencySymbol';
+    
+    if (converted == converted.toInt()) {
+      return '${converted.toInt()} $_currencySymbol';
+    } else {
+      return '${converted.toStringAsFixed(converted < 10 && _currencyCode != "KWD" ? 1 : 2)} $_currencySymbol';
+    }
   }
 }

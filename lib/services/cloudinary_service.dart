@@ -3,6 +3,10 @@ import 'dart:convert';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart';
 
+import 'cloudinary_web_stub.dart'
+    if (dart.library.js_interop) 'cloudinary_web_wasm.dart'
+    if (dart.library.html) 'cloudinary_web_html.dart';
+
 class CloudinaryService {
   static const String _cloudName = String.fromEnvironment(
     'CLOUDINARY_CLOUD_NAME',
@@ -10,13 +14,19 @@ class CloudinaryService {
   );
   static const String _uploadPreset = String.fromEnvironment(
     'CLOUDINARY_UPLOAD_PRESET',
+    defaultValue: '7esen-uploads', // ← اسم الـ preset في Cloudinary
   );
+
 
   static Future<String> uploadImage(XFile imageFile) async {
     if (_uploadPreset.isEmpty) {
       throw Exception(
         'Cloudinary upload preset is not configured. Set CLOUDINARY_UPLOAD_PRESET.',
       );
+    }
+
+    if (kIsWeb) {
+      return uploadMultipartWeb(_cloudName, _uploadPreset, imageFile);
     }
 
     final uri =

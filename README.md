@@ -1,21 +1,70 @@
-# hesen
+# Hesen TV (حسن تي في) 📺
 
-https://github.com/7essen/hesen.git
+تطبيق Flutter حديث ومتطور لبث القنوات التلفزيونية، المباريات المباشرة، الأهداف، والملخصات بجودة عالية وبث مستقر، مع دعم كامل لمنصات متعددة (Android, Web, Windows).
 
-https://github.com/7essen/hesen/archive/refs/heads/main.zip
+---
 
+## ✨ المميزات الرئيسية
+*   **بث حي ومستقر:** دعم مشغلات بث متعددة وتشغيل روابط M3U8 و DASH.
+*   **تجاوز قيود CORS:** تفعيل نظام بروكسي تلقائي ومتقدم لضمان عمل القنوات المباشرة.
+*   **متوافق بالكامل مع Flutter 3.44:** استخدام أحدث ميزات Dart مثل `final class` و `extension types` لأفضل أداء وأمان.
+*   **تذكير بالمباريات (Match Reminders):** جدولة تنبيهات محلية تلقائية قبل بدء المباريات بـ 15 دقيقة عبر إشعارات النظام.
+*   **تحميل Shimmer Loading ذكي:** تأثيرات حركية أنيقة أثناء جلب البيانات لتحسين تجربة المستخدم.
+*   **دعم PWA وتثبيت إجباري للويب:** حائط تثبيت متطور يدفع المستخدمين لتثبيت التطبيق على الهواتف والكمبيوتر.
+*   **تكامل كامل مع Firebase:** لإرسال التنبيهات المباشرة وإدارة الحسابات.
+*   **حماية متقدمة:** تفعيل نظام منع الفحص (Anti-debugging) لحماية الكود البرمجي وروابط البث.
 
-A new Flutter project.
+---
 
-## Getting Started
+## 🛠️ التقنيات المستخدمة (Tech Stack)
+*   **Core:** Flutter 3.44 (إصدار 2025/2026) / Dart 3.12+
+*   **State Management:** Provider
+*   ** مشغلات الفيديو:** Chewie & VideoPlayer (أندرويد / ويب) / MediaKit & MPV (ويندوز)
+*   **الإشعارات:** `flutter_local_notifications` للتنبيهات المحلية / `firebase_messaging` للتنبيهات السحابية
+*   **التصميم:** أسلوب تصميم داكن وعصري، خط Cairo المميز مدمج محلياً، تأثيرات Shimmer مخصصة.
 
-This project is a starting point for a Flutter application.
+---
 
-A few resources to get you started if this is your first Flutter project:
+## 🚀 التشغيل المحلي (Local Setup)
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+### 📋 المتطلبات
+1. تثبيت **Flutter SDK (إصدار 3.44 أو أحدث)**
+2. تثبيت **Android SDK** لتطوير الأندرويد، أو **Visual Studio Community** لتطوير الويندوز.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+### 🏃 خطوات التشغيل
+1. قم بتهيئة ملف المتغيرات البيئية `.env` في جذر المشروع وتعبئته بالمفاتيح المطلوبة:
+   ```properties
+   GITHUB_TOKEN=your_token
+   UNITY_GAME_ID=your_id
+   RESEND_API_KEY=your_key
+   ```
+2. قم بتحميل المكتبات البرمجية:
+   ```bash
+   flutter pub get
+   ```
+3. تشغيل التطبيق:
+   ```bash
+   flutter run
+   ```
+
+---
+
+## 📦 البناء والرفع (Build & Deploy)
+
+### 📱 أندرويد (Android APK)
+لإنشاء نسخة APK موقعة وجاهزة للنشر:
+```bash
+flutter build apk --release
+```
+*(ملاحظة: يتم قراءة إعدادات التوقيع تلقائياً من ملف `android/gradle.properties` بأمان).*
+
+### 🌐 الويب (WASM Web Build)
+لبناء نسخة الويب فائقة الأداء باستخدام تقنية WebAssembly:
+```bash
+flutter build web --wasm --release
+```
+
+---
+
+## 📖 تفاصيل معمارية
+للحصول على تفاصيل تقنية أعمق وتوثيق التعديلات في نسخة الويب، يرجى مراجعة [دليل المطور (DEVELOPER_GUIDE.md)](file:///d:/flutterproject/hesen/DEVELOPER_GUIDE.md).

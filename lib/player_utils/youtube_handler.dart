@@ -1,51 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'stream_details.dart';
-import 'dart:convert'; // For base64 encoding
-
-/// Creates a DASH manifest string from video and audio streams.
-/// This manifest is passed to the player as a data URI.
-String _createDashManifest(
-    StreamInfo video, StreamInfo audio, Duration? videoDuration) {
-  // URLs in XML must have special characters like '&' escaped.
-  final videoUrl = video.url.toString().replaceAll('&', '&amp;');
-  final audioUrl = audio.url.toString().replaceAll('&', '&amp;');
-
-  // Format duration to xs:duration (e.g., PT15.033S) as required by DASH standard.
-  String durationString = 'PT0S'; // Default value
-  if (videoDuration != null) {
-    final seconds = videoDuration.inMilliseconds / 1000.0;
-    durationString = 'PT${seconds}S';
-  }
-  
-  // Cast to the correct types to access specific properties
-  final videoStream = video as VideoStreamInfo;
-  final audioStream = audio as AudioStreamInfo;
-
-
-  final manifest = '''
-<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" profiles="urn:mpeg:dash:profile:isoff-on-demand:2011" type="static" mediaPresentationDuration="$durationString">
-  <Period duration="$durationString">
-    <AdaptationSet mimeType="video/mp4" contentType="video" segmentAlignment="true">
-      <Representation id="1" codecs="${videoStream.videoCodec}" bandwidth="${videoStream.bitrate.bitsPerSecond}">
-        <BaseURL>${videoUrl}</BaseURL>
-        <SegmentBase/>
-      </Representation>
-    </AdaptationSet>
-    <AdaptationSet mimeType="audio/mp4" contentType="audio" segmentAlignment="true">
-      <Representation id="2" codecs="mp4a.40.2" bandwidth="${audioStream.bitrate.bitsPerSecond}">
-        <BaseURL>${audioUrl}</BaseURL>
-        <SegmentBase/>
-      </Representation>
-    </AdaptationSet>
-  </Period>
-</MPD>
-''';
-  // Encode the XML string to be used in a data URI
-  final plainText = utf8.encode(manifest);
-  final base64 = base64Encode(plainText);
-  return 'data:application/dash+xml;base64,$base64';
-}
 
 // This function MUST be a top-level function to be used with compute.
 Future<StreamDetails> handleYoutubeStream(String url) async {
@@ -57,7 +12,6 @@ Future<StreamDetails> handleYoutubeStream(String url) async {
       final videoId = VideoId(url);
     
       debugPrint('[YOUTUBE HANDLER] Getting video metadata...');
-      final videoData = await yt.videos.get(videoId); // Get video metadata for duration
       debugPrint('[YOUTUBE HANDLER] Getting stream manifest...');
       final manifest = await yt.videos.streamsClient.getManifest(videoId, ytClients: [
         YoutubeApiClient.android,
@@ -117,6 +71,7 @@ Future<StreamDetails> handleYoutubeStream(String url) async {
         });
 
       final Map<String, Map<String, dynamic>> qualitiesMap = {};
+      final String currentVideoId = videoId.value;
 
       // Priority 1: Use muxed streams (video + audio together)
       if (muxed.isNotEmpty) {
@@ -130,37 +85,39 @@ Future<StreamDetails> handleYoutubeStream(String url) async {
           'height': s.videoResolution.height,
               'hasAudio': true,
               'type': 'muxed',
+              'videoId': currentVideoId,
             };
             debugPrint('[YOUTUBE HANDLER] Added muxed: $qualityLabel');
           }
         }
       }
 
-      // Priority 2: Build DASH manifest with separate video + audio for higher qualities
+      // Priority 2: Use video-only URL + external audio for higher qualities
+      // Avoids DASH manifest crash in MediaKit/MPV on Windows (media-kit #973)
       if (videoOnly.isNotEmpty && audioOnly.isNotEmpty) {
-        debugPrint('[YOUTUBE HANDLER] Creating DASH manifests for additional higher qualities');
+        debugPrint('[YOUTUBE HANDLER] Creating video-only + audio for higher qualities');
         final bestAudio = audioOnly.first;
 
         for (final video in videoOnly) {
           final qualityLabel = '${video.videoResolution.height}p';
           if (!qualitiesMap.containsKey(qualityLabel)) {
-            // Use DASH manifest on ALL platforms — MediaKit/MPV handles it
-            // with proper headers, and it avoids the split-stream audio problem
-            // where AudioTrack.uri() can't send User-Agent/Referer to YouTube.
-            final manifestUrl =
-                _createDashManifest(video, bestAudio, videoData.duration);
+            final videoUrl = video.url.toString();
+            final audioUrl = bestAudio.url.toString();
 
-            debugPrint('[YOUTUBE HANDLER] DASH for $qualityLabel uses codec=${video.videoCodec} container=${video.container.name}');
+            debugPrint('[YOUTUBE HANDLER] Added split quality: $qualityLabel (video=${video.videoCodec} + audio=mp4a.40.2)');
 
             qualitiesMap[qualityLabel] = {
               'name':
                   '$qualityLabel - ${video.container.name.toUpperCase()} (مع صوت)',
-              'url': manifestUrl,
+              'url': videoUrl,
+              'audioUrl': audioUrl,
               'height': video.videoResolution.height,
               'hasAudio': true,
-              'type': 'dash_manifest',
+              'type': 'video_audio_split',
+              'videoId': currentVideoId,
+              'itag': video.tag,
+              'audioItag': bestAudio.tag,
             };
-            debugPrint('[YOUTUBE HANDLER] Added DASH Manifest for: $qualityLabel');
           }
         }
       }

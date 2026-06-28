@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hesen/services/api_service.dart';
-import 'package:hesen/services/currency_service.dart';
 import 'package:hesen/services/auth_service.dart';
-import 'package:hesen/screens/payment_screen.dart';
+import 'package:hesen/screens/login_screen.dart';
 import 'package:hesen/widgets/subscription_widgets.dart';
 // cloud_firestore import removed (not needed, prevents Web crash)
 import 'dart:ui'; // For formatting
@@ -20,6 +19,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   bool _isSubscribed = false;
   Map<String, dynamic>? _userData;
   int _selectedPackageIndex = 0;
+  bool _isActivatingTrial = false;
 
   @override
   void initState() {
@@ -46,7 +46,6 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         setState(() {
           _packages = packages;
           _isLoading = false;
-          // Set default selection to the featured package
           final fIndex = _getFeaturedPackageIndex();
           if (fIndex != -1) {
             _selectedPackageIndex = fIndex;
@@ -285,6 +284,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                           }),
                         ],
 
+                        // ====== Free Trial Banner / Card ======
+                        if (!_isSubscribed) ...[
+                          if (_userData == null) ...[
+                            _buildRegisterForTrialBanner(),
+                          ] else if (_userData!['trialUsed'] != true) ...[
+                            _buildActivateTrialCard(),
+                          ],
+                        ],
+
                         if (_packages.isEmpty)
                           const Center(
                               child: Text("لا توجد باقات متاحة حالياً",
@@ -294,116 +302,156 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                             final isDesktop = constraints.maxWidth > 600;
                             final featuredIndex = _getFeaturedPackageIndex();
                             if (isDesktop) {
-                              return Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: List.generate(_packages.length, (index) {
-                                  final pkg = _packages[index];
-                                  final isFeatured = index == featuredIndex;
-                                  return Expanded(
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 5),
-                                      child: SubscriptionPackageCard(
-                                        pkg: pkg,
-                                        isFeatured: isFeatured,
-                                        isSubscribed: _isSubscribed,
-                                        onPaymentComplete: _fetchPackages,
-                                      ),
-                                    ),
-                                  );
-                                }),
-                              );
-                            } else {
-                              // Calculate theme for the dynamically selected package button
-                              Color selectedButtonColor = Colors.purpleAccent;
-                              bool isSelectedStrong = false;
-                              if (_packages.isNotEmpty && _selectedPackageIndex < _packages.length) {
-                                final selectedPkg = _packages[_selectedPackageIndex];
-                                final selectedSalePrice = selectedPkg['sale_price'];
-                                final int selectedDiscountMonths = int.tryParse(selectedPkg['discount_months']?.toString() ?? '0') ?? 0;
-                                final double selectedOriginalPrice = num.tryParse(selectedPkg['price'].toString())?.toDouble() ?? 0.0;
-                                final double selectedSalePriceVal = num.tryParse(selectedSalePrice.toString())?.toDouble() ?? selectedOriginalPrice;
-                                double selectedDiscountPercent = 0.0;
-                                if (selectedOriginalPrice > 0 && selectedSalePriceVal < selectedOriginalPrice) {
-                                  selectedDiscountPercent = ((selectedOriginalPrice - selectedSalePriceVal) / selectedOriginalPrice) * 100;
-                                }
-                                isSelectedStrong = selectedDiscountPercent > 25 || selectedDiscountMonths > 0;
-                                selectedButtonColor = isSelectedStrong ? Colors.amber : Colors.purpleAccent;
-                              }
-
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  // Plan options list (vertical stack of horizontal cards)
-                                  ...List.generate(_packages.length, (index) {
+                              return IntrinsicHeight(
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: List.generate(_packages.length, (index) {
                                     final pkg = _packages[index];
-                                    final isSelected = index == _selectedPackageIndex;
                                     final isFeatured = index == featuredIndex;
-                                    return GestureDetector(
-                                      onTap: () {
-                                        setState(() {
-                                          _selectedPackageIndex = index;
-                                        });
-                                      },
-                                      child: _buildPlanOption(pkg, isSelected, isFeatured),
+                                    
+                                    final planIdStr = pkg['id']?.toString();
+                                    final userPlanIdStr = _userData?['planId']?.toString();
+                                    final userPlanName = _userData?['subscriptionPlan']?.toString() ?? _userData?['planName']?.toString();
+                                    final isCurrentPlan = _isSubscribed && (
+                                      (userPlanIdStr != null && planIdStr == userPlanIdStr) ||
+                                      (userPlanName != null && pkg['name']?.toString().toLowerCase() == userPlanName.toLowerCase())
+                                    );
+
+                                    return Expanded(
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 5),
+                                        child: SubscriptionPackageCard(
+                                          pkg: pkg,
+                                          isFeatured: isFeatured,
+                                          isSubscribed: _isSubscribed,
+                                          isCurrentPlan: isCurrentPlan,
+                                          onPaymentComplete: _fetchPackages,
+                                        ),
+                                      ),
                                     );
                                   }),
-                                  const SizedBox(height: 16),
-                                  
-                                  // Premium features list (static, premium looking box)
+                                ),
+                              );
+                            } else {
+                              return Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  // Cupertino-Style Segmented Control (Apple Selector)
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                    padding: const EdgeInsets.all(4),
+                                    clipBehavior: Clip.none,
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withValues(alpha: 0.03),
-                                      borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                                      color: const Color(0xFF1C1C1E), // iOS System Gray 6
+                                      borderRadius: BorderRadius.circular(16),
                                     ),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                                                                PremiumFeatureItem(icon: Icons.hd_rounded, text: "بث بجودة Full HD & 4K بدون تقطيع"),
-                                        const SizedBox(height: 10),
-                                                                                PremiumFeatureItem(icon: Icons.devices_rounded, text: "تشغيل على جميع الأجهزة (شاشة، هاتف، كمبيوتر)"),
-                                        const SizedBox(height: 10),
-                                                                                PremiumFeatureItem(icon: Icons.support_agent_rounded, text: "دعم فني متواصل على مدار الساعة 24/7"),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 20),
-                                  
-                                  // Action Button
-                                  SizedBox(
-                                    width: double.infinity,
-                                    height: 50,
-                                    child: ElevatedButton(
-                                      onPressed: () async {
-                                        if (_packages.isEmpty) return;
-                                        final selectedPkg = _packages[_selectedPackageIndex];
-                                        await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => PaymentScreen(package: selectedPkg),
+                                    child: Row(
+                                      children: List.generate(_packages.length, (index) {
+                                        final pkg = _packages[index];
+                                        final isSelected = index == _selectedPackageIndex;
+                                        final String pkgName = (pkg['name'] ?? '').toString();
+                                        
+                                        return Expanded(
+                                          child: GestureDetector(
+                                            onTap: () {
+                                              setState(() {
+                                                _selectedPackageIndex = index;
+                                              });
+                                            },
+                                            child: AnimatedContainer(
+                                              duration: const Duration(milliseconds: 180),
+                                              padding: const EdgeInsets.symmetric(vertical: 9),
+                                              clipBehavior: Clip.none,
+                                              decoration: BoxDecoration(
+                                                color: isSelected ? const Color(0xFF2C2C2E) : Colors.transparent, // iOS System Gray 4 background
+                                                borderRadius: BorderRadius.circular(12),
+                                                boxShadow: isSelected ? [
+                                                  BoxShadow(
+                                                    color: Colors.black.withValues(alpha: 0.15),
+                                                    blurRadius: 4,
+                                                    offset: const Offset(0, 2),
+                                                  )
+                                                ] : null,
+                                              ),
+                                              child: Stack(
+                                                clipBehavior: Clip.none,
+                                                alignment: Alignment.center,
+                                                children: [
+                                                  Text(
+                                                    pkgName,
+                                                    textAlign: TextAlign.center,
+                                                    style: TextStyle(
+                                                      color: isSelected ? Colors.white : Colors.white38, // White text when active, muted when inactive
+                                                      fontSize: 14,
+                                                      fontWeight: FontWeight.bold,
+                                                      letterSpacing: -0.2,
+                                                    ),
+                                                  ),
+                                                  if (_getPackageDiscountPercent(pkg) > 0)
+                                                    Positioned(
+                                                      top: -14, // Lowered down slightly
+                                                      right: -6, // Adjusted position
+                                                      child: Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3), // Slightly larger padding
+                                                        decoration: BoxDecoration(
+                                                          color: Colors.black, // Premium AMOLED black background
+                                                          borderRadius: BorderRadius.circular(20), // Oval/Capsule shape like iOS
+                                                          border: Border.all(
+                                                            color: Colors.white.withValues(alpha: 0.15),
+                                                            width: 1.0,
+                                                          ),
+                                                          boxShadow: [
+                                                            BoxShadow(
+                                                              color: Colors.black.withValues(alpha: 0.3),
+                                                              blurRadius: 4,
+                                                              offset: const Offset(0, 2),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        child: Text(
+                                                          "-${_getPackageDiscountPercent(pkg)}%",
+                                                          style: const TextStyle(
+                                                            color: Colors.redAccent, // Vibrant red accent for the discount number
+                                                            fontSize: 10.5, // Slightly larger font size
+                                                            fontWeight: FontWeight.bold,
+                                                            height: 1,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                ],
+                                              ),
+                                            ),
                                           ),
                                         );
-                                        if (mounted) _fetchPackages();
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: selectedButtonColor,
-                                        foregroundColor: isSelectedStrong ? Colors.black : Colors.white,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(16),
-                                        ),
-                                        elevation: 5,
-                                        shadowColor: selectedButtonColor.withValues(alpha: 0.3),
-                                      ),
-                                      child: Text(
-                                        _isSubscribed ? 'إضافة الباقة المختارة' : 'اشترك الآن في الباقة',
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
+                                      }),
                                     ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  
+                                  // Selected Card Details (Apple-style)
+                                  Builder(
+                                    builder: (context) {
+                                      final selectedPkg = _packages[_selectedPackageIndex];
+                                      final isFeatured = _selectedPackageIndex == featuredIndex;
+
+                                      final planIdStr = selectedPkg['id']?.toString();
+                                      final userPlanIdStr = _userData?['planId']?.toString();
+                                      final userPlanName = _userData?['subscriptionPlan']?.toString() ?? _userData?['planName']?.toString();
+                                      final isCurrentPlan = _isSubscribed && (
+                                        (userPlanIdStr != null && planIdStr == userPlanIdStr) ||
+                                        (userPlanName != null && selectedPkg['name']?.toString().toLowerCase() == userPlanName.toLowerCase())
+                                      );
+
+                                      return SubscriptionPackageCard(
+                                        pkg: selectedPkg,
+                                        isFeatured: isFeatured,
+                                        isSubscribed: _isSubscribed,
+                                        isCurrentPlan: isCurrentPlan,
+                                        onPaymentComplete: _fetchPackages,
+                                      );
+                                    }
                                   ),
                                 ],
                               );
@@ -432,6 +480,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     );
   }
 
+  int _getPackageDiscountPercent(dynamic pkg) {
+    final double originalPrice = num.tryParse(pkg['price']?.toString() ?? '0')?.toDouble() ?? 0.0;
+    final double salePriceVal = num.tryParse(pkg['sale_price']?.toString() ?? '0')?.toDouble() ?? originalPrice;
+    if (originalPrice > 0 && salePriceVal < originalPrice && salePriceVal > 0) {
+      return ((originalPrice - salePriceVal) / originalPrice * 100).round();
+    }
+    return 0;
+  }
+
   int _getFeaturedPackageIndex() {
     if (_packages.isEmpty) return -1;
     int featuredIndex = -1;
@@ -452,7 +509,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       for (int i = 0; i < _packages.length; i++) {
         final double originalPrice = num.tryParse(_packages[i]['price']?.toString() ?? '0')?.toDouble() ?? 0.0;
         final double salePriceVal = num.tryParse(_packages[i]['sale_price']?.toString() ?? '0')?.toDouble() ?? originalPrice;
-        if (originalPrice > 0 && salePriceVal < originalPrice) {
+        if (originalPrice > 0 && salePriceVal < originalPrice && salePriceVal > 0) {
           double percent = ((originalPrice - salePriceVal) / originalPrice) * 100;
           if (percent > maxDiscountPercent) {
             maxDiscountPercent = percent;
@@ -468,207 +525,100 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     }
     
     return featuredIndex;
-  }
-
-  String _getDurationString(dynamic days) {
-    int d = int.tryParse(days.toString()) ?? 30;
-    if (d == 30) return "شهر";
-    if (d == 60) return "شهرين";
-    if (d == 90) return "3 شهور";
-    if (d == 180) return "6 شهور";
-    if (d == 365 || d == 360) return "سنة";
-    return "$d يوم";
-  }
-
-  Widget _buildPlanOption(dynamic pkg, bool isSelected, bool isFeatured) {
-    final salePrice = pkg['sale_price'];
-    final int discountMonths = int.tryParse(pkg['discount_months']?.toString() ?? '0') ?? 0;
-
-    bool hasDiscount = (salePrice != null &&
-        salePrice.toString() != 'null' &&
-        salePrice.toString() != '0') || discountMonths > 0;
-
-    final double originalPrice =
-        num.tryParse(pkg['price'].toString())?.toDouble() ?? 0.0;
-    final double salePriceVal =
-        num.tryParse(salePrice.toString())?.toDouble() ?? originalPrice;
-
-    double discountPercent = 0.0;
-    if (originalPrice > 0 && salePriceVal < originalPrice) {
-      discountPercent = ((originalPrice - salePriceVal) / originalPrice) * 100;
-    }
-
-    final bool isStrongOffer = discountPercent > 25 || discountMonths > 0;
-    final Color themeColor = isFeatured 
-        ? Colors.amberAccent 
-        : (isStrongOffer ? Colors.cyanAccent : Colors.white24);
-
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          margin: const EdgeInsets.symmetric(vertical: 6),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? themeColor.withValues(alpha: 0.08)
-                : (isFeatured ? Colors.purpleAccent.withValues(alpha: 0.03) : Colors.white.withValues(alpha: 0.02)),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isSelected 
-                  ? themeColor 
-                  : (isFeatured ? Colors.amberAccent.withValues(alpha: 0.5) : (isStrongOffer ? Colors.cyanAccent.withValues(alpha: 0.4) : Colors.white.withValues(alpha: 0.08))),
-              width: isSelected ? 2.0 : (isFeatured || isStrongOffer ? 1.5 : 1.0),
-            ),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: themeColor.withValues(alpha: 0.15),
-                      blurRadius: 10,
-                      spreadRadius: 0,
-                    )
-                  ]
-                : [],
-          ),
-          child: Row(
-            children: [
-              // Radio Indicator
-              Container(
-                width: 20,
-                height: 20,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isSelected ? themeColor : Colors.white30,
-                    width: 2.0,
-                  ),
-                ),
-                child: isSelected
-                    ? Center(
-                        child: Container(
-                          width: 10,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: themeColor,
-                          ),
-                        ),
-                      )
-                    : null,
-              ),
-              const SizedBox(width: 16),
-              
-              // Name and Duration
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      pkg['name'] ?? 'باقة',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _getDurationString(pkg['duration_days']),
-                      style: const TextStyle(
-                        color: Colors.white38,
-                        fontSize: 12,
-                      ),
-                    ),
-                    if (discountMonths > 0) ...[
-                      const SizedBox(height: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.greenAccent.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.2)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.card_giftcard, color: Colors.greenAccent, size: 12),
-                            const SizedBox(width: 4),
-                            Text(
-                              discountMonths == 1
-                                  ? "خصم شهر كامل مجاناً"
-                                  : discountMonths == 2
-                                      ? "خصم شهرين مجاناً"
-                                      : "خصم $discountMonths أشهر مجانية",
-                              style: const TextStyle(
-                                color: Colors.greenAccent,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              
-              // Price
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    CurrencyService.format(hasDiscount ? salePriceVal : originalPrice),
-                    style: TextStyle(
-                      color: isSelected ? themeColor : Colors.white,
-                      fontSize: 18,
-                      fontFamily: 'Roboto',
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  if (hasDiscount)
-                    Text(
-                      CurrencyService.format(originalPrice),
-                      style: const TextStyle(
-                        color: Colors.white38,
-                        fontSize: 12,
-                        decoration: TextDecoration.lineThrough,
-                        decorationColor: Colors.redAccent,
-                      ),
-                    ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        
-        // Floating Discount Badge
-        if (isFeatured || hasDiscount)
-          Positioned(
-            top: -3,
-            left: 16,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: isFeatured ? Colors.amber : themeColor,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                isFeatured
-                    ? (discountMonths > 0 ? "الخصم الأكبر 🔥" : "الأكثر طلباً ⭐")
-                    : (isStrongOffer ? "الأكثر توفيراً 🔥" : "خصم %${discountPercent.round()}"),
-                style: TextStyle(
-                  color: (isFeatured || isStrongOffer) ? Colors.black : Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+  }  Widget _buildRegisterForTrialBanner() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.amber.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.amber.withValues(alpha: 0.3), width: 1.0),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.card_giftcard_rounded, color: Colors.amber, size: 20),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'سجل حسابك الآن واحصل على 3 أيام تجربة مجانية! 🎁',
+              style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
             ),
           ),
-      ],
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
+              _checkSubscriptionStatus();
+            },
+            style: TextButton.styleFrom(
+              backgroundColor: Colors.amber,
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('سجل الآن', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActivateTrialCard() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.amber.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.amber.withValues(alpha: 0.3), width: 1.0),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.timer_outlined, color: Colors.amber, size: 20),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'عرض خاص: يمكنك تجربة الباقة المميزة لمدة 3 أيام مجاناً! 🎉',
+              style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: _isActivatingTrial ? null : () async {
+              setState(() => _isActivatingTrial = true);
+              try {
+                final success = await AuthService().startTrial();
+                if (mounted) {
+                  if (success) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('تم تفعيل التجربة المجانية بنجاح! 🎉'), backgroundColor: Colors.green),
+                    );
+                    _checkSubscriptionStatus();
+                    _fetchPackages();
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('فشل تفعيل التجربة.'), backgroundColor: Colors.red),
+                    );
+                  }
+                }
+              } catch (e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red));
+              } finally {
+                if (mounted) setState(() => _isActivatingTrial = false);
+              }
+            },
+            style: TextButton.styleFrom(
+              backgroundColor: Colors.amber,
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: _isActivatingTrial
+                ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 1.5))
+                : const Text('تفعيل مجاني', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
     );
   }
 }

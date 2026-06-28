@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 class VidstackPlayerImpl extends StatelessWidget {
   final String url;
   final List<Map<String, dynamic>> streamLinks;
+  final int selectedStreamIndex;
 
   const VidstackPlayerImpl({
     required this.url,
     this.streamLinks = const [],
+    this.selectedStreamIndex = 0,
     Key? key,
   }) : super(key: key);
 

@@ -46,3 +46,11 @@ class WebProxyService {
     return getProxiedUrl(url, referer: referer);
   }
 }
+
+/// Extension type representing a stream URL with helper properties.
+extension type StreamUrl(String value) {
+  bool get isHls => value.endsWith('.m3u8') || value.contains('.m3u8');
+  bool get isDash => value.endsWith('.mpd') || value.contains('.mpd');
+  String get proxied => 'https://hi.husseinh2711.workers.dev/?url=${Uri.encodeComponent(value)}';
+}
+

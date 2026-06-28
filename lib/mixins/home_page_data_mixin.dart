@@ -411,7 +411,15 @@ mixin HomePageDataMixin on State<HomePage> {
                 await prefs.setString('user_name', newName);
                 if (mounted) {
                   setState(() { _userName = newName; });
-                  if (context.mounted) { Navigator.of(context).pop(); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تحديث الاسم بنجاح'), backgroundColor: Colors.green)); }
+                  if (context.mounted) {
+                    Navigator.of(context).pop();
+                    InAppNotification.show(
+                      context: context,
+                      message: 'تم تحديث الاسم بنجاح',
+                      type: NotificationType.success,
+                      icon: Icons.check_circle_outline,
+                    );
+                  }
                 }
               }
             },
@@ -523,7 +531,12 @@ mixin HomePageDataMixin on State<HomePage> {
         debugPrint("Subscription ACTIVATED!");
         final userEmail = FirebaseAuth.instance.currentUser?.email;
         if (userEmail != null) { ResendService.sendUserActivationNotification(userEmail); }
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تفعيل اشتراكك بنجاح! استمتع بالمشاهدة.'), backgroundColor: Colors.green));
+        InAppNotification.show(
+          context: context,
+          message: 'تم تفعيل اشتراكك بنجاح! استمتع بالمشاهدة.',
+          type: NotificationType.success,
+          icon: Icons.workspace_premium_rounded,
+        );
       }
       setState(() {
         _isSubscribed = isSub;
@@ -633,7 +646,12 @@ mixin HomePageDataMixin on State<HomePage> {
     } catch (e) {
       if (e is http.ClientException || e.toString().contains('SocketException')) {
         if (mounted && !_isLoading) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('فشل التحقق من التحديث. يرجى التحقق من اتصالك بالإنترنت.'), backgroundColor: Colors.red));
+          InAppNotification.show(
+            context: context,
+            message: 'فشل التحقق من التحديث. يرجى التحقق من اتصالك بالإنترنت.',
+            type: NotificationType.error,
+            icon: Icons.wifi_off_rounded,
+          );
         }
       }
     }
@@ -669,8 +687,22 @@ mixin HomePageDataMixin on State<HomePage> {
                             final Uri uri = Uri.parse(updateUrl);
                             try {
                               if (await canLaunchUrl(uri)) { await launchUrl(uri, mode: LaunchMode.externalApplication); }
-                              else if (mounted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لا يمكن فتح رابط التحديث.'))); }
-                            } catch (e) { if (mounted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('حدث خطأ عند فتح الرابط.'))); } }
+                              else if (mounted) {
+                                InAppNotification.show(
+                                  context: context,
+                                  message: 'لا يمكن فتح رابط التحديث.',
+                                  type: NotificationType.error,
+                                );
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                InAppNotification.show(
+                                  context: context,
+                                  message: 'حدث خطأ عند فتح الرابط.',
+                                  type: NotificationType.error,
+                                );
+                              }
+                            }
                           },
                           child: const Padding(
                             padding: EdgeInsets.symmetric(horizontal: 25, vertical: 12),

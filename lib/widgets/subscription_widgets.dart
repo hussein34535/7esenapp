@@ -3,6 +3,7 @@ import 'package:hesen/services/currency_service.dart';
 import 'package:hesen/screens/payment_screen.dart';
 import 'package:hesen/services/auth_service.dart';
 import 'package:hesen/screens/login_screen.dart';
+import 'package:hesen/widgets/in_app_notification.dart';
 
 class SubscriptionPackageCard extends StatelessWidget {
   final dynamic pkg;
@@ -228,11 +229,11 @@ class SubscriptionPackageCard extends StatelessWidget {
                     : () async {
                         final currentUser = AuthService().currentUser;
                         if (currentUser == null) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('الرجاء تسجيل الدخول أو إنشاء حساب أولاً للاشتراك'),
-                              backgroundColor: Colors.redAccent,
-                            ),
+                          InAppNotification.show(
+                            context: context,
+                            message: 'الرجاء تسجيل الدخول أو إنشاء حساب أولاً للاشتراك',
+                            type: NotificationType.error,
+                            icon: Icons.login_rounded,
                           );
                           await Navigator.push(
                             context,

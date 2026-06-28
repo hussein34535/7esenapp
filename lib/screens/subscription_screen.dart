@@ -3,6 +3,7 @@ import 'package:hesen/services/api_service.dart';
 import 'package:hesen/services/auth_service.dart';
 import 'package:hesen/screens/login_screen.dart';
 import 'package:hesen/widgets/subscription_widgets.dart';
+import 'package:hesen/widgets/in_app_notification.dart';
 // cloud_firestore import removed (not needed, prevents Web crash)
 import 'dart:ui'; // For formatting
 
@@ -590,19 +591,32 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 final success = await AuthService().startTrial();
                 if (mounted) {
                   if (success) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('تم تفعيل التجربة المجانية بنجاح! 🎉'), backgroundColor: Colors.green),
+                    InAppNotification.show(
+                      context: context,
+                      message: 'تم تفعيل التجربة المجانية بنجاح! 🎉',
+                      type: NotificationType.success,
+                      icon: Icons.check_circle_outline,
                     );
                     _checkSubscriptionStatus();
                     _fetchPackages();
                   } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('فشل تفعيل التجربة.'), backgroundColor: Colors.red),
+                    InAppNotification.show(
+                      context: context,
+                      message: 'فشل تفعيل التجربة.',
+                      type: NotificationType.error,
+                      icon: Icons.error_outline,
                     );
                   }
                 }
               } catch (e) {
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red));
+                if (mounted) {
+                  InAppNotification.show(
+                    context: context,
+                    message: 'خطأ: $e',
+                    type: NotificationType.error,
+                    icon: Icons.error_outline,
+                  );
+                }
               } finally {
                 if (mounted) setState(() => _isActivatingTrial = false);
               }

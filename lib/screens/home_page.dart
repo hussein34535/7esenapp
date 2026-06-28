@@ -27,6 +27,7 @@ import 'package:hesen/screens/subscription_screen.dart';
 import 'package:hesen/screens/profile_screen.dart';
 import 'package:hesen/privacy_policy_page.dart';
 import 'package:hesen/video_player_screen.dart';
+import 'package:hesen/widgets/in_app_notification.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 

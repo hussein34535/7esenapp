@@ -10,6 +10,7 @@ import 'package:intl/intl.dart';
 import 'package:hesen/screens/subscription_screen.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:hesen/services/cloudinary_service.dart';
+import 'package:hesen/widgets/in_app_notification.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -102,21 +103,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (mounted) {
         setState(() => _isUploadingProfile = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم تحديث الصورة الشخصية بنجاح'),
-            backgroundColor: Colors.green,
-          ),
+        InAppNotification.show(
+          context: context,
+          message: 'تم تحديث الصورة الشخصية بنجاح',
+          type: NotificationType.success,
+          icon: Icons.check_circle_outline,
         );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isUploadingProfile = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('فشل تحديث الصورة: $e'),
-            backgroundColor: Colors.red,
-          ),
+        InAppNotification.show(
+          context: context,
+          message: 'فشل تحديث الصورة: $e',
+          type: NotificationType.error,
+          icon: Icons.error_outline,
         );
       }
     }
@@ -243,7 +244,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               )
             : SingleChildScrollView(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   child: Column(
                     children: [
                       // Avatar Section
@@ -324,7 +325,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Text(
                             email,
                             style: const TextStyle(
-                              fontSize: 18,
+                              fontSize: 16,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
                             ),
@@ -368,26 +369,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    
-                    // Subscription Details Glass Card
+                    // Subscription Details Section
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.03),
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.08),
-                          width: 1.5,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.2),
-                            blurRadius: 15,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -499,19 +484,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             if (mounted) {
                               setState(() => _isLoading = false);
                               if (success) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('تم إلغاء الاشتراك بنجاح ونودّعك بكل ودّ 😔'),
-                                    backgroundColor: Colors.green,
-                                  ),
+                                InAppNotification.show(
+                                  context: context,
+                                  message: 'تم إلغاء الاشتراك بنجاح ونودّعك بكل ودّ 😔',
+                                  type: NotificationType.success,
+                                  icon: Icons.check_circle_outline,
                                 );
                                 _fetchUserData();
                               } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('فشل إلغاء الاشتراك. يرجى المحاولة لاحقاً.'),
-                                    backgroundColor: Colors.red,
-                                  ),
+                                InAppNotification.show(
+                                  context: context,
+                                  message: 'فشل إلغاء الاشتراك. يرجى المحاولة لاحقاً.',
+                                  type: NotificationType.error,
+                                  icon: Icons.error_outline,
                                 );
                               }
                             }
@@ -620,14 +605,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.02),
+        color: Colors.white.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.05),
-          width: 1,
-        ),
       ),
       child: Row(
         children: [
@@ -643,7 +624,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Text(
             label,
             style: const TextStyle(
-              fontSize: 14,
+              fontSize: 13,
               fontWeight: FontWeight.w500,
               color: Colors.white70,
             ),
@@ -653,7 +634,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Text(
               value,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: FontWeight.bold,
                 color: valueColor,
               ),

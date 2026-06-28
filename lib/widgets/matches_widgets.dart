@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:hesen/utils/image_proxy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hesen/services/notification_service.dart';
+import 'package:hesen/widgets/in_app_notification.dart';
 
 
 class MatchesSection extends StatelessWidget {
@@ -185,22 +186,22 @@ class _MatchBoxState extends State<MatchBox> {
         setState(() {
           _hasReminder = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم إلغاء التنبيه للمباراة'),
-            backgroundColor: Colors.red,
-          ),
+        InAppNotification.show(
+          context: context,
+          message: 'تم إلغاء التنبيه للمباراة',
+          type: NotificationType.error,
+          icon: Icons.notifications_off_rounded,
         );
       }
     } else {
-      final reminderTime = matchTime.subtract(const Duration(minutes: 15));
+      final reminderTime = matchTime.subtract(const Duration(minutes: 5));
       if (reminderTime.isBefore(DateTime.now())) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('المباراة ستبدأ قريباً جداً أو بدأت بالفعل!'),
-              backgroundColor: Colors.orange,
-            ),
+          InAppNotification.show(
+            context: context,
+            message: 'المباراة ستبدأ قريباً جداً أو بدأت بالفعل!',
+            type: NotificationType.info,
+            icon: Icons.info_outline_rounded,
           );
         }
         return;
@@ -208,8 +209,8 @@ class _MatchBoxState extends State<MatchBox> {
 
       final success = await NotificationService.scheduleMatchReminder(
         id: widget.match.id,
-        title: 'مباراة قادمة بعد قليل ⚽',
-        body: 'تبدأ مباراة ${widget.match.teamA} ضد ${widget.match.teamB} بعد 15 دقيقة، لا تفوت المشاهدة!',
+        title: 'مباراة على وشك البدء ⚽',
+        body: 'مباراة ${widget.match.teamA} ضد ${widget.match.teamB} ستبدأ بعد 5 دقائق، استعد للمشاهدة!',
         scheduledTime: reminderTime,
       );
 
@@ -219,20 +220,20 @@ class _MatchBoxState extends State<MatchBox> {
           setState(() {
             _hasReminder = true;
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('تم تفعيل التنبيه قبل المباراة بـ 15 دقيقة 🔔'),
-              backgroundColor: Colors.green,
-            ),
+          InAppNotification.show(
+            context: context,
+            message: 'تم تفعيل التنبيه قبل المباراة بـ 5 دقائق',
+            type: NotificationType.success,
+            icon: Icons.notifications_active_rounded,
           );
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('فشل تفعيل التنبيه، يرجى المحاولة لاحقاً'),
-              backgroundColor: Colors.red,
-            ),
+          InAppNotification.show(
+            context: context,
+            message: 'فشل تفعيل التنبيه، يرجى المحاولة لاحقاً',
+            type: NotificationType.error,
+            icon: Icons.error_outline_rounded,
           );
         }
       }
@@ -424,29 +425,49 @@ class _MatchBoxState extends State<MatchBox> {
                                   ),
                                 ),
                               ),
-                              if (timeStatus != 'مباشر' && timeStatus != 'انتهت') ...[
-                                const SizedBox(height: 6),
-                                InkWell(
-                                  onTap: () => _toggleReminder(matchDateTimeWithToday),
-                                  borderRadius: BorderRadius.circular(15),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: _hasReminder
-                                          ? Colors.green.withValues(alpha: 0.2)
-                                          : Colors.white.withValues(alpha: 0.1),
-                                    ),
-                                    child: Icon(
-                                      _hasReminder
-                                          ? Icons.notifications_active_rounded
-                                          : Icons.notifications_none_rounded,
-                                      color: _hasReminder ? Colors.greenAccent : Colors.grey[400],
-                                      size: 20,
-                                    ),
+                              const SizedBox(height: 6),
+                              InkWell(
+                                onTap: () {
+                                  if (timeStatus == 'مباشر') {
+                                    InAppNotification.show(
+                                      context: context,
+                                      message: 'المباراة جارية الآن!',
+                                      type: NotificationType.info,
+                                      icon: Icons.sports_soccer_rounded,
+                                    );
+                                  } else if (timeStatus == 'انتهت') {
+                                    InAppNotification.show(
+                                      context: context,
+                                      message: 'المباراة انتهت',
+                                      type: NotificationType.info,
+                                      icon: Icons.timer_off_rounded,
+                                    );
+                                  } else {
+                                    _toggleReminder(matchDateTimeWithToday);
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(15),
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: _hasReminder
+                                        ? Colors.green.withValues(alpha: 0.2)
+                                        : Colors.white.withValues(alpha: 0.1),
+                                  ),
+                                  child: Icon(
+                                    _hasReminder
+                                        ? Icons.notifications_active_rounded
+                                        : Icons.notifications_none_rounded,
+                                    color: timeStatus == 'انتهت'
+                                        ? Colors.grey[700]
+                                        : _hasReminder
+                                            ? Colors.greenAccent
+                                            : Colors.grey[400],
+                                    size: 20,
                                   ),
                                 ),
-                              ],
+                              ),
                             ],
                           ),
 

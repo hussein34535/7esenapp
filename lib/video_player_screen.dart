@@ -12,6 +12,7 @@ import 'package:hesen/widgets/player/premium_dialog.dart';
 import 'package:hesen/widgets/player/player_controls.dart';
 import 'package:hesen/widgets/player/player_video_view.dart';
 import 'package:hesen/player_utils/hesen_player_controller.dart';
+import 'package:hesen/widgets/in_app_notification.dart';
 
 const String _userAgent =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36';
@@ -162,9 +163,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         if (!mounted) {
           return;
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('تم تفعيل التجربة المجانية لمدة 24 ساعة!')),
+        InAppNotification.show(
+          context: context,
+          message: 'تم تفعيل التجربة المجانية لمدة 24 ساعة!',
+          type: NotificationType.success,
+          icon: Icons.check_circle_outline,
         );
         _controller.unlockAndPlay();
       } else {
@@ -173,8 +176,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
           _premiumRetries++;
           _showPremiumDialog();
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('تعذر تفعيل التجربة. يرجى المحاولة لاحقاً.')),
+          InAppNotification.show(
+            context: context,
+            message: 'تعذر تفعيل التجربة. يرجى المحاولة لاحقاً.',
+            type: NotificationType.error,
+            icon: Icons.error_outline,
           );
           if (mounted) Navigator.of(context).pop();
         }
@@ -197,10 +203,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       if (hasFree) {
         _controller.initializeScreen();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content:
-                  Text('عذراً، الجودة المجانية غير متاحة لهذا الحدث حالياً.')),
+        InAppNotification.show(
+          context: context,
+          message: 'عذراً، الجودة المجانية غير متاحة لهذا الحدث حالياً.',
+          type: NotificationType.error,
+          icon: Icons.error_outline,
         );
         _showPremiumDialog();
       }
@@ -318,8 +325,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
   void _showError(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(message), duration: const Duration(seconds: 5)));
+      InAppNotification.show(
+        context: context,
+        message: message,
+        type: NotificationType.error,
+        icon: Icons.error_outline,
+        duration: const Duration(seconds: 5),
+      );
     }
   }
 

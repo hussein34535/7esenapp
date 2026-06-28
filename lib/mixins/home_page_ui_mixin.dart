@@ -1,34 +1,45 @@
 part of 'package:hesen/screens/home_page.dart';
 
 mixin HomePageUIMixin on HomePageDataMixin {
-  void openVideo(BuildContext context, String? initialUrl, List<Map<String, dynamic>> streamLinks, String sourceSection, {int? contentId, bool isPremium = false}) {
+  void openVideo(BuildContext context, String? initialUrl,
+      List<Map<String, dynamic>> streamLinks, String sourceSection,
+      {int? contentId, bool isPremium = false}) {
     if (isPremium) {
       String apiType = sourceSection;
       if (sourceSection == 'channels') apiType = 'channel';
       if (sourceSection == 'goals') apiType = 'goal';
       if (sourceSection == 'news') apiType = 'news';
       if (sourceSection == 'matches') apiType = 'match';
-      _navigateToVideoPlayer(context, initialUrl ?? '', streamLinks, isLocked: true, contentId: contentId, category: apiType);
+      _navigateToVideoPlayer(context, initialUrl ?? '', streamLinks,
+          isLocked: true, contentId: contentId, category: apiType);
       return;
     }
     _navigateToVideoPlayer(context, initialUrl ?? '', streamLinks);
   }
 
-  Future<void> _navigateToVideoPlayer(BuildContext context, String initialUrl, List<Map<String, dynamic>> streamLinks, {bool isLocked = false, int? contentId, String? category}) async {
+  Future<void> _navigateToVideoPlayer(BuildContext context, String initialUrl,
+      List<Map<String, dynamic>> streamLinks,
+      {bool isLocked = false, int? contentId, String? category}) async {
     final videoScreen = VideoPlayerScreen(
-      initialUrl: initialUrl, streamLinks: streamLinks, isLocked: isLocked, contentId: contentId, category: category,
+      initialUrl: initialUrl,
+      streamLinks: streamLinks,
+      isLocked: isLocked,
+      contentId: contentId,
+      category: category,
     );
     if (kIsWeb) {
       await navigatorKey.currentState?.push(
         PageRouteBuilder(
           pageBuilder: (context, animation, secondaryAnimation) => videoScreen,
-          transitionsBuilder: (context, animation, secondaryAnimation, child) => FadeTransition(opacity: animation, child: child),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+              FadeTransition(opacity: animation, child: child),
           transitionDuration: const Duration(milliseconds: 200),
           reverseTransitionDuration: const Duration(milliseconds: 150),
         ),
       );
     } else {
-      await navigatorKey.currentState?.push(MaterialPageRoute(builder: (context) => videoScreen));
+      await navigatorKey.currentState
+          ?.push(MaterialPageRoute(builder: (context) => videoScreen));
     }
   }
 
@@ -40,19 +51,38 @@ mixin HomePageUIMixin on HomePageDataMixin {
           padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
           child: Container(
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [Color(0xFFFFD700), Color(0xFFFFA500)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+              gradient: const LinearGradient(
+                  colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight),
               borderRadius: BorderRadius.circular(20),
-              boxShadow: [BoxShadow(color: Colors.amber.withValues(alpha: 0.4), blurRadius: 6, offset: const Offset(0, 2))],
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.amber.withValues(alpha: 0.4),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2))
+              ],
             ),
             child: ElevatedButton.icon(
-              onPressed: () { Navigator.of(context).push(MaterialPageRoute(builder: (context) => const SubscriptionScreen())); },
+              onPressed: () {
+                Navigator.of(context).push(MaterialPageRoute(
+                    builder: (context) => const SubscriptionScreen()));
+              },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.transparent, shadowColor: Colors.transparent,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20)),
               ),
-              icon: const Icon(Icons.workspace_premium_rounded, color: Colors.black87, size: 18),
-              label: const Text('اشترك الآن', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 13)),
+              icon: const Icon(Icons.workspace_premium_rounded,
+                  color: Colors.black87, size: 18),
+              label: const Text('اشترك الآن',
+                  style: TextStyle(
+                      color: Colors.black87,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13)),
             ),
           ),
         ),
@@ -62,8 +92,11 @@ mixin HomePageUIMixin on HomePageDataMixin {
     Color packageColor = const Color(0xFFDFBA73); // Muted Champagne Gold
     if (_subscriptionPlan != null) {
       final plan = _subscriptionPlan!.toLowerCase();
-      if (plan.contains('ultra') || plan.contains('الترا') || plan.contains('ألترا')) {
-        packageColor = const Color(0xFF9F7AEA); // Premium Soft Purple/Violet for Ultra
+      if (plan.contains('ultra') ||
+          plan.contains('الترا') ||
+          plan.contains('ألترا')) {
+        packageColor =
+            const Color(0xFF9F7AEA); // Premium Soft Purple/Violet for Ultra
       } else if (plan.contains('pro') || plan.contains('برو')) {
         packageColor = const Color(0xFF00F0FF); // Cyan for Pro
       } else if (plan.contains('شهري') || plan.contains('month')) {
@@ -75,7 +108,7 @@ mixin HomePageUIMixin on HomePageDataMixin {
       }
     }
 
-    String planDisplayName = 'مميز';
+    String planDisplayName = 'PRO';
     if (_subscriptionPlan != null) {
       final planLower = _subscriptionPlan!.toLowerCase();
       if (planLower.contains('شهري') || planLower.contains('month')) {
@@ -85,41 +118,74 @@ mixin HomePageUIMixin on HomePageDataMixin {
       } else if (planLower.contains('اسبوع') || planLower.contains('week')) {
         planDisplayName = 'أسبوعي';
       } else {
-        planDisplayName = _subscriptionPlan!;
+        planDisplayName = 'PRO'; // اسم مختصر وأنيق بدلًا من الأسماء الطويلة
       }
     }
 
     actions.add(
       Padding(
         padding: EdgeInsets.symmetric(
-          horizontal: (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) ? 10.0 : 8.0,
+          horizontal:
+              (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows)
+                  ? 10.0
+                  : 8.0,
           vertical: 4.0,
         ),
         child: InkWell(
           customBorder: const CircleBorder(),
-          onTap: () { Navigator.of(context).push(MaterialPageRoute(builder: (context) => const ProfileScreen())); },
+          onTap: () {
+            Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const ProfileScreen()));
+          },
           child: Hero(
             tag: 'profile_avatar',
             child: Stack(
-              alignment: Alignment.center, clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              clipBehavior: Clip.none,
               children: [
                 Container(
                   padding: const EdgeInsets.all(2),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: LinearGradient(
-                      colors: _isSubscribed ? [packageColor, packageColor.withValues(alpha: 0.6)] : [Colors.grey.shade700, Colors.grey.shade900],
-                      begin: Alignment.topLeft, end: Alignment.bottomRight,
+                      colors: _isSubscribed
+                          ? [packageColor, packageColor.withValues(alpha: 0.6)]
+                          : [Colors.grey.shade700, Colors.grey.shade900],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
                   ),
                   child: CircleAvatar(
-                    radius: (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) ? 24 : 19.5,
+                    radius: (!kIsWeb &&
+                            defaultTargetPlatform == TargetPlatform.windows)
+                        ? 24
+                        : 19.5,
                     backgroundColor: const Color(0xFF121212),
-                    backgroundImage: _userProfileImage != null ? CachedNetworkImageProvider(_userProfileImage!) : null,
-                    child: _userProfileImage != null ? null
+                    backgroundImage: _userProfileImage != null
+                        ? CachedNetworkImageProvider(_userProfileImage!)
+                        : null,
+                    child: _userProfileImage != null
+                        ? null
                         : (_userName != null && _userName!.isNotEmpty
-                            ? Text(_userName![0].toUpperCase(), style: TextStyle(color: _isSubscribed ? packageColor : Colors.white, fontWeight: FontWeight.bold, fontSize: (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) ? 20 : 15))
-                            : Icon(Icons.person, color: _isSubscribed ? packageColor : Colors.white, size: (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) ? 26 : 21)),
+                            ? Text(_userName![0].toUpperCase(),
+                                style: TextStyle(
+                                    color: _isSubscribed
+                                        ? packageColor
+                                        : Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: (!kIsWeb &&
+                                            defaultTargetPlatform ==
+                                                TargetPlatform.windows)
+                                        ? 20
+                                        : 15))
+                            : Icon(Icons.person,
+                                color:
+                                    _isSubscribed ? packageColor : Colors.white,
+                                size: (!kIsWeb &&
+                                        defaultTargetPlatform ==
+                                            TargetPlatform.windows)
+                                    ? 26
+                                    : 21)),
                   ),
                 ),
                 if (_isSubscribed)
@@ -129,12 +195,18 @@ mixin HomePageUIMixin on HomePageDataMixin {
                     right: 0,
                     child: Center(
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 2),
                         decoration: BoxDecoration(
                           color: const Color(0xFF121212),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(color: packageColor, width: 1.2),
-                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 4, offset: const Offset(0, 1.5))],
+                          boxShadow: [
+                            BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.4),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1.5))
+                          ],
                         ),
                         child: Text(
                           planDisplayName,
@@ -167,7 +239,11 @@ mixin HomePageUIMixin on HomePageDataMixin {
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Theme.of(context).colorScheme.secondary.withAlpha((0.5 * 255).round())),
+            border: Border.all(
+                color: Theme.of(context)
+                    .colorScheme
+                    .secondary
+                    .withAlpha((0.5 * 255).round())),
           ),
           child: Row(
             children: [
@@ -176,19 +252,32 @@ mixin HomePageUIMixin on HomePageDataMixin {
                   controller: _searchController,
                   decoration: InputDecoration(
                     hintText: 'بحث عن قناة...',
-                    hintStyle: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color),
-                    prefixIcon: Icon(Icons.search, color: Theme.of(context).colorScheme.secondary),
-                    border: InputBorder.none, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14), isDense: true,
+                    hintStyle: TextStyle(
+                        color: Theme.of(context).textTheme.bodySmall?.color),
+                    prefixIcon: Icon(Icons.search,
+                        color: Theme.of(context).colorScheme.secondary),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14),
+                    isDense: true,
                   ),
                   onChanged: _filterChannels,
-                  style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color ?? Colors.white),
+                  style: TextStyle(
+                      color: Theme.of(context).textTheme.bodyLarge?.color ??
+                          Colors.white),
                 ),
               ),
               IconButton(
-                icon: Icon(Icons.close, color: Theme.of(context).textTheme.bodyLarge?.color ?? Colors.white),
+                icon: Icon(Icons.close,
+                    color: Theme.of(context).textTheme.bodyLarge?.color ??
+                        Colors.white),
                 onPressed: () {
                   if (!mounted) return;
-                  setState(() { _isSearchBarVisible = false; _searchController.clear(); _filterChannels(''); });
+                  setState(() {
+                    _isSearchBarVisible = false;
+                    _searchController.clear();
+                    _filterChannels('');
+                  });
                 },
               ),
             ],
@@ -201,7 +290,10 @@ mixin HomePageUIMixin on HomePageDataMixin {
   @override
   Widget build(BuildContext context) {
     if (kIsWeb && _isLoading) {
-      return const Scaffold(backgroundColor: Colors.black, body: Center(child: CircularProgressIndicator(color: Color(0xFF7C52D8))));
+      return const Scaffold(
+          backgroundColor: Colors.black,
+          body: Center(
+              child: CircularProgressIndicator(color: Color(0xFF7C52D8))));
     }
 
     return Scaffold(
@@ -210,13 +302,20 @@ mixin HomePageUIMixin on HomePageDataMixin {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           decoration: BoxDecoration(
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), spreadRadius: 1, blurRadius: 3, offset: const Offset(0, 1))],
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  spreadRadius: 1,
+                  blurRadius: 3,
+                  offset: const Offset(0, 1))
+            ],
             color: Theme.of(context).appBarTheme.backgroundColor,
           ),
           child: AppBar(
             elevation: 0,
             leading: IconButton(
-              icon: const Icon(Icons.menu_rounded, color: Colors.white, size: 28),
+              icon:
+                  const Icon(Icons.menu_rounded, color: Colors.white, size: 28),
               onPressed: () {
                 showModalBottomSheet(
                   context: context,
@@ -226,14 +325,15 @@ mixin HomePageUIMixin on HomePageDataMixin {
                     final theme = Theme.of(context);
                     final isLight = theme.brightness == Brightness.light;
                     final secondaryColor = theme.colorScheme.secondary;
-                    
+
                     return Directionality(
                       textDirection: TextDirection.rtl,
                       child: Container(
                         padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
                         decoration: BoxDecoration(
                           color: theme.cardColor,
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+                          borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(32)),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withValues(alpha: 0.2),
@@ -251,25 +351,34 @@ mixin HomePageUIMixin on HomePageDataMixin {
                                 width: 40,
                                 height: 4,
                                 decoration: BoxDecoration(
-                                  color: theme.textTheme.bodyLarge?.color?.withValues(alpha: 0.15),
+                                  color: theme.textTheme.bodyLarge?.color
+                                      ?.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                               ),
                               const SizedBox(height: 20),
-                              
+
                               // Profile Header Card
                               if (_userName != null)
                                 Container(
                                   padding: const EdgeInsets.all(16),
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
-                                      colors: isLight 
-                                          ? [Colors.grey.shade100, Colors.grey.shade200]
-                                          : [theme.scaffoldBackgroundColor, theme.scaffoldBackgroundColor.withValues(alpha: 0.6)],
+                                      colors: isLight
+                                          ? [
+                                              Colors.grey.shade100,
+                                              Colors.grey.shade200
+                                            ]
+                                          : [
+                                              theme.scaffoldBackgroundColor,
+                                              theme.scaffoldBackgroundColor
+                                                  .withValues(alpha: 0.6)
+                                            ],
                                     ),
                                     borderRadius: BorderRadius.circular(24),
                                     border: Border.all(
-                                      color: theme.dividerColor.withValues(alpha: 0.08),
+                                      color: theme.dividerColor
+                                          .withValues(alpha: 0.08),
                                     ),
                                   ),
                                   child: Row(
@@ -280,14 +389,24 @@ mixin HomePageUIMixin on HomePageDataMixin {
                                         height: 50,
                                         decoration: BoxDecoration(
                                           gradient: LinearGradient(
-                                            colors: _isSubscribed 
-                                                ? [const Color(0xFFFFD700), const Color(0xFFFFA500)]
-                                                : [secondaryColor, secondaryColor.withValues(alpha: 0.6)],
+                                            colors: _isSubscribed
+                                                ? [
+                                                    const Color(0xFFFFD700),
+                                                    const Color(0xFFFFA500)
+                                                  ]
+                                                : [
+                                                    secondaryColor,
+                                                    secondaryColor.withValues(
+                                                        alpha: 0.6)
+                                                  ],
                                           ),
                                           shape: BoxShape.circle,
                                           boxShadow: [
                                             BoxShadow(
-                                              color: (_isSubscribed ? const Color(0xFFFFA500) : secondaryColor).withValues(alpha: 0.2),
+                                              color: (_isSubscribed
+                                                      ? const Color(0xFFFFA500)
+                                                      : secondaryColor)
+                                                  .withValues(alpha: 0.2),
                                               blurRadius: 8,
                                               offset: const Offset(0, 3),
                                             )
@@ -295,7 +414,9 @@ mixin HomePageUIMixin on HomePageDataMixin {
                                         ),
                                         child: Center(
                                           child: Text(
-                                            _userName!.isNotEmpty ? _userName![0].toUpperCase() : 'U',
+                                            _userName!.isNotEmpty
+                                                ? _userName![0].toUpperCase()
+                                                : 'U',
                                             style: const TextStyle(
                                               color: Colors.white,
                                               fontWeight: FontWeight.bold,
@@ -308,7 +429,8 @@ mixin HomePageUIMixin on HomePageDataMixin {
                                       // Name and Plan Details
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
                                               _userName ?? 'المستخدم',
@@ -320,28 +442,46 @@ mixin HomePageUIMixin on HomePageDataMixin {
                                             const SizedBox(height: 4),
                                             // Plan tag
                                             Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 10,
+                                                      vertical: 4),
                                               decoration: BoxDecoration(
-                                                color: _isSubscribed 
-                                                    ? Colors.amber.withValues(alpha: 0.15)
-                                                    : Colors.grey.withValues(alpha: 0.15),
-                                                borderRadius: BorderRadius.circular(10),
+                                                color: _isSubscribed
+                                                    ? Colors.amber
+                                                        .withValues(alpha: 0.15)
+                                                    : Colors.grey.withValues(
+                                                        alpha: 0.15),
+                                                borderRadius:
+                                                    BorderRadius.circular(10),
                                               ),
                                               child: Row(
                                                 mainAxisSize: MainAxisSize.min,
                                                 children: [
                                                   Icon(
-                                                    _isSubscribed ? Icons.star_rounded : Icons.star_border_rounded,
+                                                    _isSubscribed
+                                                        ? Icons.star_rounded
+                                                        : Icons
+                                                            .star_border_rounded,
                                                     size: 14,
-                                                    color: _isSubscribed ? Colors.amber.shade700 : Colors.grey,
+                                                    color: _isSubscribed
+                                                        ? Colors.amber.shade700
+                                                        : Colors.grey,
                                                   ),
                                                   const SizedBox(width: 4),
                                                   Text(
-                                                    _isSubscribed ? 'عضوية PRO المميزة' : 'باقة مجانية',
+                                                    _isSubscribed
+                                                        ? 'عضوية PRO المميزة'
+                                                        : 'باقة مجانية',
                                                     style: TextStyle(
                                                       fontSize: 12,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: _isSubscribed ? Colors.amber.shade800 : Colors.grey.shade600,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color: _isSubscribed
+                                                          ? Colors
+                                                              .amber.shade800
+                                                          : Colors
+                                                              .grey.shade600,
                                                     ),
                                                   ),
                                                 ],
@@ -354,7 +494,8 @@ mixin HomePageUIMixin on HomePageDataMixin {
                                       Material(
                                         color: Colors.transparent,
                                         child: IconButton(
-                                          icon: Icon(Icons.edit_rounded, color: secondaryColor, size: 22),
+                                          icon: Icon(Icons.edit_rounded,
+                                              color: secondaryColor, size: 22),
                                           onPressed: () {
                                             Navigator.pop(context);
                                             _showEditNameDialog();
@@ -364,9 +505,9 @@ mixin HomePageUIMixin on HomePageDataMixin {
                                     ],
                                   ),
                                 ),
-                              
+
                               const SizedBox(height: 16),
-                              
+
                               // Premium Promotion Card (Only for non-subscribers)
                               if (!_isSubscribed)
                                 Container(
@@ -374,14 +515,18 @@ mixin HomePageUIMixin on HomePageDataMixin {
                                   padding: const EdgeInsets.all(16),
                                   decoration: BoxDecoration(
                                     gradient: const LinearGradient(
-                                      colors: [Color(0xFF8E2DE2), Color(0xFF4A00E0)], // Deep violet gradient
+                                      colors: [
+                                        Color(0xFF8E2DE2),
+                                        Color(0xFF4A00E0)
+                                      ], // Deep violet gradient
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
                                     ),
                                     borderRadius: BorderRadius.circular(24),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: const Color(0xFF4A00E0).withValues(alpha: 0.3),
+                                        color: const Color(0xFF4A00E0)
+                                            .withValues(alpha: 0.3),
                                         blurRadius: 10,
                                         offset: const Offset(0, 4),
                                       )
@@ -392,18 +537,21 @@ mixin HomePageUIMixin on HomePageDataMixin {
                                       Container(
                                         padding: const EdgeInsets.all(10),
                                         decoration: BoxDecoration(
-                                          color: Colors.white.withValues(alpha: 0.15),
+                                          color: Colors.white
+                                              .withValues(alpha: 0.15),
                                           shape: BoxShape.circle,
                                         ),
-                                        child: const Icon(Icons.diamond_rounded, color: Colors.amber, size: 30),
+                                        child: const Icon(Icons.diamond_rounded,
+                                            color: Colors.amber, size: 30),
                                       ),
                                       const SizedBox(width: 16),
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             const Text(
-                                              'ترقية إلى Hesen PRO',
+                                              'ترقية إلى 7esen PRO',
                                               style: TextStyle(
                                                 color: Colors.white,
                                                 fontSize: 16,
@@ -414,7 +562,8 @@ mixin HomePageUIMixin on HomePageDataMixin {
                                             Text(
                                               'افتح مميزات حصرية وتجربة أسرع بدون إعلانات',
                                               style: TextStyle(
-                                                color: Colors.white.withValues(alpha: 0.8),
+                                                color: Colors.white
+                                                    .withValues(alpha: 0.8),
                                                 fontSize: 12,
                                               ),
                                             ),
@@ -427,15 +576,19 @@ mixin HomePageUIMixin on HomePageDataMixin {
                                           Navigator.pop(context);
                                           Navigator.push(
                                             context,
-                                            MaterialPageRoute(builder: (context) => const SubscriptionScreen()),
+                                            MaterialPageRoute(
+                                                builder: (context) =>
+                                                    const SubscriptionScreen()),
                                           );
                                         },
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: Colors.amber,
                                           foregroundColor: Colors.black87,
-                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 16, vertical: 10),
                                           shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(14),
+                                            borderRadius:
+                                                BorderRadius.circular(14),
                                           ),
                                           elevation: 0,
                                         ),
@@ -450,9 +603,9 @@ mixin HomePageUIMixin on HomePageDataMixin {
                                     ],
                                   ),
                                 ),
-                              
+
                               if (!_isSubscribed) const SizedBox(height: 20),
-                              
+
                               // Section Title
                               Align(
                                 alignment: Alignment.centerRight,
@@ -461,12 +614,13 @@ mixin HomePageUIMixin on HomePageDataMixin {
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
-                                    color: theme.textTheme.bodyLarge?.color?.withValues(alpha: 0.5),
+                                    color: theme.textTheme.bodyLarge?.color
+                                        ?.withValues(alpha: 0.5),
                                   ),
                                 ),
                               ),
                               const SizedBox(height: 12),
-                              
+
                               // Options Grid
                               Row(
                                 children: [
@@ -482,7 +636,9 @@ mixin HomePageUIMixin on HomePageDataMixin {
                                         Navigator.pop(context);
                                         Navigator.push(
                                           context,
-                                          MaterialPageRoute(builder: (context) => const ThemeCustomizationScreen()),
+                                          MaterialPageRoute(
+                                              builder: (context) =>
+                                                  const ThemeCustomizationScreen()),
                                         );
                                       },
                                     ),
@@ -521,16 +677,25 @@ mixin HomePageUIMixin on HomePageDataMixin {
                                       subtitle: 'مجتمع القناة الرسمي',
                                       onTap: () async {
                                         Navigator.pop(context);
-                                        final Uri telegramUri = Uri.parse('https://t.me/he_s_en');
+                                        final Uri telegramUri =
+                                            Uri.parse('https://t.me/he_s_en');
                                         try {
                                           if (await canLaunchUrl(telegramUri)) {
-                                            await launchUrl(telegramUri, mode: LaunchMode.externalApplication);
+                                            await launchUrl(telegramUri,
+                                                mode: LaunchMode
+                                                    .externalApplication);
                                           } else if (context.mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لا يمكن فتح رابط التحديث.')));
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(const SnackBar(
+                                                    content: Text(
+                                                        'لا يمكن فتح رابط التحديث.')));
                                           }
                                         } catch (e) {
                                           if (context.mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('حدث خطأ عند فتح الرابط.')));
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(const SnackBar(
+                                                    content: Text(
+                                                        'حدث خطأ عند فتح الرابط.')));
                                           }
                                         }
                                       },
@@ -570,39 +735,52 @@ mixin HomePageUIMixin on HomePageDataMixin {
                                         Navigator.pop(context);
                                         Navigator.push(
                                           context,
-                                          MaterialPageRoute(builder: (context) => PrivacyPolicyPage()),
+                                          MaterialPageRoute(
+                                              builder: (context) =>
+                                                  PrivacyPolicyPage()),
                                         );
                                       },
                                     ),
                                   ),
                                 ],
                               ),
-                              
+
                               if (_isSubscribed) ...[
                                 const SizedBox(height: 20),
                                 Container(
                                   width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 14, horizontal: 16),
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
-                                      colors: [Colors.amber.shade700.withValues(alpha: 0.1), Colors.orange.shade700.withValues(alpha: 0.1)],
+                                      colors: [
+                                        Colors.amber.shade700
+                                            .withValues(alpha: 0.1),
+                                        Colors.orange.shade700
+                                            .withValues(alpha: 0.1)
+                                      ],
                                     ),
                                     borderRadius: BorderRadius.circular(20),
                                     border: Border.all(
-                                      color: Colors.amber.shade500.withValues(alpha: 0.3),
+                                      color: Colors.amber.shade500
+                                          .withValues(alpha: 0.3),
                                     ),
                                   ),
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Icon(Icons.workspace_premium_rounded, color: Colors.amber.shade700),
+                                      Icon(Icons.workspace_premium_rounded,
+                                          color: Colors.amber.shade700),
                                       const SizedBox(width: 8),
-                                      Text(
-                                        'أنت تستمتع بجميع مميزات Hesen PRO الفاخرة ✨',
-                                        style: TextStyle(
-                                          color: Colors.amber.shade900,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 13,
+                                      Expanded(
+                                        child: Text(
+                                          'تستمتع بمميزات 7esen PRO ✨',
+                                          style: TextStyle(
+                                            color: Colors.amber.shade900,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                          ),
+                                          textAlign: TextAlign.center,
                                         ),
                                       ),
                                     ],
@@ -625,23 +803,38 @@ mixin HomePageUIMixin on HomePageDataMixin {
                     textDirection: TextDirection.rtl,
                     child: _userName != null
                         ? RichText(
-                            textAlign: Directionality.of(context) == TextDirection.rtl ? TextAlign.right : TextAlign.left,
+                            textAlign:
+                                Directionality.of(context) == TextDirection.rtl
+                                    ? TextAlign.right
+                                    : TextAlign.left,
                             text: TextSpan(
-                               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                              style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white),
                               children: [
                                 const TextSpan(text: 'أهلاً بك '),
                                 TextSpan(
                                   text: _userName,
                                   style: TextStyle(
-                                    fontSize: 22, fontWeight: FontWeight.bold,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
                                     foreground: _isDarkMode
-                                        ? (Paint()..shader = LinearGradient(
-                                            colors: [Colors.blue.shade800, Colors.deepPurple.shade700, Colors.blue.shade500],
-                                            begin: Alignment.centerLeft, end: Alignment.centerRight,
-                                          ).createShader(const Rect.fromLTWH(0.0, 0.0, 200.0, 70.0))
-                                          )
+                                        ? (Paint()
+                                          ..shader = LinearGradient(
+                                            colors: [
+                                              Colors.blue.shade800,
+                                              Colors.deepPurple.shade700,
+                                              Colors.blue.shade500
+                                            ],
+                                            begin: Alignment.centerLeft,
+                                            end: Alignment.centerRight,
+                                          ).createShader(const Rect.fromLTWH(
+                                              0.0, 0.0, 200.0, 70.0)))
                                         : null,
-                                    color: _isDarkMode ? null : const Color(0xFFF8F8F8),
+                                    color: _isDarkMode
+                                        ? null
+                                        : const Color(0xFFF8F8F8),
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
@@ -657,15 +850,15 @@ mixin HomePageUIMixin on HomePageDataMixin {
           ),
         ),
       ),
-      body: _isSearchBarVisible ? _buildSearchBar()
+      body: _isSearchBarVisible
+          ? _buildSearchBar()
           : Builder(
               builder: (context) {
-        if (_isLoading && channels.isEmpty) {
-          return _buildShimmerPlaceholder();
-        } else if (_hasError) {
-          return _buildGeneralErrorWidget();
-        } else {
-
+                if (_isLoading && channels.isEmpty) {
+                  return _buildShimmerPlaceholder();
+                } else if (_hasError) {
+                  return _buildGeneralErrorWidget();
+                } else {
                   return RefreshIndicator(
                     color: Theme.of(context).colorScheme.secondary,
                     backgroundColor: Theme.of(context).cardColor,
@@ -702,12 +895,14 @@ mixin HomePageUIMixin on HomePageDataMixin {
         index: _selectedIndex,
         onTap: (index) {
           if (!mounted) return;
-          setState(() { _selectedIndex = index; });
+          setState(() {
+            _selectedIndex = index;
+          });
           SharedPreferences.getInstance().then((prefs) {
             prefs.setInt('last_selected_index', index);
           });
         },
-        height: 60,
+        height: 65,
       ),
     );
   }
@@ -722,33 +917,43 @@ mixin HomePageUIMixin on HomePageDataMixin {
 
     Widget iconWidget;
     if (iconDataOrPath is IconData) {
-      iconWidget = Icon(iconDataOrPath, size: isSelected ? 24 : 30, color: itemColor);
+      iconWidget =
+          Icon(iconDataOrPath, size: isSelected ? 30 : 28, color: itemColor);
     } else {
       iconWidget = Image.asset(
         iconDataOrPath as String,
-        width: isSelected ? 24 : 30,
-        height: isSelected ? 24 : 30,
+        width: isSelected ? 30 : 28,
+        height: isSelected ? 30 : 28,
         color: itemColor,
       );
     }
 
-    return Column(
+    final Widget content = Column(
       mainAxisSize: MainAxisSize.min,
-      mainAxisAlignment: MainAxisAlignment.center,
       children: [
         iconWidget,
-        if (isSelected) ...[
-          const SizedBox(height: 2),
+        if (isSelected) const SizedBox(height: 12),
+        if (isSelected)
           Text(
             label,
-            style: TextStyle(
-              color: itemColor,
-              fontSize: 9,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10,
               fontWeight: FontWeight.bold,
             ),
           ),
-        ],
       ],
+    );
+
+    if (isSelected) {
+      return Transform.translate(
+        offset: const Offset(0, 13),
+        child: content,
+      );
+    }
+    return Transform.translate(
+      offset: const Offset(0, -1),
+      child: content,
     );
   }
 
@@ -760,12 +965,22 @@ mixin HomePageUIMixin on HomePageDataMixin {
           const Icon(Icons.error_outline, color: Colors.red, size: 60),
           const SizedBox(height: 20),
           Text(
-            _lastError.isNotEmpty ? _lastError : 'حدث خطأ أثناء تحميل البيانات.',
-            style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color ?? Colors.white, fontSize: 18),
+            _lastError.isNotEmpty
+                ? _lastError
+                : 'حدث خطأ أثناء تحميل البيانات.',
+            style: TextStyle(
+                color: Theme.of(context).textTheme.bodyLarge?.color ??
+                    Colors.white,
+                fontSize: 18),
           ),
           const SizedBox(height: 10),
-          Text('الرجاء التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.', textAlign: TextAlign.center,
-            style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color ?? Colors.white70, fontSize: 14),
+          Text(
+            'الرجاء التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+                color: Theme.of(context).textTheme.bodyMedium?.color ??
+                    Colors.white70,
+                fontSize: 14),
           ),
           const SizedBox(height: 30),
           ElevatedButton.icon(
@@ -773,8 +988,10 @@ mixin HomePageUIMixin on HomePageDataMixin {
             icon: const Icon(Icons.replay),
             label: const Text('إعادة المحاولة'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).primaryColor, foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15), textStyle: const TextStyle(fontSize: 16),
+              backgroundColor: Theme.of(context).primaryColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              textStyle: const TextStyle(fontSize: 16),
             ),
           ),
         ],
@@ -792,19 +1009,28 @@ mixin HomePageUIMixin on HomePageDataMixin {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24.0),
             child: Text(
-              message, textAlign: TextAlign.center,
-              style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color ?? Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  color: Theme.of(context).textTheme.bodyLarge?.color ??
+                      Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold),
             ),
           ),
           const SizedBox(height: 25),
           ElevatedButton.icon(
             onPressed: onRetry,
             icon: const Icon(Icons.refresh_rounded),
-            label: const Text('إعادة المحاولة', style: TextStyle(fontWeight: FontWeight.bold)),
+            label: const Text('إعادة المحاولة',
+                style: TextStyle(fontWeight: FontWeight.bold)),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).primaryColor, foregroundColor: Colors.white,
+              backgroundColor: Theme.of(context).primaryColor,
+              foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)), elevation: 0,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30)),
+              elevation: 0,
             ),
           ),
         ],
@@ -816,7 +1042,8 @@ mixin HomePageUIMixin on HomePageDataMixin {
     switch (index) {
       case 0:
         if (_channelsHasError) {
-          return _buildSectionErrorWidget('فشل تحميل القنوات. الرجاء المحاولة مرة أخرى.', _retryChannels);
+          return _buildSectionErrorWidget(
+              'فشل تحميل القنوات. الرجاء المحاولة مرة أخرى.', _retryChannels);
         }
         return Column(
           children: [
@@ -831,24 +1058,35 @@ mixin HomePageUIMixin on HomePageDataMixin {
         );
       case 1:
         if (_newsHasError) {
-          return _buildSectionErrorWidget('فشل تحميل الأخبار. الرجاء المحاولة مرة أخرى.', _retryNews);
+          return _buildSectionErrorWidget(
+              'فشل تحميل الأخبار. الرجاء المحاولة مرة أخرى.', _retryNews);
         }
-        return NewsSection(newsArticles: Future.value(news), openVideo: openVideo);
+        return NewsSection(
+            newsArticles: Future.value(news), openVideo: openVideo);
       case 2:
         if (_goalsHasError) {
-          return _buildSectionErrorWidget('فشل تحميل الأهداف. الرجاء المحاولة مرة أخرى.', _retryGoals);
+          return _buildSectionErrorWidget(
+              'فشل تحميل الأهداف. الرجاء المحاولة مرة أخرى.', _retryGoals);
         }
-        return GoalsSection(goalsArticles: Future.value(goals), openVideo: openVideo, userName: _userName);
+        return GoalsSection(
+            goalsArticles: Future.value(goals),
+            openVideo: openVideo,
+            userName: _userName);
       case 3:
         if (_matchesHasError) {
-          return _buildSectionErrorWidget('فشل تحميل المباريات. الرجاء المحاولة مرة أخرى.', _retryMatches);
+          return _buildSectionErrorWidget(
+              'فشل تحميل المباريات. الرجاء المحاولة مرة أخرى.', _retryMatches);
         }
-        return MatchesSection(matches: Future.value(matches), openVideo: openVideo);
+        return MatchesSection(
+            matches: Future.value(matches), openVideo: openVideo);
       case 4:
         if (_highlightsHasError) {
-          return _buildSectionErrorWidget('فشل تحميل الملخصات. الرجاء المحاولة مرة أخرى.', _retryHighlights);
+          return _buildSectionErrorWidget(
+              'فشل تحميل الملخصات. الرجاء المحاولة مرة أخرى.',
+              _retryHighlights);
         }
-        return HighlightsSection(highlights: Future.value(highlights), openVideo: openVideo);
+        return HighlightsSection(
+            highlights: Future.value(highlights), openVideo: openVideo);
       default:
         return const Center(child: Text('قسم غير معروف'));
     }
@@ -859,9 +1097,9 @@ mixin HomePageUIMixin on HomePageDataMixin {
   }
 
   Widget _buildShimmerPlaceholder() {
+    final bool isWindows =
+        defaultTargetPlatform == TargetPlatform.windows && !kIsWeb;
 
-    final bool isWindows = defaultTargetPlatform == TargetPlatform.windows && !kIsWeb;
-    
     // Grid of Category Boxes
     if (_selectedIndex == 0) {
       return Center(
@@ -897,7 +1135,7 @@ mixin HomePageUIMixin on HomePageDataMixin {
         ),
       );
     }
-    
+
     // List for news, goals, matches, highlights
     return ListView.builder(
       physics: const NeverScrollableScrollPhysics(),
@@ -928,7 +1166,9 @@ mixin HomePageUIMixin on HomePageDataMixin {
     final isLight = theme.brightness == Brightness.light;
     return Container(
       decoration: BoxDecoration(
-        color: isLight ? Colors.grey.shade50 : theme.cardColor.withValues(alpha: 0.7),
+        color: isLight
+            ? Colors.grey.shade50
+            : theme.cardColor.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: theme.dividerColor.withValues(alpha: 0.05),
@@ -967,7 +1207,8 @@ mixin HomePageUIMixin on HomePageDataMixin {
                 Text(
                   subtitle,
                   style: TextStyle(
-                    color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.5),
+                    color: theme.textTheme.bodyMedium?.color
+                        ?.withValues(alpha: 0.5),
                     fontSize: 11,
                   ),
                   maxLines: 1,
@@ -986,7 +1227,9 @@ mixin HomePageUIMixin on HomePageDataMixin {
     final isLight = theme.brightness == Brightness.light;
     return Container(
       decoration: BoxDecoration(
-        color: isLight ? Colors.grey.shade50 : theme.cardColor.withValues(alpha: 0.7),
+        color: isLight
+            ? Colors.grey.shade50
+            : theme.cardColor.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: theme.dividerColor.withValues(alpha: 0.05),
@@ -1007,7 +1250,9 @@ mixin HomePageUIMixin on HomePageDataMixin {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    _isDarkMode ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                    _isDarkMode
+                        ? Icons.dark_mode_rounded
+                        : Icons.light_mode_rounded,
                     color: Colors.amber,
                     size: 24,
                   ),
@@ -1040,7 +1285,8 @@ mixin HomePageUIMixin on HomePageDataMixin {
             Text(
               _isDarkMode ? 'مفعل الآن' : 'غير مفعل',
               style: TextStyle(
-                color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.5),
+                color:
+                    theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.5),
                 fontSize: 11,
               ),
             ),
@@ -1050,4 +1296,3 @@ mixin HomePageUIMixin on HomePageDataMixin {
     );
   }
 }
-

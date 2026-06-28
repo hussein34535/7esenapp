@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:hesen/utils/image_proxy.dart';
+import 'package:hesen/widgets/in_app_notification.dart';
 
 /// Cache Manager مخصص لصور الكاتيجوريز - يحفظ الصور لمدة 7 أيام
 class CategoryImageCacheManager {
@@ -673,8 +674,11 @@ class _ChannelTileState extends State<ChannelTile> {
               _extractStreamLinks(streamLinks);
 
           if (streams.isEmpty && !isPremium) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("No stream available.")),
+            InAppNotification.show(
+              context: context,
+              message: 'لا يوجد بث متاح لهذه القناة',
+              type: NotificationType.error,
+              icon: Icons.videocam_off_rounded,
             );
             return;
           }

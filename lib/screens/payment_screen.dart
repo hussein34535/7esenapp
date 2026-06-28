@@ -11,6 +11,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hesen/services/cloudinary_service.dart';
 import 'package:hesen/services/resend_service.dart';
+import 'package:hesen/widgets/in_app_notification.dart';
 import 'package:hesen/screens/payment_success_screen.dart';
 
 class PaymentScreen extends StatefulWidget {
@@ -146,8 +147,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking image: $e')),
+        InAppNotification.show(
+          context: context,
+          message: 'Error picking image: $e',
+          type: NotificationType.error,
+          icon: Icons.error_outline,
         );
       }
     }
@@ -156,8 +160,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
   Future<void> _submitPaymentRequest(double finalPrice) async {
     if (_receiptImage == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('يرجى رفع صورة الإيصال أولاً')),
+        InAppNotification.show(
+          context: context,
+          message: 'يرجى رفع صورة الإيصال أولاً',
+          type: NotificationType.error,
+          icon: Icons.error_outline,
         );
       }
       return;
@@ -220,8 +227,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
     } catch (e) {
       debugPrint("Payment Error: $e");
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('حدث خطأ: $e')),
+        InAppNotification.show(
+          context: context,
+          message: 'حدث خطأ: $e',
+          type: NotificationType.error,
+          icon: Icons.error_outline,
         );
       }
     } finally {
@@ -287,8 +297,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
     } catch (e) {
       debugPrint("Fawaterak Payment Error: $e");
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('حدث خطأ أثناء بدء الدفع: $e')),
+        InAppNotification.show(
+          context: context,
+          message: 'حدث خطأ أثناء تهيئة الدفع: $e',
+          type: NotificationType.error,
+          icon: Icons.error_outline,
         );
       }
     } finally {
@@ -470,11 +483,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       icon: const Icon(Icons.copy, color: Colors.purpleAccent),
                       onPressed: () {
                         Clipboard.setData(ClipboardData(text: paymentCode));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('تم نسخ كود الدفع بنجاح'),
-                            duration: Duration(seconds: 2),
-                          ),
+                        InAppNotification.show(
+                          context: context,
+                          message: 'تم نسخ كود الدفع بنجاح',
+                          type: NotificationType.success,
+                          icon: Icons.check_circle_outline,
                         );
                       },
                     ),

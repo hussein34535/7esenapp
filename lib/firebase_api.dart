@@ -6,28 +6,24 @@ class FirebaseApi {
   final _firebseMessaging = FirebaseMessaging.instance;
 
   Future<String?> initNotification() async {
-    if (kIsWeb) {
-      try {
-        await _firebseMessaging.getToken(
-          vapidKey: 'YOUR_VAPID_KEY', // Get this from Firebase Console
-        );
-        return null; // Token handling for web is different
-      } catch (e) {
-        // debugPrint('Web notification error: $e');
+    try {
+      if (kIsWeb) {
         return null;
       }
-    } else {
       await _firebseMessaging.requestPermission();
       String? token = await _firebseMessaging.getToken();
       debugPrint("FCM Token: $token");
       return token;
+    } catch (e) {
+      debugPrint("Notification init error: $e");
+      return null;
     }
   }
 
   void handleMessage(RemoteMessage? message) {
     if (message == null) return;
     navigatorKey.currentState?.pushNamed(
-      '/notification_screen',
+      '/Notification_screen',
       arguments: message,
     );
   }

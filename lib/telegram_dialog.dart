@@ -7,8 +7,6 @@ import 'package:hesen/screens/subscription_screen.dart';
 void showTelegramDialog(BuildContext context, {String? userName, bool isSubscribed = false}) {
   final theme = Theme.of(context);
   final secondaryColor = theme.colorScheme.secondary;
-  bool dontShowAgain = false;
-
   showDialog(
     context: context,
     builder: (BuildContext context) {
@@ -67,99 +65,74 @@ void showTelegramDialog(BuildContext context, {String? userName, bool isSubscrib
                 ),
               ),
               const SizedBox(height: 20),
-              StatefulBuilder(
-                builder: (context, setState) {
-                  return InkWell(
-                    onTap: () async {
-                      if (isSubscribed) {
-                        setState(() {
-                          dontShowAgain = !dontShowAgain;
-                        });
-                        final prefs = await SharedPreferences.getInstance();
-                        await prefs.setBool('hide_telegram_dialog', dontShowAgain);
-                      } else {
-                        if (context.mounted) {
-                          _showProRequiredBottomSheet(context);
-                        }
-                      }
-                    },
+              InkWell(
+                onTap: () async {
+                  if (isSubscribed) {
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setBool('hide_telegram_dialog', true);
+                    if (context.mounted) {
+                      Navigator.of(context).pop();
+                    }
+                  } else {
+                    if (context.mounted) {
+                      _showProRequiredBottomSheet(context);
+                    }
+                  }
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+                  decoration: BoxDecoration(
+                    color: theme.scaffoldBackgroundColor.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
-                      decoration: BoxDecoration(
-                        color: theme.scaffoldBackgroundColor.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: theme.dividerColor.withValues(alpha: 0.1),
+                    border: Border.all(
+                      color: theme.dividerColor.withValues(alpha: 0.1),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.visibility_off_outlined,
+                        color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'عدم إظهار هذه النافذة مرة أخرى',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
+                          ),
                         ),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        children: [
-                          SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: Checkbox(
-                              value: dontShowAgain,
-                              activeColor: secondaryColor,
-                              checkColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              onChanged: (val) async {
-                                if (isSubscribed) {
-                                  setState(() {
-                                    dontShowAgain = val ?? false;
-                                  });
-                                  final prefs = await SharedPreferences.getInstance();
-                                  await prefs.setBool('hide_telegram_dialog', dontShowAgain);
-                                } else {
-                                  if (context.mounted) {
-                                    _showProRequiredBottomSheet(context);
-                                  }
-                                }
-                              },
-                            ),
+                      if (!isSubscribed)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              'عدم العرض مرة أخرى',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.diamond_rounded, size: 14, color: Colors.amber.shade700),
+                              const SizedBox(width: 4),
+                              Text(
+                                'PRO',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.amber.shade800,
+                                ),
                               ),
-                            ),
+                            ],
                           ),
-                          if (!isSubscribed)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.amber.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.diamond_rounded, size: 14, color: Colors.amber.shade700),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'PRO',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.amber.shade800,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
+                        ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),

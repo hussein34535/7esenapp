@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'package:hesen/utils/image_proxy.dart';
+import 'package:hesen/widgets/in_app_notification.dart';
 
 class NewsSection extends StatelessWidget {
   final Future<List<dynamic>> newsArticles;
@@ -232,7 +233,6 @@ class _NewsBoxState extends State<NewsBox> {
       // --- MOBILE LAYOUT (Original) ---
       return GestureDetector(
         onTap: () {
-          final scaffoldMessenger = ScaffoldMessenger.of(context);
           bool isPremium = widget.article['is_premium'] ?? false;
           int? id = int.tryParse(widget.article['id']?.toString() ?? '');
 
@@ -247,9 +247,11 @@ class _NewsBoxState extends State<NewsBox> {
                 contentId: id,
                 isPremium: isPremium);
           } else {
-            scaffoldMessenger.showSnackBar(
-              const SnackBar(
-                  content: Text('No video link found for this news article.')),
+            InAppNotification.show(
+              context: context,
+              message: 'لا يوجد رابط فيديو لهذا الخبر',
+              type: NotificationType.error,
+              icon: Icons.videocam_off_rounded,
             );
           }
         },
@@ -322,7 +324,6 @@ class _NewsBoxState extends State<NewsBox> {
       onExit: (_) => setState(() => _isHovered = false),
       child: GestureDetector(
         onTap: () {
-          final scaffoldMessenger = ScaffoldMessenger.of(context);
           bool isPremium = widget.article['is_premium'] ?? false;
           int? id = int.tryParse(widget.article['id']?.toString() ?? '');
 
@@ -337,9 +338,11 @@ class _NewsBoxState extends State<NewsBox> {
                 contentId: id,
                 isPremium: isPremium);
           } else {
-            scaffoldMessenger.showSnackBar(
-              const SnackBar(
-                  content: Text('No video link found for this news article.')),
+            InAppNotification.show(
+              context: context,
+              message: 'لا يوجد رابط فيديو لهذا الخبر',
+              type: NotificationType.error,
+              icon: Icons.videocam_off_rounded,
             );
           }
         },

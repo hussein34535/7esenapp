@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:hesen/navigation.dart';
-import 'package:hesen/screens/home_page.dart';
 import 'package:hesen/screens/pwa_install_screen.dart';
+import 'package:hesen/screens/app_intro_screen.dart';
 import 'package:hesen/notification_page.dart';
 import 'package:hesen/theme_customization_screen.dart';
-import 'package:hesen/main.dart' show homeKey;
 import 'package:provider/provider.dart';
 
 class MyApp extends StatelessWidget {
@@ -167,17 +166,16 @@ class MyApp extends StatelessWidget {
                   'sans-serif',
                 ],
               ),
-              initialRoute: '/',
+              home: AppIntroScreen(
+                themeProvider: themeProvider,
+                onThemeChanged: (isDarkMode) {
+                  themeProvider.setThemeMode(
+                    isDarkMode ? ThemeMode.dark : ThemeMode.light,
+                  );
+                },
+              ),
               routes: {
                 '/pwa_install': (context) => const PwaInstallScreen(),
-                '/': (context) => HomePage(
-                      key: homeKey,
-                      onThemeChanged: (isDarkMode) {
-                        themeProvider.setThemeMode(
-                          isDarkMode ? ThemeMode.dark : ThemeMode.light,
-                        );
-                      },
-                    ),
                 '/Notification_screen': (context) => const NotificationPage(),
               },
               navigatorKey: navigatorKey,

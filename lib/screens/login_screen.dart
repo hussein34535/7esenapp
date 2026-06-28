@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 import 'package:hesen/services/cloudinary_service.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:hesen/widgets/in_app_notification.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -79,8 +80,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (_profileImage == null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('برجاء اختيار صورة شخصية')),
+          InAppNotification.show(
+            context: context,
+            message: 'برجاء اختيار صورة شخصية',
+            type: NotificationType.error,
+            icon: Icons.error_outline,
           );
           setState(() => _isLoading = false);
         }
@@ -159,14 +163,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (mounted) {
         debugPrint("Auth Final Message: $message");
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message, textAlign: TextAlign.center),
-            backgroundColor: Colors.red.shade800,
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
+        InAppNotification.show(
+          context: context,
+          message: message,
+          type: NotificationType.error,
+          icon: Icons.error_outline,
         );
       }
     } finally {
@@ -183,11 +184,11 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('فشل تسجيل الدخول: $e', textAlign: TextAlign.center),
-            backgroundColor: Colors.red.shade900,
-          ),
+        InAppNotification.show(
+          context: context,
+          message: 'فشل تسجيل الدخول: $e',
+          type: NotificationType.error,
+          icon: Icons.error_outline,
         );
       }
     } finally {

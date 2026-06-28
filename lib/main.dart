@@ -112,7 +112,7 @@ Future<void> main() async {
   if (!kIsWeb && defaultTargetPlatform != TargetPlatform.windows) {
     try {
       final firebaseApi = FirebaseApi();
-      firebaseApi.initNotification();
+      await firebaseApi.initNotification();
     } catch (e) {
       debugPrint("Notification Init Error: $e");
     }

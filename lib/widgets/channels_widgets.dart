@@ -63,9 +63,9 @@ class _ChannelsSectionState extends State<ChannelsSection> {
       );
     }
 
-    final bool isWindows =
-        defaultTargetPlatform == TargetPlatform.windows && !kIsWeb;
-    final double maxContainerWidth = isWindows ? 1500 : 900;
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool isWideScreen = screenWidth > 600;
+    final double maxContainerWidth = isWideScreen ? 1500 : 900;
 
     return Center(
       child: ConstrainedBox(
@@ -74,10 +74,10 @@ class _ChannelsSectionState extends State<ChannelsSection> {
           key: _gridKey,
           physics: const BouncingScrollPhysics(),
           padding: EdgeInsets.symmetric(
-            horizontal: isWindows ? 30 : 16,
+            horizontal: isWideScreen ? 24 : 16,
             vertical: 20,
           ),
-          gridDelegate: isWindows
+          gridDelegate: isWideScreen
               ? const SliverGridDelegateWithMaxCrossAxisExtent(
                   maxCrossAxisExtent: 500,
                   mainAxisExtent: 160,
@@ -177,8 +177,8 @@ class _ChannelBoxState extends State<ChannelBox> {
     }
 
     return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
+      onEnter: (_) { if (!_isHovered) setState(() => _isHovered = true); },
+      onExit: (_) { if (_isHovered) setState(() => _isHovered = false); },
       child: GestureDetector(
         onTapDown: (_) => setState(() => _isPressed = true),
         onTapUp: (_) => setState(() => _isPressed = false),
@@ -409,9 +409,7 @@ class _CategoryChannelsScreenState extends State<CategoryChannelsScreen> {
         widget.category['channels'] ?? widget.category['Channels'] ?? [];
     final bool isPremiumCategory = widget.category['is_premium'] == true;
 
-    // Detect Windows platform
-    final bool isWindows =
-        defaultTargetPlatform == TargetPlatform.windows && !kIsWeb;
+    final bool isWideScreen = MediaQuery.of(context).size.width > 600;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -508,17 +506,17 @@ class _CategoryChannelsScreenState extends State<CategoryChannelsScreen> {
           // --- Channel Grid Section ---
           SliverPadding(
             padding: EdgeInsets.symmetric(
-              horizontal: isWindows ? 40 : 12,
+              horizontal: isWideScreen ? 40 : 12,
               vertical: 20,
             ),
             sliver: SliverLayoutBuilder(
               builder: (context, constraints) {
                 // Determine Grid Delegate
                 SliverGridDelegate gridDelegate;
-                if (isWindows) {
+                if (isWideScreen) {
                   gridDelegate = const SliverGridDelegateWithMaxCrossAxisExtent(
                     maxCrossAxisExtent: 600,
-                    childAspectRatio: 3.8,
+                    mainAxisExtent: 120,
                     crossAxisSpacing: 20,
                     mainAxisSpacing: 20,
                   );
@@ -662,8 +660,8 @@ class _ChannelTileState extends State<ChannelTile> {
     }
 
     return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
+      onEnter: (_) { if (!_isHovered) setState(() => _isHovered = true); },
+      onExit: (_) { if (_isHovered) setState(() => _isHovered = false); },
       child: GestureDetector(
         onTapDown: (_) => setState(() => _isPressed = true),
         onTapUp: (_) => setState(() => _isPressed = false),

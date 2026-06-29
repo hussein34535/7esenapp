@@ -49,6 +49,14 @@ class _PaymentScreenState extends State<PaymentScreen> {
     _fetchPaymentData();
   }
 
+  @override
+  void dispose() {
+    _couponController.dispose();
+    _paymentIdController.dispose();
+    _walletPhoneController.dispose();
+    super.dispose();
+  }
+
   Future<void> _fetchPaymentData() async {
     try {
       final methods = await ApiService.fetchPaymentMethods();

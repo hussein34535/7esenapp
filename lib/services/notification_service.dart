@@ -12,8 +12,8 @@ class NotificationService {
     
     try {
       tz.initializeTimeZones();
-      // Set Egyptian timezone as default local location
-      tz.setLocalLocation(tz.getLocation('Africa/Cairo'));
+      // Set UTC as local location to avoid timezone mismatch errors
+      tz.setLocalLocation(tz.UTC);
       
       const AndroidInitializationSettings initializationSettingsAndroid =
           AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -68,11 +68,14 @@ class NotificationService {
         iOS: iosDetails,
       );
 
-      final tzScheduledTime = tz.TZDateTime.from(scheduledTime, tz.local);
+      final now = DateTime.now();
+      final difference = scheduledTime.difference(now);
 
-      if (tzScheduledTime.isBefore(tz.TZDateTime.now(tz.local))) {
+      if (difference.isNegative) {
         return false;
       }
+
+      final tzScheduledTime = tz.TZDateTime.now(tz.UTC).add(difference);
 
       await _notificationsPlugin.zonedSchedule(
         id,
@@ -80,9 +83,9 @@ class NotificationService {
         body,
         tzScheduledTime,
         notificationDetails,
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       );
-      debugPrint('[NOTIFICATION SERVICE] Scheduled notification $id at $tzScheduledTime');
+      debugPrint('[NOTIFICATION SERVICE] Scheduled notification $id at $tzScheduledTime (in ${difference.inSeconds} seconds)');
       return true;
     } catch (e) {
       debugPrint('[NOTIFICATION SERVICE] Error scheduling notification: $e');
@@ -94,5 +97,27 @@ class NotificationService {
     if (kIsWeb) return;
     await _notificationsPlugin.cancel(id);
     debugPrint('[NOTIFICATION SERVICE] Cancelled notification $id');
+  }
+
+  static Future<void> showInstantNotification() async {
+    if (kIsWeb) return;
+    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      'match_reminders_channel',
+      'تذكيرات المباريات',
+      channelDescription: 'قناة لإرسال تنبيهات قبل بدء المباريات',
+      importance: Importance.max,
+      priority: Priority.high,
+      playSound: true,
+    );
+    const NotificationDetails notificationDetails = NotificationDetails(
+      android: androidDetails,
+    );
+    await _notificationsPlugin.show(
+      999,
+      'إشعار فوري ⚽',
+      'هذا إشعار فوري للتأكد من عمل الإشعارات على جهازك!',
+      notificationDetails,
+    );
+    debugPrint('[NOTIFICATION SERVICE] Showed instant notification.');
   }
 }

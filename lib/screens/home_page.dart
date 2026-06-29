@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform, debugPrint;
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform, debugPrint, compute;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
@@ -28,6 +28,7 @@ import 'package:hesen/screens/profile_screen.dart';
 import 'package:hesen/privacy_policy_page.dart';
 import 'package:hesen/video_player_screen.dart';
 import 'package:hesen/widgets/in_app_notification.dart';
+import 'package:hesen/services/auto_scheduler_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 

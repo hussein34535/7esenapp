@@ -13,6 +13,8 @@ mixin HomePageDataMixin on State<HomePage> {
   List<dynamic> goals = [];
   List<Highlight> highlights = [];
   int _selectedIndex = 0;
+  List<Widget>? _cachedSections;
+  bool _isTabSwitching = false;
 
   final TextEditingController _searchController = TextEditingController();
   List<dynamic> _filteredChannels = [];
@@ -90,7 +92,7 @@ mixin HomePageDataMixin on State<HomePage> {
           ApiService.fetchMatches(authToken: token).catchError((e) {
             debugPrint('Error fetching matches: $e');
             if (mounted) setState(() { _matchesHasError = true; _lastError = 'فشل تحميل المباريات: $e'; });
-            return <Match>[];
+            return [];
           }),
           ApiService.fetchGoals(authToken: token).catchError((e) {
             debugPrint('Error fetching goals: $e');
@@ -100,7 +102,7 @@ mixin HomePageDataMixin on State<HomePage> {
           ApiService.fetchHighlights(authToken: token).catchError((e) {
             debugPrint('Error fetching highlights: $e');
             if (mounted) setState(() { _highlightsHasError = true; _lastError = 'فشل تحميل ملخصات: $e'; });
-            return <Highlight>[];
+            return [];
           }),
           ApiService.fetchCategories(authToken: token).catchError((e) {
             debugPrint('Error fetching categories: $e');
@@ -139,14 +141,23 @@ mixin HomePageDataMixin on State<HomePage> {
               _triggerSubscriptionExpiryWarning(user.email!, user.uid, difference);
             }
           }
-          setState(() {
-            _isSubscribed = isSub;
-            _subscriptionExpiryDays = daysRemaining;
-            if (userData?['subscriptionPlan'] != null) { _subscriptionPlan = userData!['subscriptionPlan']; }
-            else if (userData?['planId'] != null) { _subscriptionPlan = 'Premium (Plan ${userData!['planId']})'; }
-            else { _subscriptionPlan = isSub ? 'Premium' : null; }
-            _initialStatusLoaded = true;
-          });
+          final newPlan = userData?['subscriptionPlan'] != null
+              ? userData!['subscriptionPlan']
+              : (userData?['planId'] != null
+                  ? 'Premium (Plan ${userData!['planId']})'
+                  : (isSub ? 'Premium' : null));
+
+          if (_isSubscribed != isSub ||
+              _subscriptionExpiryDays != daysRemaining ||
+              _subscriptionPlan != newPlan ||
+              !_initialStatusLoaded) {
+            setState(() {
+              _isSubscribed = isSub;
+              _subscriptionExpiryDays = daysRemaining;
+              _subscriptionPlan = newPlan;
+              _initialStatusLoaded = true;
+            });
+          }
         }
         ApiService.sendTelemetry(user.uid);
 
@@ -156,8 +167,8 @@ mixin HomePageDataMixin on State<HomePage> {
         }
 
         try {
-          debugPrint('Processing data on Main Thread (Authenticated)...');
-          final processedData = await processFetchedData(fetchedResults);
+          debugPrint('Processing data on Isolate (Authenticated)...');
+          final processedData = await compute(processFetchedData, fetchedResults);
           if (mounted) {
             setState(() {
               channels = processedData['channels'] ?? [];
@@ -170,6 +181,7 @@ mixin HomePageDataMixin on State<HomePage> {
               if (kIsWeb) removeWebSplash();
             });
             _saveSectionsToCache(processedData);
+            AutoSchedulerService.autoScheduleFavoriteMatches(processedData['matches'] ?? []);
           }
         } catch (e) {
           debugPrint('Error processing data: $e');
@@ -182,9 +194,9 @@ mixin HomePageDataMixin on State<HomePage> {
     final List<Future<dynamic>> guestFutures = [
       ApiService.fetchChannels(authToken: token).catchError((e) { debugPrint('Error fetching channels: $e'); if (mounted) setState(() { _channelsHasError = true; _lastError = 'فشل تحميل القنوات: $e'; }); return <dynamic>[]; }),
       ApiService.fetchNews(authToken: token).catchError((e) { debugPrint('Error fetching news: $e'); if (mounted) setState(() { _newsHasError = true; _lastError = 'فشل تحميل الأخبار: $e'; }); return <dynamic>[]; }),
-      ApiService.fetchMatches(authToken: token).catchError((e) { debugPrint('Error fetching matches: $e'); if (mounted) setState(() { _matchesHasError = true; _lastError = 'فشل تحميل المباريات: $e'; }); return <Match>[]; }),
+      ApiService.fetchMatches(authToken: token).catchError((e) { debugPrint('Error fetching matches: $e'); if (mounted) setState(() { _matchesHasError = true; _lastError = 'فشل تحميل المباريات: $e'; }); return <dynamic>[]; }),
       ApiService.fetchGoals(authToken: token).catchError((e) { debugPrint('Error fetching goals: $e'); if (mounted) setState(() { _goalsHasError = true; _lastError = 'فشل تحميل الأهداف: $e'; }); return <dynamic>[]; }),
-      ApiService.fetchHighlights(authToken: token).catchError((e) { debugPrint('Error fetching highlights: $e'); if (mounted) setState(() { _highlightsHasError = true; _lastError = 'فشل تحميل الملخصات: $e'; }); return <Highlight>[]; }),
+      ApiService.fetchHighlights(authToken: token).catchError((e) { debugPrint('Error fetching highlights: $e'); if (mounted) setState(() { _highlightsHasError = true; _lastError = 'فشل تحميل الملخصات: $e'; }); return <dynamic>[]; }),
       ApiService.fetchCategories(authToken: token).catchError((e) { debugPrint('Error fetching categories: $e'); if (mounted) setState(() { _categoriesHasError = true; _lastError = 'فشل تحميل التصنيفات: $e'; }); return <dynamic>[]; }),
     ];
 
@@ -196,8 +208,8 @@ mixin HomePageDataMixin on State<HomePage> {
     }
 
     try {
-      debugPrint('Processing data on Main Thread...');
-      final processedData = await processFetchedData(fetchedResults);
+      debugPrint('Processing data on Isolate...');
+      final processedData = await compute(processFetchedData, fetchedResults);
       if (mounted) {
         setState(() {
           channels = processedData['channels'] ?? [];
@@ -210,6 +222,7 @@ mixin HomePageDataMixin on State<HomePage> {
           if (kIsWeb) removeWebSplash();
         });
         _saveSectionsToCache(processedData);
+        AutoSchedulerService.autoScheduleFavoriteMatches(processedData['matches'] ?? []);
       }
     } catch (e) {
       debugPrint('Error processing data: $e');
@@ -254,34 +267,39 @@ mixin HomePageDataMixin on State<HomePage> {
               ApiService.fetchChannels(authToken: token),
               ApiService.fetchCategories(authToken: token),
             ]);
-            final processedChannels = await processRefreshedChannelsData(results);
+            final processedChannels = await compute(processRefreshedChannelsData, results);
             if (mounted) { setState(() { channels = processedChannels; _filterChannels(_searchController.text); _channelsHasError = false; }); }
           } catch (e) { if (mounted) { setState(() { _channelsHasError = true; channels = []; _filterChannels(''); }); } }
           break;
         case 1:
           try {
             final fetchedNews = await ApiService.fetchNews();
-            final processedNews = await processRefreshedNewsData(fetchedNews);
+            final processedNews = await compute(processRefreshedNewsData, fetchedNews);
             if (mounted) { setState(() { news = processedNews; _newsHasError = false; }); }
           } catch (e) { if (mounted) { setState(() { _newsHasError = true; news = []; }); } }
           break;
         case 2:
           try {
             final fetchedGoals = await ApiService.fetchGoals();
-            final processedGoals = await processRefreshedGoalsData(fetchedGoals);
+            final processedGoals = await compute(processRefreshedGoalsData, fetchedGoals);
             if (mounted) { setState(() { goals = processedGoals; _goalsHasError = false; }); }
           } catch (e) { if (mounted) { setState(() { _goalsHasError = true; goals = []; }); } }
           break;
         case 3:
           try {
             final fetchedMatches = await ApiService.fetchMatches();
-            if (mounted) { setState(() { matches = fetchedMatches; _matchesHasError = false; }); }
+            final parsedMatches = await compute(parseMatches, fetchedMatches);
+            if (mounted) {
+              setState(() { matches = parsedMatches; _matchesHasError = false; });
+              AutoSchedulerService.autoScheduleFavoriteMatches(parsedMatches);
+            }
           } catch (e) { if (mounted) { setState(() { _matchesHasError = true; matches = []; }); } }
           break;
         case 4:
           try {
             final fetchedHighlights = await ApiService.fetchHighlights();
-            if (mounted) { setState(() { highlights = fetchedHighlights; _highlightsHasError = false; }); }
+            final parsedHighlights = await compute(parseHighlights, fetchedHighlights);
+            if (mounted) { setState(() { highlights = parsedHighlights; _highlightsHasError = false; }); }
           } catch (e) { if (mounted) { setState(() { _highlightsHasError = true; highlights = []; }); } }
           break;
       }
@@ -319,6 +337,7 @@ mixin HomePageDataMixin on State<HomePage> {
 
   Future<void> _initNotifications() async {
     if (kIsWeb || defaultTargetPlatform == TargetPlatform.windows) return;
+    await requestNotificationPermission();
     final firebaseApi = FirebaseApi();
     _fcmToken = await firebaseApi.initNotification();
     if (_userName != null && _userName!.isNotEmpty) {
@@ -329,6 +348,11 @@ mixin HomePageDataMixin on State<HomePage> {
   Future<void> requestNotificationPermission() async {
     var status = await Permission.notification.status;
     if (!status.isGranted) { await Permission.notification.request(); }
+    
+    var alarmStatus = await Permission.scheduleExactAlarm.status;
+    if (!alarmStatus.isGranted) {
+      await Permission.scheduleExactAlarm.request();
+    }
   }
 
   void _sendDeviceInfoToServer({required String name, required String? token}) {
@@ -766,27 +790,8 @@ mixin HomePageDataMixin on State<HomePage> {
         final List<dynamic> rawNews = cacheMap['news'] ?? [];
         final List<dynamic> rawGoals = cacheMap['goals'] ?? [];
         
-        final List<Match> cachedMatches = [];
-        if (cacheMap['matches'] is List) {
-          for (var item in cacheMap['matches']) {
-            try {
-              cachedMatches.add(Match.fromJson(Map<String, dynamic>.from(item)));
-            } catch (e) {
-              debugPrint("Match cache parse error: $e");
-            }
-          }
-        }
-
-        final List<Highlight> cachedHighlights = [];
-        if (cacheMap['highlights'] is List) {
-          for (var item in cacheMap['highlights']) {
-            try {
-              cachedHighlights.add(Highlight.fromJson(Map<String, dynamic>.from(item)));
-            } catch (e) {
-              debugPrint("Highlight cache parse error: $e");
-            }
-          }
-        }
+        final List<Match> cachedMatches = await compute(parseMatches, cacheMap['matches'] as List<dynamic>? ?? []);
+        final List<Highlight> cachedHighlights = await compute(parseHighlights, cacheMap['highlights'] as List<dynamic>? ?? []);
 
         if (mounted) {
           setState(() {
@@ -801,6 +806,7 @@ mixin HomePageDataMixin on State<HomePage> {
             }
           });
           debugPrint("Loaded home sections from cache. Total channels: ${channels.length}");
+          AutoSchedulerService.autoScheduleFavoriteMatches(cachedMatches);
         }
       }
     } catch (e) {

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:hesen/models/highlight_model.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/foundation.dart';
 import 'package:hesen/utils/image_proxy.dart';
 
 class HighlightsSection extends StatelessWidget {
-  final Future<List<Highlight>> highlights;
+  final List<Highlight> highlights;
   final Function(BuildContext, String, List<Map<String, dynamic>>, String,
       {int? contentId, bool isPremium}) openVideo;
 
@@ -14,110 +13,69 @@ class HighlightsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<Highlight>>(
-      future: highlights,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        } else if (snapshot.hasError) {
-          return CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error_outline,
-                          size: 50, color: Colors.red[400]),
-                      const SizedBox(height: 16),
-                      Text('حدث خطأ أثناء الاتصال',
-                          style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context)
-                                      .textTheme
-                                      .bodyLarge
-                                      ?.color ??
-                                  Colors.white)),
-                      const SizedBox(height: 8),
-                      Text('يرجى المحاولة مرة أخرى لاحقاً',
-                          style:
-                              TextStyle(fontSize: 14, color: Colors.grey[500])),
-                    ],
-                  ),
-                ),
+    if (highlights.isEmpty) {
+      return CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.video_library_outlined,
+                      size: 60, color: Colors.grey[600]),
+                  const SizedBox(height: 16),
+                  Text('لا توجد ملخصات حالياً',
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context)
+                                  .textTheme
+                                  .bodyLarge
+                                  ?.color ??
+                              Colors.white)),
+                  const SizedBox(height: 8),
+                  Text('يرجى التحقق لاحقاً',
+                      style:
+                          TextStyle(fontSize: 14, color: Colors.grey[500])),
+                ],
               ),
-            ],
-          );
-        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.video_library_outlined,
-                          size: 60, color: Colors.grey[600]),
-                      const SizedBox(height: 16),
-                      Text('لا توجد ملخصات حالياً',
-                          style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context)
-                                      .textTheme
-                                      .bodyLarge
-                                      ?.color ??
-                                  Colors.white)),
-                      const SizedBox(height: 8),
-                      Text('يرجى التحقق لاحقاً',
-                          style:
-                              TextStyle(fontSize: 14, color: Colors.grey[500])),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          );
-        } else {
-          final items = snapshot.data!;
-          final bool isWindows =
-              defaultTargetPlatform == TargetPlatform.windows && !kIsWeb;
+            ),
+          ),
+        ],
+      );
+    }
 
-          if (isWindows) {
-            return GridView.builder(
-              padding: const EdgeInsets.all(16.0),
-              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent:
-                    600, // Responsive columns for 3nd column layout
-                childAspectRatio: 1.4,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-              ),
-              itemCount: items.length,
-              itemBuilder: (context, index) {
-                return HighlightBox(
-                  highlight: items[index],
-                  openVideo: openVideo,
-                );
-              },
-            );
-          }
+    final bool isWideScreen = MediaQuery.of(context).size.width > 600;
 
-          return ListView.builder(
-            shrinkWrap: true,
-            physics: const AlwaysScrollableScrollPhysics(),
-            itemCount: items.length,
-            itemBuilder: (context, index) {
-              return HighlightBox(
-                  highlight: items[index], openVideo: openVideo);
-            },
+    if (isWideScreen) {
+      return GridView.builder(
+        padding: const EdgeInsets.all(16.0),
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent:
+              600, // Responsive columns for 3nd column layout
+          mainAxisExtent: 320,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+        ),
+        itemCount: highlights.length,
+        itemBuilder: (context, index) {
+          return HighlightBox(
+            highlight: highlights[index],
+            openVideo: openVideo,
           );
-        }
+        },
+      );
+    }
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const AlwaysScrollableScrollPhysics(),
+      itemCount: highlights.length,
+      itemBuilder: (context, index) {
+        return HighlightBox(
+            highlight: highlights[index], openVideo: openVideo);
       },
     );
   }
@@ -157,8 +115,7 @@ class _HighlightBoxState extends State<HighlightBox> {
         .map((s) => {'name': s.name, 'url': s.url})
         .toList();
 
-    final bool isDesktop =
-        defaultTargetPlatform == TargetPlatform.windows && !kIsWeb;
+    final bool isWideScreen = MediaQuery.of(context).size.width > 600;
     void handleTap() {
       String firstUrl = streams.isNotEmpty
           ? streams[0]['url'] ?? ''
@@ -173,7 +130,7 @@ class _HighlightBoxState extends State<HighlightBox> {
       );
     }
 
-    if (!isDesktop) {
+    if (!isWideScreen) {
       // --- MOBILE LAYOUT (Safe for ListView) ---
       return GestureDetector(
         onTap: handleTap,
@@ -306,20 +263,20 @@ class _HighlightBoxState extends State<HighlightBox> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
-          transform: (isDesktop && _isHovered)
+          transform: (isWideScreen && _isHovered)
               ? Matrix4.diagonal3Values(1.02, 1.02, 1.0)
               : Matrix4.identity(),
           child: Card(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(25.0),
-              side: (isDesktop && _isHovered)
+              side: (isWideScreen && _isHovered)
                   ? const BorderSide(color: Color(0xFF673ab7), width: 2)
                   : BorderSide.none,
             ),
             clipBehavior: Clip.antiAlias,
-            elevation: (isDesktop && _isHovered) ? 8 : 4,
+            elevation: (isWideScreen && _isHovered) ? 8 : 4,
             shadowColor:
-                (isDesktop && _isHovered) ? const Color(0xFF673ab7) : null,
+                (isWideScreen && _isHovered) ? const Color(0xFF673ab7) : null,
             margin: const EdgeInsets.all(8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -328,7 +285,7 @@ class _HighlightBoxState extends State<HighlightBox> {
                   child: CachedNetworkImage(
                     imageUrl: ImageProxy.resolveUrl(imageUrl),
                     placeholder: (context, url) =>
-                        const Center(child: const CircularProgressIndicator()),
+                        const Center(child: CircularProgressIndicator()),
                     errorWidget: (context, url, error) => _buildPlaceholder(),
                     width: double.infinity,
                     fit: BoxFit.cover,

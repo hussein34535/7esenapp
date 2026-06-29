@@ -135,29 +135,14 @@ class _AppIntroScreenState extends State<AppIntroScreen>
           color: const Color(0xFF0A0A14),
           child: Stack(
             children: [
-              // Particles
-              ...(_particles.map((p) => Positioned(
-                    left: p.x * MediaQuery.of(context).size.width,
-                    top: p.y * MediaQuery.of(context).size.height,
-                    child: Opacity(
-                      opacity: p.opacity,
-                      child: Container(
-                        width: p.size,
-                        height: p.size,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF7C52D8),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF7C52D8)
-                                  .withValues(alpha: 0.6),
-                              blurRadius: p.size * 3,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ))),
+              // Particles drawn efficiently via CustomPaint & RepaintBoundary
+              Positioned.fill(
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    painter: _ParticlesPainter(_particles),
+                  ),
+                ),
+              ),
 
               // Gradient overlays
               Positioned(
@@ -311,4 +296,34 @@ class _Particle {
     required this.speed,
     required this.opacity,
   });
+}
+
+class _ParticlesPainter extends CustomPainter {
+  final List<_Particle> particles;
+
+  _ParticlesPainter(this.particles);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final p in particles) {
+      final paint = Paint()
+        ..color = const Color(0xFF7C52D8).withOpacity(p.opacity)
+        ..style = PaintingStyle.fill;
+
+      final glowPaint = Paint()
+        ..color = const Color(0xFF7C52D8).withOpacity(p.opacity * 0.6)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, p.size * 3);
+
+      final center = Offset(p.x * size.width, p.y * size.height);
+      final radius = p.size / 2;
+
+      // Draw glow / shadow
+      canvas.drawCircle(center, radius, glowPaint);
+      // Draw main particle
+      canvas.drawCircle(center, radius, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ParticlesPainter oldDelegate) => true;
 }

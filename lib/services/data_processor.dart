@@ -256,3 +256,31 @@ Future<List<dynamic>> processRefreshedGoalsData(
   });
   return fetchedGoals;
 }
+
+List<Match> parseMatches(List<dynamic> list) {
+  final List<Match> parsed = [];
+  for (var item in list) {
+    try {
+      if (item != null) {
+        parsed.add(Match.fromJson(Map<String, dynamic>.from(item)));
+      }
+    } catch (e) {
+      debugPrint("Match parse error: $e");
+    }
+  }
+  return parsed;
+}
+
+List<Highlight> parseHighlights(List<dynamic> list) {
+  final List<Highlight> parsed = [];
+  for (var item in list) {
+    try {
+      if (item != null) {
+        parsed.add(Highlight.fromJson(Map<String, dynamic>.from(item)));
+      }
+    } catch (e) {
+      debugPrint("Highlight parse error: $e");
+    }
+  }
+  return parsed;
+}

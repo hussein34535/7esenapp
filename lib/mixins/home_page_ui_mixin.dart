@@ -289,6 +289,17 @@ mixin HomePageUIMixin on HomePageDataMixin {
 
   @override
   Widget build(BuildContext context) {
+    if (_cachedSections == null || !_isTabSwitching) {
+      _cachedSections = [
+        _buildSectionContent(0),
+        _buildSectionContent(1),
+        _buildSectionContent(2),
+        _buildSectionContent(3),
+        _buildSectionContent(4),
+      ];
+    }
+    _isTabSwitching = false;
+
     if (kIsWeb && _isLoading) {
       return const Scaffold(
           backgroundColor: Colors.black,
@@ -867,13 +878,7 @@ mixin HomePageUIMixin on HomePageDataMixin {
                       padding: const EdgeInsets.only(top: 10.0),
                       child: IndexedStack(
                         index: _selectedIndex,
-                        children: [
-                          _buildSectionContent(0),
-                          _buildSectionContent(1),
-                          _buildSectionContent(2),
-                          _buildSectionContent(3),
-                          _buildSectionContent(4),
-                        ],
+                        children: _cachedSections!,
                       ),
                     ),
                   );
@@ -884,7 +889,8 @@ mixin HomePageUIMixin on HomePageDataMixin {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         color: _isDarkMode ? Colors.black : const Color(0xFF7C52D8),
         buttonBackgroundColor: Theme.of(context).cardColor,
-        animationDuration: const Duration(milliseconds: 300),
+        animationDuration: const Duration(milliseconds: 180),
+        animationCurve: Curves.decelerate,
         items: [
           _buildNavItem(0, Icons.tv, 'قنوات'),
           _buildNavItem(1, 'assets/replay.png', 'أخبار'),
@@ -895,6 +901,7 @@ mixin HomePageUIMixin on HomePageDataMixin {
         index: _selectedIndex,
         onTap: (index) {
           if (!mounted) return;
+          _isTabSwitching = true;
           setState(() {
             _selectedIndex = index;
           });
@@ -918,42 +925,40 @@ mixin HomePageUIMixin on HomePageDataMixin {
     Widget iconWidget;
     if (iconDataOrPath is IconData) {
       iconWidget =
-          Icon(iconDataOrPath, size: isSelected ? 30 : 28, color: itemColor);
+          Icon(iconDataOrPath, size: isSelected ? 28 : 26, color: itemColor);
     } else {
       iconWidget = Image.asset(
         iconDataOrPath as String,
-        width: isSelected ? 30 : 28,
-        height: isSelected ? 30 : 28,
+        width: isSelected ? 28 : 26,
+        height: isSelected ? 28 : 26,
         color: itemColor,
       );
     }
 
-    final Widget content = Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        iconWidget,
-        if (isSelected) const SizedBox(height: 12),
-        if (isSelected)
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
+    return SizedBox(
+      height: 46,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          iconWidget,
+          const SizedBox(height: 2),
+          AnimatedOpacity(
+            opacity: isSelected ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 150),
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-      ],
-    );
-
-    if (isSelected) {
-      return Transform.translate(
-        offset: const Offset(0, 13),
-        child: content,
-      );
-    }
-    return Transform.translate(
-      offset: const Offset(0, -1),
-      child: content,
+        ],
+      ),
     );
   }
 
@@ -1062,14 +1067,14 @@ mixin HomePageUIMixin on HomePageDataMixin {
               'فشل تحميل الأخبار. الرجاء المحاولة مرة أخرى.', _retryNews);
         }
         return NewsSection(
-            newsArticles: Future.value(news), openVideo: openVideo);
+            newsArticles: news, openVideo: openVideo);
       case 2:
         if (_goalsHasError) {
           return _buildSectionErrorWidget(
               'فشل تحميل الأهداف. الرجاء المحاولة مرة أخرى.', _retryGoals);
         }
         return GoalsSection(
-            goalsArticles: Future.value(goals),
+            goalsArticles: goals,
             openVideo: openVideo,
             userName: _userName);
       case 3:
@@ -1078,7 +1083,7 @@ mixin HomePageUIMixin on HomePageDataMixin {
               'فشل تحميل المباريات. الرجاء المحاولة مرة أخرى.', _retryMatches);
         }
         return MatchesSection(
-            matches: Future.value(matches), openVideo: openVideo);
+            matches: matches, openVideo: openVideo);
       case 4:
         if (_highlightsHasError) {
           return _buildSectionErrorWidget(
@@ -1086,7 +1091,7 @@ mixin HomePageUIMixin on HomePageDataMixin {
               _retryHighlights);
         }
         return HighlightsSection(
-            highlights: Future.value(highlights), openVideo: openVideo);
+            highlights: highlights, openVideo: openVideo);
       default:
         return const Center(child: Text('قسم غير معروف'));
     }
@@ -1097,21 +1102,20 @@ mixin HomePageUIMixin on HomePageDataMixin {
   }
 
   Widget _buildShimmerPlaceholder() {
-    final bool isWindows =
-        defaultTargetPlatform == TargetPlatform.windows && !kIsWeb;
+    final bool isWideScreen = MediaQuery.of(context).size.width > 600;
 
     // Grid of Category Boxes
     if (_selectedIndex == 0) {
       return Center(
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isWindows ? 1500 : 900),
+          constraints: BoxConstraints(maxWidth: isWideScreen ? 1500 : 900),
           child: GridView.builder(
             physics: const NeverScrollableScrollPhysics(),
             padding: EdgeInsets.symmetric(
-              horizontal: isWindows ? 30 : 16,
+              horizontal: isWideScreen ? 24 : 16,
               vertical: 20,
             ),
-            gridDelegate: isWindows
+            gridDelegate: isWideScreen
                 ? const SliverGridDelegateWithMaxCrossAxisExtent(
                     maxCrossAxisExtent: 500,
                     mainAxisExtent: 160,

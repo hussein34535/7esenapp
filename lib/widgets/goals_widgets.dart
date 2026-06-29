@@ -9,8 +9,8 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:hesen/utils/image_proxy.dart';
 
-class GoalsSection extends StatefulWidget {
-  final Future<List<dynamic>> goalsArticles;
+class GoalsSection extends StatelessWidget {
+  final List<dynamic> goalsArticles;
   final String? userName;
   final Function(BuildContext, String, List<Map<String, dynamic>>, String,
       {int? contentId, bool isPremium}) openVideo;
@@ -23,122 +23,73 @@ class GoalsSection extends StatefulWidget {
   });
 
   @override
-  State<GoalsSection> createState() => _GoalsSectionState();
-}
-
-class _GoalsSectionState extends State<GoalsSection> {
-  @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<dynamic>>(
-      future: widget.goalsArticles,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        } else if (snapshot.hasError) {
-          return CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error_outline,
-                          size: 50, color: Colors.red[400]),
-                      const SizedBox(height: 16),
-                      Text('حدث خطأ أثناء الاتصال',
-                          style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context)
-                                      .textTheme
-                                      .bodyLarge
-                                      ?.color ??
-                                  Colors.white)),
-                      const SizedBox(height: 8),
-                      Text('يرجى المحاولة مرة أخرى لاحقاً',
-                          style:
-                              TextStyle(fontSize: 14, color: Colors.grey[500])),
-                    ],
-                  ),
-                ),
+    if (goalsArticles.isEmpty) {
+      // Use CustomScrollView + SliverFillRemaining for centering + scrollability
+      return CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.sports_soccer_outlined,
+                      size: 60, color: Colors.grey[600]),
+                  const SizedBox(height: 16),
+                  Text('لا توجد أهداف حالياً',
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context)
+                                  .textTheme
+                                  .bodyLarge
+                                  ?.color ??
+                              Colors.white)),
+                  const SizedBox(height: 8),
+                  Text('يرجى التحقق لاحقاً',
+                      style:
+                          TextStyle(fontSize: 14, color: Colors.grey[500])),
+                ],
               ),
-            ],
-          );
-        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          // Use CustomScrollView + SliverFillRemaining for centering + scrollability
-          return CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.sports_soccer_outlined,
-                          size: 60, color: Colors.grey[600]),
-                      const SizedBox(height: 16),
-                      Text('لا توجد أهداف حالياً',
-                          style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context)
-                                      .textTheme
-                                      .bodyLarge
-                                      ?.color ??
-                                  Colors.white)),
-                      const SizedBox(height: 8),
-                      Text('يرجى التحقق لاحقاً',
-                          style:
-                              TextStyle(fontSize: 14, color: Colors.grey[500])),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          );
-        }
-
-        final goals = snapshot.data!;
-
-        // Detect Windows platform
-        final bool isWindows =
-            defaultTargetPlatform == TargetPlatform.windows && !kIsWeb;
-
-        if (isWindows) {
-          return GridView.builder(
-            padding: const EdgeInsets.all(16.0),
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 600, // Responsive 3-column layout
-              childAspectRatio:
-                  1.2, // Final balance: no 'grey space' and no overflows
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
             ),
-            itemCount: goals.length,
-            itemBuilder: (context, index) {
-              return GoalBox(
-                goal: goals[index],
-                openVideo: widget.openVideo,
-                loadThumbnail: true, // Loads when scrolled into view
-              );
-            },
-          );
-        }
+          ),
+        ],
+      );
+    }
 
-        return ListView.builder(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16.0),
-          itemCount: goals.length,
-          itemBuilder: (context, index) {
-            return GoalBox(
-              goal: goals[index],
-              openVideo: widget.openVideo,
-              loadThumbnail: true, // Loads when scrolled into view
-            );
-          },
+    final bool isWideScreen = MediaQuery.of(context).size.width > 600;
+
+    if (isWideScreen) {
+      return GridView.builder(
+        padding: const EdgeInsets.all(16.0),
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 600, // Responsive 3-column layout
+          mainAxisExtent: 340,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+        ),
+        itemCount: goalsArticles.length,
+        itemBuilder: (context, index) {
+          return GoalBox(
+            goal: goalsArticles[index],
+            openVideo: openVideo,
+            loadThumbnail: true, // Loads when scrolled into view
+          );
+        },
+      );
+    }
+
+    return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(16.0),
+      itemCount: goalsArticles.length,
+      itemBuilder: (context, index) {
+        return GoalBox(
+          goal: goalsArticles[index],
+          openVideo: openVideo,
+          loadThumbnail: true, // Loads when scrolled into view
         );
       },
     );
@@ -378,8 +329,8 @@ class _GoalBoxState extends State<GoalBox> {
     }
 
     return MouseRegion(
-      onEnter: (_) => isDesktop ? setState(() => _isHovered = true) : null,
-      onExit: (_) => isDesktop ? setState(() => _isHovered = false) : null,
+      onEnter: (_) { if (isDesktop && !_isHovered) setState(() => _isHovered = true); },
+      onExit: (_) { if (isDesktop && _isHovered) setState(() => _isHovered = false); },
       child: GestureDetector(
         // Only allow tap when NOT playing (Issue 5)
         onTap: _isPlayingInline ? null : handleTap,

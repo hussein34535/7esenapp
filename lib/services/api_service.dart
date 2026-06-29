@@ -1,7 +1,5 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:hesen/models/match_model.dart';
-import 'package:hesen/models/highlight_model.dart';
 import 'package:flutter/foundation.dart';
 
 // Conditional import: on web, use dart:html's HttpRequest (text-based, no ArrayBuffer crash)
@@ -29,7 +27,11 @@ class ApiService {
         headers: {'content-type': 'application/json; charset=utf-8'},
       );
     }
-    return http.get(Uri.parse(url), headers: headers);
+    final mergedHeaders = <String, String>{
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      ...?headers,
+    };
+    return http.get(Uri.parse(url), headers: mergedHeaders);
   }
 
   /// Web-safe POST request. Uses dart:html on web, package:http on native.
@@ -43,11 +45,15 @@ class ApiService {
         headers: {'content-type': 'application/json; charset=utf-8'},
       );
     }
-    return http.post(Uri.parse(url), headers: headers, body: body);
+    final mergedHeaders = <String, String>{
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      ...?headers,
+    };
+    return http.post(Uri.parse(url), headers: mergedHeaders, body: body);
   }
 
   /// Fetches all highlights.
-  static Future<List<Highlight>> fetchHighlights({String? authToken}) async {
+  static Future<List<dynamic>> fetchHighlights({String? authToken}) async {
     final url = '$baseUrl/highlights';
     try {
       final response = await _safeGet(
@@ -59,8 +65,7 @@ class ApiService {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true) {
-          final List highlightsJson = data['data'] ?? [];
-          return highlightsJson.map((h) => Highlight.fromJson(h)).toList();
+          return data['data'] ?? [];
         }
         throw Exception('API returned success=false');
       } else {
@@ -133,7 +138,7 @@ class ApiService {
   }
 
   /// Fetches all matches.
-  static Future<List<Match>> fetchMatches({String? authToken}) async {
+  static Future<List<dynamic>> fetchMatches({String? authToken}) async {
     final url = '$baseUrl/matches';
     try {
       final response = await _safeGet(
@@ -145,8 +150,7 @@ class ApiService {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true) {
-          final List matchesJson = data['data'] ?? [];
-          return matchesJson.map((match) => Match.fromJson(match)).toList();
+          return data['data'] ?? [];
         }
         throw Exception('API returned success=false');
       } else {

@@ -2,15 +2,30 @@ import 'package:flutter/material.dart';
 import 'package:hesen/models/match_model.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter/foundation.dart';
 import 'package:hesen/utils/image_proxy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hesen/services/notification_service.dart';
 import 'package:hesen/widgets/in_app_notification.dart';
+import 'package:hesen/services/favorite_teams_service.dart';
+DateTime parseMatchTimeToLocal(String matchTime) {
+  final matchDateTime = DateFormat('HH:mm').parse(matchTime);
+  final now = DateTime.now();
+  var matchDateTimeWithToday = DateTime(
+    now.year, now.month, now.day,
+    matchDateTime.hour, matchDateTime.minute,
+  );
+  
+  // معالجة المباريات التي تتخطى منتصف الليل
+  if (matchDateTimeWithToday.isBefore(now) &&
+      now.difference(matchDateTimeWithToday) > const Duration(minutes: 180)) {
+    matchDateTimeWithToday = matchDateTimeWithToday.add(const Duration(days: 1));
+  }
+  return matchDateTimeWithToday;
+}
 
 
 class MatchesSection extends StatelessWidget {
-  final Future<List<Match>> matches;
+  final List<Match> matches;
   final Function(BuildContext, String, List<Map<String, dynamic>>, String,
       {int? contentId, bool isPremium}) openVideo;
 
@@ -19,127 +34,90 @@ class MatchesSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<Match>>(
-      // Start FutureBuilder
-      future: matches,
-      builder: (context, snapshot) {
-        // Start builder method
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
-        } else if (snapshot.hasError) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error_outline, size: 50, color: Colors.red[400]),
-                const SizedBox(height: 16),
-                Text('حدث خطأ أثناء الاتصال',
-                    style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).textTheme.bodyLarge?.color ??
-                            Colors.white)),
-                const SizedBox(height: 8),
-                Text('يرجى المحاولة مرة أخرى لاحقاً',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[500])),
-              ],
-            ),
+    if (matches.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.sports_soccer_outlined,
+                size: 60, color: Colors.grey[600]),
+            const SizedBox(height: 16),
+            Text('لا توجد مباريات حالياً',
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).textTheme.bodyLarge?.color ??
+                        Colors.white)),
+            const SizedBox(height: 8),
+            Text('يرجى التحقق لاحقاً',
+                style: TextStyle(fontSize: 14, color: Colors.grey[500])),
+          ],
+        ),
+      );
+    }
+
+    List<Match> liveMatches = [];
+    List<Match> finishedMatches = [];
+    List<Match> upcomingMatches = [];
+
+    final now = DateTime.now();
+    for (var match in matches) {
+      final matchDateTimeWithToday = parseMatchTimeToLocal(match.matchTime);
+
+      if (matchDateTimeWithToday.isBefore(now) &&
+          now.isBefore(
+              matchDateTimeWithToday.add(const Duration(minutes: 110)))) {
+        liveMatches.add(match);
+      } else if (matchDateTimeWithToday.isAfter(now)) {
+        upcomingMatches.add(match);
+      } else {
+        finishedMatches.add(match);
+      }
+    }
+
+    upcomingMatches.sort((a, b) {
+      final matchTimeA = parseMatchTimeToLocal(a.matchTime);
+      final matchTimeB = parseMatchTimeToLocal(b.matchTime);
+      return matchTimeA.compareTo(matchTimeB);
+    });
+
+    final allMatches = [
+      ...liveMatches,
+      ...upcomingMatches,
+      ...finishedMatches
+    ];
+
+    final bool isWideScreen = MediaQuery.of(context).size.width > 600;
+
+    if (isWideScreen) {
+      return GridView.builder(
+        padding: const EdgeInsets.all(16.0),
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 600, // Responsive 3-column layout
+          mainAxisExtent: 220,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+        ),
+        itemCount: allMatches.length,
+        itemBuilder: (context, index) {
+          return MatchBox(
+            match: allMatches[index],
+            openVideo: openVideo,
           );
-        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.sports_soccer_outlined,
-                    size: 60, color: Colors.grey[600]),
-                const SizedBox(height: 16),
-                Text('لا توجد مباريات حالياً',
-                    style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).textTheme.bodyLarge?.color ??
-                            Colors.white)),
-                const SizedBox(height: 8),
-                Text('يرجى التحقق لاحقاً',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[500])),
-              ],
-            ),
-          );
-        } else {
-          final matches = snapshot.data!;
+        },
+      );
+    }
 
-          List<Match> liveMatches = [];
-          List<Match> finishedMatches = [];
-          List<Match> upcomingMatches = [];
-
-          for (var match in matches) {
-            final matchDateTime = DateFormat('HH:mm').parse(match.matchTime);
-            final now = DateTime.now();
-            var matchDateTimeWithToday = DateTime(now.year, now.month,
-                now.day, matchDateTime.hour, matchDateTime.minute);
-
-            // Handle midnight-crossing matches (e.g., 01:00 AM displayed at 10 PM)
-            if (matchDateTimeWithToday.isBefore(now) &&
-                now.difference(matchDateTimeWithToday) >
-                    const Duration(minutes: 180)) {
-              matchDateTimeWithToday = matchDateTimeWithToday
-                  .add(const Duration(days: 1));
-            }
-
-            if (matchDateTimeWithToday.isBefore(now) &&
-                now.isBefore(
-                    matchDateTimeWithToday.add(const Duration(minutes: 110)))) {
-              liveMatches.add(match);
-            } else if (matchDateTimeWithToday.isAfter(now)) {
-              upcomingMatches.add(match);
-            } else {
-              finishedMatches.add(match);
-            }
-          }
-
-          upcomingMatches.sort((a, b) {
-            final matchTimeA = DateFormat('HH:mm').parse(a.matchTime);
-            final matchTimeB = DateFormat('HH:mm').parse(b.matchTime);
-            return matchTimeA.compareTo(matchTimeB);
-          });
-
-          final allMatches = [
-            ...liveMatches,
-            ...upcomingMatches,
-            ...finishedMatches
-          ];
-
-          // Detect Windows platform
-          final bool isWindows =
-              defaultTargetPlatform == TargetPlatform.windows && !kIsWeb;
-
-          if (isWindows) {
-            return GridView.builder(
-              padding: const EdgeInsets.all(16.0),
-              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent: 600, // Responsive 3-column layout
-                childAspectRatio: 2.2, // Reverted to elegant/compact look
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-              ),
-              itemCount: allMatches.length,
-              itemBuilder: (context, index) {
-                return MatchBox(
-                  match: allMatches[index],
-                  openVideo: openVideo,
-                );
-              },
-            );
-          }
-
-          return ListView(
-            children: allMatches
-                .map((match) => MatchBox(match: match, openVideo: openVideo))
-                .toList(),
-          );
-        }
-      }, // End builder method
-    ); // End FutureBuilder
+    return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
+      itemCount: allMatches.length,
+      itemBuilder: (context, index) {
+        return MatchBox(
+          match: allMatches[index],
+          openVideo: openVideo,
+        );
+      },
+    );
   }
 }
 
@@ -161,6 +139,10 @@ class MatchBox extends StatefulWidget {
 class _MatchBoxState extends State<MatchBox> {
   bool _isHovered = false;
   bool _hasReminder = false;
+  bool _isTeamAFavorite = false;
+  bool _isTeamBFavorite = false;
+  int _teamAScore = 0;
+  int _teamBScore = 0;
 
   @override
   void initState() {
@@ -170,11 +152,33 @@ class _MatchBoxState extends State<MatchBox> {
 
   Future<void> _checkReminderStatus() async {
     final prefs = await SharedPreferences.getInstance();
+    final teamA = widget.match.teamA.trim();
+    final teamB = widget.match.teamB.trim();
+    final aScore = prefs.getInt('team_score_$teamA') ?? 0;
+    final bScore = prefs.getInt('team_score_$teamB') ?? 0;
+    final favorites = prefs.getStringList('smart_favorite_teams') ?? [];
+
     if (mounted) {
       setState(() {
         _hasReminder = prefs.getBool('reminder_${widget.match.id}') ?? false;
+        _teamAScore = aScore;
+        _teamBScore = bScore;
+        _isTeamAFavorite = favorites.contains(teamA);
+        _isTeamBFavorite = favorites.contains(teamB);
       });
     }
+  }
+
+  Widget _buildTeamBadge(int score, bool isFavorite) {
+    if (score <= 0 || !isFavorite) return const SizedBox.shrink();
+    return const Tooltip(
+      message: 'فريق متابع تلقائياً',
+      child: Icon(
+        Icons.star_rounded,
+        color: Colors.amber,
+        size: 14,
+      ),
+    );
   }
 
   Future<void> _toggleReminder(DateTime matchTime) async {
@@ -182,10 +186,16 @@ class _MatchBoxState extends State<MatchBox> {
     if (_hasReminder) {
       await NotificationService.cancelReminder(widget.match.id);
       await prefs.setBool('reminder_${widget.match.id}', false);
+      
+      // تقليل نقاط الفرق المفضلة عند إلغاء الإشعار
+      await FavoriteTeamsService.decrementTeamScore(widget.match.teamA);
+      await FavoriteTeamsService.decrementTeamScore(widget.match.teamB);
+
       if (mounted) {
         setState(() {
           _hasReminder = false;
         });
+        _checkReminderStatus(); // تحديث حالة الفرق المفضلة فوراً
         InAppNotification.show(
           context: context,
           message: 'تم إلغاء التنبيه للمباراة',
@@ -194,35 +204,54 @@ class _MatchBoxState extends State<MatchBox> {
         );
       }
     } else {
-      final reminderTime = matchTime.subtract(const Duration(minutes: 5));
-      if (reminderTime.isBefore(DateTime.now())) {
+      // التحقق مما إذا كانت المباراة قد بدأت بالفعل
+      if (matchTime.isBefore(DateTime.now())) {
         if (mounted) {
           InAppNotification.show(
             context: context,
-            message: 'المباراة ستبدأ قريباً جداً أو بدأت بالفعل!',
+            message: 'المباراة بدأت بالفعل!',
             type: NotificationType.info,
-            icon: Icons.info_outline_rounded,
+            icon: Icons.timer_off_rounded,
           );
         }
         return;
       }
 
+      DateTime reminderTime = matchTime.subtract(const Duration(minutes: 1));
+      bool isImmediate = false;
+      
+      // إذا كان وقت التنبيه (قبل المباراة بدقيقة) قد مر بالفعل، نجدول التنبيه ليبدأ بعد 5 ثوانٍ فوراً
+      if (reminderTime.isBefore(DateTime.now())) {
+        reminderTime = DateTime.now().add(const Duration(seconds: 5));
+        isImmediate = true;
+      }
+
       final success = await NotificationService.scheduleMatchReminder(
         id: widget.match.id,
         title: 'مباراة على وشك البدء ⚽',
-        body: 'مباراة ${widget.match.teamA} ضد ${widget.match.teamB} ستبدأ بعد 5 دقائق، استعد للمشاهدة!',
+        body: isImmediate 
+            ? 'مباراة ${widget.match.teamA} ضد ${widget.match.teamB} تبدأ الآن، استعد للمشاهدة!'
+            : 'مباراة ${widget.match.teamA} ضد ${widget.match.teamB} ستبدأ بعد دقيقة واحدة، استعد للمشاهدة!',
         scheduledTime: reminderTime,
       );
 
       if (success) {
         await prefs.setBool('reminder_${widget.match.id}', true);
+
+        // زيادة نقاط الفرق المفضلة عند تفعيل التنبيه
+        await FavoriteTeamsService.incrementTeamScore(widget.match.teamA);
+        await FavoriteTeamsService.incrementTeamScore(widget.match.teamB);
+
         if (mounted) {
           setState(() {
             _hasReminder = true;
           });
+          _checkReminderStatus(); // تحديث حالة الفرق المفضلة فوراً
           InAppNotification.show(
             context: context,
-            message: 'تم تفعيل التنبيه قبل المباراة بـ 5 دقائق',
+            message: isImmediate 
+                ? 'تم تفعيل التنبيه للمباراة فوراً!' 
+                : 'تم تفعيل التنبيه قبل المباراة بدقيقة واحدة',
             type: NotificationType.success,
             icon: Icons.notifications_active_rounded,
           );
@@ -259,10 +288,8 @@ class _MatchBoxState extends State<MatchBox> {
       logoB = 'https://7esentvbackend.vercel.app$logoB';
     }
 
-    DateTime now = DateTime.now();
-    final matchDateTime = DateFormat('HH:mm').parse(matchTime);
-    final matchDateTimeWithToday = DateTime(
-        now.year, now.month, now.day, matchDateTime.hour, matchDateTime.minute);
+    final now = DateTime.now();
+    final matchDateTimeWithToday = parseMatchTimeToLocal(matchTime);
 
     String timeStatus;
 
@@ -388,16 +415,28 @@ class _MatchBoxState extends State<MatchBox> {
                                 Padding(
                                   padding:
                                       const EdgeInsets.symmetric(horizontal: 4),
-                                  child: Text(
-                                    teamA,
-                                    maxLines: 1,
-                                    textAlign: TextAlign.center,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                      color: Colors.white,
-                                    ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          teamA,
+                                          maxLines: 1,
+                                          textAlign: TextAlign.center,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                      if (_teamAScore > 0) ...[
+                                        const SizedBox(width: 4),
+                                        _buildTeamBadge(_teamAScore, _isTeamAFavorite),
+                                      ],
+                                    ],
                                   ),
                                 ),
                               ],
@@ -481,16 +520,28 @@ class _MatchBoxState extends State<MatchBox> {
                                 Padding(
                                   padding:
                                       const EdgeInsets.symmetric(horizontal: 4),
-                                  child: Text(
-                                    teamB,
-                                    maxLines: 1,
-                                    textAlign: TextAlign.center,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                      color: Colors.white,
-                                    ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          teamB,
+                                          maxLines: 1,
+                                          textAlign: TextAlign.center,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                      if (_teamBScore > 0) ...[
+                                        const SizedBox(width: 4),
+                                        _buildTeamBadge(_teamBScore, _isTeamBFavorite),
+                                      ],
+                                    ],
                                   ),
                                 ),
                               ],

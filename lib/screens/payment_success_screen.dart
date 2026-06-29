@@ -22,15 +22,11 @@ class PaymentSuccessScreen extends StatefulWidget {
 }
 
 class _PaymentSuccessScreenState extends State<PaymentSuccessScreen>
-    with TickerProviderStateMixin {
+    with SingleTickerProviderStateMixin {
   late AnimationController _mainController;
-  late AnimationController _confettiController;
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
   late Animation<double> _cardSlideAnimation;
-
-  final List<ConfettiParticle> _particles = [];
-  final Random _random = Random();
 
   @override
   void initState() {
@@ -66,91 +62,14 @@ class _PaymentSuccessScreenState extends State<PaymentSuccessScreen>
       ),
     );
 
-    // Confetti physics controller
-    _confettiController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 4),
-    )..addListener(() {
-        _updateParticles();
-      });
-
     // Start animations
     _mainController.forward();
-    
-    // Delay confetti slightly for maximum impact when checkmark pops
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (mounted) {
-        _initializeConfetti();
-        _confettiController.repeat();
-      }
-    });
   }
 
   @override
   void dispose() {
     _mainController.dispose();
-    _confettiController.dispose();
     super.dispose();
-  }
-
-  void _initializeConfetti() {
-    final colors = [
-      Colors.purpleAccent,
-      Colors.blueAccent,
-      Colors.greenAccent,
-      Colors.amberAccent,
-      Colors.pinkAccent,
-      Colors.deepPurpleAccent,
-    ];
-
-    // Create 70 particles blasting outward from the center-top
-    for (int i = 0; i < 75; i++) {
-      final angle = _random.nextDouble() * pi * 2;
-      final speed = _random.nextDouble() * 8 + 3;
-      _particles.add(
-        ConfettiParticle(
-          x: _random.nextDouble() * 400 + 50, // spread across width
-          y: -20 - _random.nextDouble() * 100, // start above screen
-          vx: cos(angle) * speed * 0.5,
-          vy: _random.nextDouble() * 5 + 3, // downward speed
-          size: _random.nextDouble() * 8 + 6,
-          color: colors[_random.nextInt(colors.length)],
-          rotation: _random.nextDouble() * pi,
-          rotationSpeed: (_random.nextDouble() * 0.1 - 0.05) * 2,
-          swayOffset: _random.nextDouble() * pi * 2,
-          swaySpeed: _random.nextDouble() * 0.05 + 0.02,
-        ),
-      );
-    }
-  }
-
-  void _updateParticles() {
-    setState(() {
-      for (final p in _particles) {
-        // Gravity
-        p.vy += 0.08;
-        // Friction
-        p.vx *= 0.99;
-        
-        // Position update
-        p.x += p.vx;
-        p.y += p.vy;
-        
-        // Sway / wind simulation
-        p.x += sin(p.y * 0.02 + p.swayOffset) * 0.6;
-        
-        // Rotation
-        p.rotation += p.rotationSpeed;
-
-        // Reset particle if it goes below screen (to keep some falling action)
-        if (p.y > MediaQuery.of(context).size.height + 20) {
-          p.y = -20;
-          p.x = _random.nextDouble() * MediaQuery.of(context).size.width;
-          p.vy = _random.nextDouble() * 4 + 2;
-          p.vx = _random.nextDouble() * 2 - 1;
-        }
-      }
-    });
   }
 
   @override
@@ -205,12 +124,7 @@ class _PaymentSuccessScreenState extends State<PaymentSuccessScreen>
           ),
 
           // Custom Confetti Celebration Overlay
-          IgnorePointer(
-            child: CustomPaint(
-              size: Size.infinite,
-              painter: ConfettiPainter(_particles),
-            ),
-          ),
+          const ConfettiCelebration(),
 
           // Main Content
           SafeArea(
@@ -601,4 +515,106 @@ class ConfettiPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant ConfettiPainter oldDelegate) => true;
+}
+
+// Independent Confetti Celebration Layer that runs its own loop
+class ConfettiCelebration extends StatefulWidget {
+  const ConfettiCelebration({super.key});
+
+  @override
+  State<ConfettiCelebration> createState() => _ConfettiCelebrationState();
+}
+
+class _ConfettiCelebrationState extends State<ConfettiCelebration>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _confettiController;
+  final List<ConfettiParticle> _particles = [];
+  final Random _random = Random();
+
+  @override
+  void initState() {
+    super.initState();
+    _confettiController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 4),
+    )..addListener(() {
+        _updateParticles();
+      });
+
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        _initializeConfetti();
+        _confettiController.repeat();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _confettiController.dispose();
+    super.dispose();
+  }
+
+  void _initializeConfetti() {
+    final colors = [
+      Colors.purpleAccent,
+      Colors.blueAccent,
+      Colors.greenAccent,
+      Colors.amberAccent,
+      Colors.pinkAccent,
+      Colors.deepPurpleAccent,
+    ];
+
+    for (int i = 0; i < 75; i++) {
+      final angle = _random.nextDouble() * pi * 2;
+      final speed = _random.nextDouble() * 8 + 3;
+      _particles.add(
+        ConfettiParticle(
+          x: _random.nextDouble() * 400 + 50,
+          y: -20 - _random.nextDouble() * 100,
+          vx: cos(angle) * speed * 0.5,
+          vy: _random.nextDouble() * 5 + 3,
+          size: _random.nextDouble() * 8 + 6,
+          color: colors[_random.nextInt(colors.length)],
+          rotation: _random.nextDouble() * pi,
+          rotationSpeed: (_random.nextDouble() * 0.1 - 0.05) * 2,
+          swayOffset: _random.nextDouble() * pi * 2,
+          swaySpeed: _random.nextDouble() * 0.05 + 0.02,
+        ),
+      );
+    }
+  }
+
+  void _updateParticles() {
+    if (!mounted) return;
+    setState(() {
+      for (final p in _particles) {
+        p.vy += 0.08;
+        p.vx *= 0.99;
+        p.x += p.vx;
+        p.y += p.vy;
+        p.x += sin(p.y * 0.02 + p.swayOffset) * 0.6;
+        p.rotation += p.rotationSpeed;
+
+        if (p.y > MediaQuery.of(context).size.height + 20) {
+          p.y = -20;
+          p.x = _random.nextDouble() * MediaQuery.of(context).size.width;
+          p.vy = _random.nextDouble() * 4 + 2;
+          p.vx = _random.nextDouble() * 2 - 1;
+        }
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: IgnorePointer(
+        child: CustomPaint(
+          size: Size.infinite,
+          painter: ConfettiPainter(_particles),
+        ),
+      ),
+    );
+  }
 }

@@ -1,0 +1,7 @@
+﻿name = "hesen-web"
+main = "worker.js"
+compatibility_date = "2024-09-01"
+
+[assets]
+directory = "./build/web"
+binding = "ASSETS"

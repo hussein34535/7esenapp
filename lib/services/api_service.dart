@@ -1,6 +1,8 @@
-import 'package:http/http.dart' as http;
+﻿import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 // Conditional import: on web, use dart:html's HttpRequest (text-based, no ArrayBuffer crash)
 // On native, use the stub (package:http is used directly)
@@ -9,7 +11,7 @@ import 'web_http_client_stub.dart'
     if (dart.library.html) 'web_http_client_web.dart';
 
 class ApiService {
-  // On web: use relative URL (same-origin, Nginx proxies to Vercel → NO CORS)
+  // On web: use relative URL (same-origin, Nginx proxies to Vercel â†’ NO CORS)
   // On mobile: use full Vercel URL directly
   static final String baseUrl =
       kIsWeb && !(Uri.base.toString().contains('localhost') || Uri.base.toString().contains('127.0.0.1'))
@@ -323,6 +325,7 @@ class ApiService {
     }
   }
 
+
   static Future<void> sendTelemetry(String uid) async {
     final url = '$baseUrl/telemetry';
     try {
@@ -339,14 +342,70 @@ class ApiService {
   static Future<void> registerUser(String uid, String email) async {
     final url = '$baseUrl/register';
     try {
+      // Backend (security patch) requires a Firebase ID token + deviceId.
+      String? authToken;
+      try {
+        final u = FirebaseAuth.instance.currentUser;
+        if (u != null) authToken = await u.getIdToken();
+      } catch (_) {}
+      String? deviceId;
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        deviceId = prefs.getString('device_id');
+      } catch (_) {}
       await _safePost(
         url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'uid': uid, 'email': email}),
-      ).timeout(const Duration(seconds: 5));
+        headers: {
+          'Content-Type': 'application/json',
+          if (authToken != null) 'Authorization': 'Bearer $authToken',
+        },
+        body: jsonEncode({'uid': uid, 'email': email, if (deviceId != null) 'deviceId': deviceId}),
+      ).timeout(const Duration(seconds: 8));
     } catch (e) {
       debugPrint('Register User API Error: $e');
     }
+  }
+
+  /// Requests a 24h stream ticket for ticketed playback (7esenlink
+  /// /api/stream URLs). Returns the backend response map
+  /// ({token, sessionId, esenkoBase, ...}).
+  /// Throws [Exception] carrying the backend error code on 403 responses
+  /// (ACCOUNT_BANNED / SUBSCRIPTION_REQUIRED / DEVICE_LIMIT_REACHED).
+  static Future<Map<String, dynamic>> requestStreamTicket({
+    required String authToken,
+    required String deviceId,
+    required String type,
+    required int id,
+  }) async {
+    final url = '$baseUrl/stream-ticket';
+    final response = await _safePost(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $authToken',
+      },
+      body: jsonEncode({'deviceId': deviceId, 'type': type, 'id': id}),
+    ).timeout(const Duration(seconds: 30));
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data is Map && data['success'] == true) {
+        return Map<String, dynamic>.from(data);
+      }
+      throw Exception('Failed to request stream ticket: success=false');
+    }
+
+    String errorCode =
+        'Failed to request stream ticket: ${response.statusCode}';
+    try {
+      final data = json.decode(response.body);
+      if (data is Map && data['error'] != null) {
+        errorCode = data['error'].toString();
+      }
+    } catch (_) {
+      // Ignore json parse errors and use the default message
+    }
+    throw Exception(errorCode);
   }
 
   /// Fetches current user status from the backend.

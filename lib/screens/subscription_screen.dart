@@ -5,7 +5,6 @@ import 'package:hesen/screens/login_screen.dart';
 import 'package:hesen/widgets/subscription_widgets.dart';
 import 'package:hesen/widgets/in_app_notification.dart';
 // cloud_firestore import removed (not needed, prevents Web crash)
-import 'dart:ui'; // For formatting
 
 class SubscriptionScreen extends StatefulWidget {
   const SubscriptionScreen({super.key});
@@ -25,8 +24,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchPackages();
-    _checkSubscriptionStatus();
+    // Kick off network work only after the push transition has settled,
+    // otherwise the incoming setState() lands mid-animation and stutters.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 320), () {
+        if (!mounted) return;
+        _fetchPackages();
+        _checkSubscriptionStatus();
+      });
+    });
   }
 
   Future<void> _checkSubscriptionStatus() async {
@@ -79,50 +85,45 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       ),
       body: Stack(
         children: [
-          // Background Gradient Elements
+          // Ambient background glows — plain radial gradients.
+          // (Previously BackdropFilter blur sigma 50 + blurRadius 100 shadows,
+          // which forced a full-screen blur every frame and made opening this
+          // screen visibly lag on web/iOS.)
           Positioned(
             top: -100,
             right: -100,
-            child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.purple.withValues(alpha: 0.2),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.purple.withValues(alpha: 0.2),
-                    blurRadius: 100,
-                    spreadRadius: 20,
+            child: IgnorePointer(
+              child: Container(
+                width: 320,
+                height: 320,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      Colors.purple.withValues(alpha: 0.22),
+                      Colors.purple.withValues(alpha: 0.0),
+                    ],
                   ),
-                ],
-              ),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
-                child: Container(color: Colors.transparent),
+                ),
               ),
             ),
           ),
           Positioned(
             bottom: -50,
             left: -50,
-            child: Container(
-              width: 250,
-              height: 250,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.blue.withValues(alpha: 0.15),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.blue.withValues(alpha: 0.15),
-                    blurRadius: 100,
-                    spreadRadius: 20,
+            child: IgnorePointer(
+              child: Container(
+                width: 270,
+                height: 270,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      Colors.blue.withValues(alpha: 0.16),
+                      Colors.blue.withValues(alpha: 0.0),
+                    ],
                   ),
-                ],
-              ),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
-                child: Container(color: Colors.transparent),
+                ),
               ),
             ),
           ),

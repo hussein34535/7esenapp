@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:hesen/utils/image_proxy.dart';
+import 'package:hesen/services/stream_ticket_service.dart';
 import 'package:hesen/widgets/in_app_notification.dart';
 
 /// Cache Manager مخصص لصور الكاتيجوريز - يحفظ الصور لمدة 7 أيام
@@ -91,9 +92,12 @@ class _ChannelsSectionState extends State<ChannelsSection> {
                 ),
           itemCount: widget.channelCategories.length,
           itemBuilder: (context, index) {
-            return ChannelBox(
-              category: widget.channelCategories[index],
-              openVideo: widget.openVideo,
+            // Isolated paint per row → much smoother grid scrolling on web.
+            return RepaintBoundary(
+              child: ChannelBox(
+                category: widget.channelCategories[index],
+                openVideo: widget.openVideo,
+              ),
             );
           },
         ),
@@ -289,12 +293,12 @@ class _ChannelBoxState extends State<ChannelBox> {
                                   cacheManager: CategoryImageCacheManager.instance,
                                   imageUrl: ImageProxy.resolveUrl(widget.category['image'].toString()),
                                   fit: BoxFit.fitHeight, // Allow width to scale proportionally to match aspect ratio
-                                  placeholder: (context, url) => const SizedBox(
-                                      width: 30,
-                                      height: 30,
-                                      child: Center(
-                                          child: CircularProgressIndicator(
-                                              strokeWidth: 1.5))),
+                                  memCacheHeight: 240,
+                                  filterQuality: FilterQuality.medium,
+                                  fadeInDuration:
+                                      const Duration(milliseconds: 120),
+                                  placeholder: (context, url) =>
+                                      const SizedBox.shrink(),
                                   errorWidget: (context, url, error) => Icon(
                                       iconData,
                                       color: Colors.white,
@@ -588,6 +592,67 @@ class _ChannelTileState extends State<ChannelTile> {
   bool _isHovered = false;
   bool _isPressed = false;
 
+  /// يطلب تذكرة بث (stream ticket) و يضيف tk/sid/dv على كل روابط 7esenlink
+  /// داخل [streams]. يرجع false عندما يجب منع التشغيل (حظر / اشتراك /
+  /// حد الجهاز / فشل الشبكة). الروابط الأخرى تمر بدون تغيير.
+  Future<bool> _applyStreamTicket(
+    List<Map<String, String>> streams, {
+    required String type,
+    required int? id,
+  }) async {
+    if (id == null) return true; // لا يوجد معرّف رقمي لطلب التذكرة
+
+    Map<String, dynamic> ticket;
+    try {
+      try {
+        ticket = await StreamTicketService.getTicket(type: type, id: id);
+      } on StreamTicketException catch (e) {
+        if (e.code != 'TOKEN-EXPIRED') rethrow;
+        // التوكن يتجدد كل 24 ساعة — إعادة المحاولة مرة واحدة بتذكرة جديدة
+        ticket = await StreamTicketService.getTicket(type: type, id: id);
+      }
+    } on StreamTicketException catch (e) {
+      if (!mounted) return false;
+      final message = switch (e.code) {
+        'ACCOUNT_BANNED' => 'تم حظر هذا الحساب',
+        'SUBSCRIPTION_REQUIRED' => 'هذه القناة تحتاج اشتراك فعال',
+        'DEVICE_LIMIT_REACHED' =>
+          'تم الوصول للحد الأقصى للحسابات على هذا الجهاز',
+        'NOT_LOGGED_IN' => 'يرجى تسجيل الدخول للمشاهدة',
+        _ => 'تعذر تشغيل البث، حاول مرة أخرى',
+      };
+      InAppNotification.show(
+        context: context,
+        message: message,
+        type: NotificationType.error,
+        icon: Icons.error_outline_rounded,
+      );
+      return false;
+    } catch (_) {
+      if (!mounted) return false;
+      InAppNotification.show(
+        context: context,
+        message: 'تعذر تشغيل البث، حاول مرة أخرى',
+        type: NotificationType.error,
+        icon: Icons.wifi_off_rounded,
+      );
+      return false;
+    }
+
+    final deviceId = await StreamTicketService.getDeviceId();
+    for (final stream in streams) {
+      final url = stream['url'] ?? '';
+      if (url.isNotEmpty && StreamTicketService.isTicketedStreamUrl(url)) {
+        stream['url'] = StreamTicketService.ticketUrl(
+          url,
+          ticket: ticket,
+          deviceId: deviceId ?? '',
+        );
+      }
+    }
+    return true;
+  }
+
   List<Map<String, String>> _extractStreamLinks(List<dynamic>? streamLinks) {
     List<Map<String, String>> streams = [];
     if (streamLinks == null) return streams;
@@ -666,7 +731,7 @@ class _ChannelTileState extends State<ChannelTile> {
         onTapDown: (_) => setState(() => _isPressed = true),
         onTapUp: (_) => setState(() => _isPressed = false),
         onTapCancel: () => setState(() => _isPressed = false),
-        onTap: () {
+        onTap: () async {
           widget.onChannelTap(channelId);
           final List<Map<String, String>> streams =
               _extractStreamLinks(streamLinks);
@@ -679,6 +744,18 @@ class _ChannelTileState extends State<ChannelTile> {
               icon: Icons.videocam_off_rounded,
             );
             return;
+          }
+
+          // روابط 7esenlink تحتاج تذكرة بث (tk/sid/dv)؛ المصادر الأخرى
+          // (youtube / ok.ru / mpd مباشر) تمر بدون تغيير
+          if (streams.any((s) =>
+              StreamTicketService.isTicketedStreamUrl(s['url'] ?? ''))) {
+            final ticketed = await _applyStreamTicket(
+              streams,
+              type: 'channel',
+              id: int.tryParse(channelId),
+            );
+            if (!ticketed || !context.mounted) return;
           }
 
           final String firstUrl =

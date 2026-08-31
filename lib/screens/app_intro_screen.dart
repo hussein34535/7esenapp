@@ -1,10 +1,19 @@
-import 'dart:math';
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:hesen/screens/login_screen.dart';
 import 'package:hesen/screens/home_page.dart';
 import 'package:hesen/navigation.dart';
 import 'package:hesen/theme_customization_screen.dart';
 import 'package:hesen/main.dart' show homeKey;
 
+/// Cinematic brand intro â€” Netflix/Apple-TV style.
+///
+/// Sequence (~2.7s):
+///   1. Pure black
+///   2. Raw logo (no box, no halo) fades in + gently scales up
+///   3. A single white light sweep glides across it
+///   4. Cinematic push-in while fading to black â†’ HomePage
 class AppIntroScreen extends StatefulWidget {
   final ThemeProvider themeProvider;
   final void Function(bool) onThemeChanged;
@@ -21,98 +30,92 @@ class AppIntroScreen extends StatefulWidget {
 
 class _AppIntroScreenState extends State<AppIntroScreen>
     with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _logoScale;
-  late Animation<double> _logoGlow;
-  late Animation<double> _textSlide;
-  late Animation<double> _textFade;
-  late Animation<double> _taglineFade;
-  late Animation<double> _exitFade;
-
-  final List<_Particle> _particles = [];
-  final Random _random = Random();
+  late final AnimationController _controller;
+  late final Animation<double> _logoOpacity;
+  late final Animation<double> _logoScale;
+  late final Animation<double> _sweep;
+  late final Animation<double> _exitZoom;
+  late final Animation<double> _exitFade;
+  bool _startScheduled = false;
 
   @override
   void initState() {
     super.initState();
 
-    for (int i = 0; i < 25; i++) {
-      _particles.add(_Particle(
-        x: _random.nextDouble(),
-        y: _random.nextDouble(),
-        size: _random.nextDouble() * 3 + 1.5,
-        speed: _random.nextDouble() * 0.008 + 0.003,
-        opacity: _random.nextDouble() * 0.5 + 0.2,
-      ));
-    }
-
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 3200),
+      duration: const Duration(milliseconds: 2700),
     );
 
-    _logoScale = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.0, 0.5, curve: Curves.elasticOut),
-      ),
+    _logoOpacity = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.10, 0.42, curve: Curves.easeOut)),
     );
-
-    _logoGlow = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.1, 0.6, curve: Curves.easeOut),
-      ),
+    _logoScale = Tween<double>(begin: 0.88, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.10, 0.52, curve: Curves.easeOutCubic)),
     );
-
-    _textSlide = Tween<double>(begin: 40.0, end: 0.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.4, 0.65, curve: Curves.easeOutCubic),
-      ),
+    // Drives the light-sweep band horizontally: -2.6 â†’ 2.6 crosses the logo once.
+    _sweep = Tween<double>(begin: -2.6, end: 2.6).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.34, 0.64, curve: Curves.easeInOutCubic)),
     );
-
-    _textFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.4, 0.65, curve: Curves.easeIn),
-      ),
+    _exitZoom = Tween<double>(begin: 1.0, end: 1.09).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.78, 1.0, curve: Curves.easeInCubic)),
     );
-
-    _taglineFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.6, 0.8, curve: Curves.easeIn),
-      ),
-    );
-
-    _exitFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.85, 1.0, curve: Curves.easeIn),
-      ),
+    _exitFade = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.83, 1.0, curve: Curves.easeIn)),
     );
 
     _controller.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
+        // WEB LOGIN GATE: on web, opening the app requires an account.
+        final bool needsLogin = kIsWeb &&
+            (FirebaseAuth.instance.currentUser == null);
         navigatorKey.currentState?.pushReplacement(
           PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) =>
-                HomePage(
-              key: homeKey,
-              onThemeChanged: widget.onThemeChanged,
-            ),
+            pageBuilder: (context, animation, secondaryAnimation) {
+              if (needsLogin) {
+                return const LoginScreen();
+              }
+              return HomePage(
+                key: homeKey,
+                onThemeChanged: widget.onThemeChanged,
+              );
+            },
             transitionsBuilder:
                 (context, animation, secondaryAnimation, child) {
               return FadeTransition(opacity: animation, child: child);
             },
-            transitionDuration: const Duration(milliseconds: 600),
+            transitionDuration: const Duration(milliseconds: 450),
           ),
         );
       }
     });
+    // NOTE: the animation is started from didChangeDependencies() once the logo
+    // is decoded â€” Flutter animations are time-based, so starting before the
+    // image/engine is ready made the intro visibly jump to its final frames.
+  }
 
-    _controller.forward();
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_startScheduled) return;
+    _startScheduled = true;
+
+    // Decode the logo first, then play. A short timeout guarantees the intro
+    // always starts even if the asset is slow or missing.
+    bool started = false;
+    void startOnce() {
+      if (started || !mounted) return;
+      started = true;
+      // Begin on the next frame so the first paint is already on screen.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _controller.forward();
+      });
+    }
+
+    precacheImage(const AssetImage('assets/icon/logo.png'), context)
+        .then((_) => startOnce())
+        .catchError((_) => startOnce());
+    Future.delayed(const Duration(milliseconds: 700), startOnce);
   }
 
   @override
@@ -125,156 +128,86 @@ class _AppIntroScreenState extends State<AppIntroScreen>
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _controller,
-      builder: (context, child) {
-        for (final p in _particles) {
-          p.y -= p.speed;
-          if (p.y < -0.05) p.y = 1.05;
-        }
+      builder: (context, _) {
+        final double x = _sweep.value;
 
-        return Container(
-          color: const Color(0xFF0A0A14),
-          child: Stack(
-            children: [
-              // Particles drawn efficiently via CustomPaint & RepaintBoundary
-              Positioned.fill(
-                child: RepaintBoundary(
-                  child: CustomPaint(
-                    painter: _ParticlesPainter(_particles),
-                  ),
-                ),
-              ),
-
-              // Gradient overlays
-              Positioned(
-                top: -100,
-                left: -100,
-                child: Container(
-                  width: 300,
-                  height: 300,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        const Color(0xFF7C52D8).withValues(alpha: 0.15),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                bottom: -80,
-                right: -80,
-                child: Container(
-                  width: 250,
-                  height: 250,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        const Color(0xFFB388FF).withValues(alpha: 0.1),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
-              // Content
-              Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Logo with scale + glow
-                    Transform.scale(
-                      scale: _logoScale.value,
-                      child: Container(
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF7C52D8).withValues(
-                                alpha: 0.4 * _logoGlow.value,
+        return ColoredBox(
+          color: Colors.black,
+          child: ClipRect(
+            child: Transform.scale(
+              scale: _exitZoom.value,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Center(
+                    child: Opacity(
+                      opacity: _logoOpacity.value,
+                      child: Transform.scale(
+                        scale: _logoScale.value,
+                        child: ShaderMask(
+                          blendMode: BlendMode.srcATop,
+                          // Soft 5-stop falloff â†’ a smooth metallic shine,
+                          // not a hard diagonal stripe.
+                          shaderCallback: (bounds) => LinearGradient(
+                            begin: Alignment(x - 0.55, -1.4),
+                            end: Alignment(x + 0.55, 1.4),
+                            colors: [
+                              Colors.transparent,
+                              Colors.white.withValues(alpha: 0.10),
+                              Colors.white.withValues(alpha: 0.85),
+                              Colors.white.withValues(alpha: 0.10),
+                              Colors.transparent,
+                            ],
+                            stops: const [0.0, 0.38, 0.5, 0.62, 1.0],
+                          ).createShader(bounds),
+                          child: Container(
+                            width: 158,
+                            height: 158,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(34),
+                              // Faint neutral rim so the rounded shape reads
+                              // on pure black â€” no purple halo.
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.10),
+                                width: 1,
                               ),
-                              blurRadius: 20 + 30 * _logoGlow.value,
-                              spreadRadius: 5 * _logoGlow.value,
+                              boxShadow: [
+                                BoxShadow(
+                                  color:
+                                      Colors.white.withValues(alpha: 0.05),
+                                  blurRadius: 44,
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(24),
-                          child: Image.asset(
-                            'assets/icon/logo.png',
-                            width: 120,
-                            height: 120,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF1A1A2E),
-                                borderRadius: BorderRadius.circular(24),
-                              ),
-                              child: const Icon(
-                                Icons.tv,
-                                size: 60,
-                                color: Color(0xFF7C52D8),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(33),
+                              child: Image.asset(
+                                'assets/icon/logo.png',
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  color: const Color(0xFF12101A),
+                                  alignment: Alignment.center,
+                                  child: const Icon(
+                                    Icons.tv_rounded,
+                                    size: 72,
+                                    color: Color(0xFFB388FF),
+                                  ),
+                                ),
                               ),
                             ),
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 32),
+                  ),
 
-                    // App name
-                    Transform.translate(
-                      offset: Offset(0, _textSlide.value),
-                      child: Opacity(
-                        opacity: _textFade.value,
-                        child: const Text(
-                          '7eSen TV',
-                          style: TextStyle(
-                            fontSize: 36,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            letterSpacing: 2,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Tagline
-                    Opacity(
-                      opacity: _taglineFade.value,
-                      child: Text(
-                        'تلفازك في كل مكان',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.white.withValues(alpha: 0.6),
-                          fontWeight: FontWeight.w300,
-                          letterSpacing: 1,
-                        ),
-                        textDirection: TextDirection.rtl,
-                      ),
-                    ),
-                  ],
-                ),
+                  // Cinematic fade-out overlay
+                  ColoredBox(
+                    color: Colors.black.withValues(alpha: _exitFade.value),
+                  ),
+                ],
               ),
-
-              // Exit fade
-              Positioned(
-                left: 0,
-                right: 0,
-                top: 0,
-                bottom: 0,
-                child: Container(
-                  color: const Color(0xFF0A0A14)
-                      .withValues(alpha: _exitFade.value),
-                ),
-              ),
-            ],
+            ),
           ),
         );
       },
@@ -282,48 +215,3 @@ class _AppIntroScreenState extends State<AppIntroScreen>
   }
 }
 
-class _Particle {
-  double x;
-  double y;
-  final double size;
-  final double speed;
-  final double opacity;
-
-  _Particle({
-    required this.x,
-    required this.y,
-    required this.size,
-    required this.speed,
-    required this.opacity,
-  });
-}
-
-class _ParticlesPainter extends CustomPainter {
-  final List<_Particle> particles;
-
-  _ParticlesPainter(this.particles);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    for (final p in particles) {
-      final paint = Paint()
-        ..color = const Color(0xFF7C52D8).withOpacity(p.opacity)
-        ..style = PaintingStyle.fill;
-
-      final glowPaint = Paint()
-        ..color = const Color(0xFF7C52D8).withOpacity(p.opacity * 0.6)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, p.size * 3);
-
-      final center = Offset(p.x * size.width, p.y * size.height);
-      final radius = p.size / 2;
-
-      // Draw glow / shadow
-      canvas.drawCircle(center, radius, glowPaint);
-      // Draw main particle
-      canvas.drawCircle(center, radius, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _ParticlesPainter oldDelegate) => true;
-}

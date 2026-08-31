@@ -126,7 +126,19 @@ class PlayerStreamResolver {
             !urlToProcess.contains('dailymotion') &&
             !urlToProcess.contains('dmcdn.net');
 
-        if (isHlsOrStream) {
+        // Streams served from our own domains already have a trusted
+        // certificate. Proxying them would break native HLS on iOS, because
+        // relative playlist segments resolve against the proxy host.
+        final Uri? parsedUrl = Uri.tryParse(urlToProcess);
+        final bool isOwnTrustedHost = parsedUrl != null &&
+            parsedUrl.scheme == 'https' &&
+            (parsedUrl.host == '7esentv.com' ||
+                parsedUrl.host.endsWith('.7esentv.com'));
+
+        if (isOwnTrustedHost) {
+          videoUrlToLoad = urlToProcess;
+          debugPrint('[WEB] Trusted own host - Using direct URL (no proxy): $videoUrlToLoad');
+        } else if (isHlsOrStream) {
           videoUrlToLoad = WebProxyService.proxiedUrl(urlToProcess);
           debugPrint('[WEB] HLS/Stream - Using proxied URL: $videoUrlToLoad');
         } else {

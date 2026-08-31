@@ -83,7 +83,7 @@ class NotificationService {
         body,
         tzScheduledTime,
         notificationDetails,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       );
       debugPrint('[NOTIFICATION SERVICE] Scheduled notification $id at $tzScheduledTime (in ${difference.inSeconds} seconds)');
       return true;

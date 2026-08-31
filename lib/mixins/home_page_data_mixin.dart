@@ -13,8 +13,10 @@ mixin HomePageDataMixin on State<HomePage> {
   List<dynamic> goals = [];
   List<Highlight> highlights = [];
   int _selectedIndex = 0;
-  List<Widget>? _cachedSections;
-  bool _isTabSwitching = false;
+
+  /// Tabs the user has actually opened. Sections are built lazily on first
+  /// visit and stay mounted afterwards (instant switching + kept scroll).
+  final Set<int> _visitedTabs = <int>{};
 
   final TextEditingController _searchController = TextEditingController();
   List<dynamic> _filteredChannels = [];
@@ -141,10 +143,9 @@ mixin HomePageDataMixin on State<HomePage> {
               _triggerSubscriptionExpiryWarning(user.email!, user.uid, difference);
             }
           }
-          final newPlan = userData?['subscriptionPlan'] != null
-              ? userData!['subscriptionPlan']
-              : (userData?['planId'] != null
-                  ? 'Premium (Plan ${userData!['planId']})'
+          final newPlan = userData['subscriptionPlan'] ??
+              (userData['planId'] != null
+                  ? 'Premium (Plan ${userData['planId']})'
                   : (isSub ? 'Premium' : null));
 
           if (_isSubscribed != isSub ||
@@ -348,11 +349,6 @@ mixin HomePageDataMixin on State<HomePage> {
   Future<void> requestNotificationPermission() async {
     var status = await Permission.notification.status;
     if (!status.isGranted) { await Permission.notification.request(); }
-    
-    var alarmStatus = await Permission.scheduleExactAlarm.status;
-    if (!alarmStatus.isGranted) {
-      await Permission.scheduleExactAlarm.request();
-    }
   }
 
   void _sendDeviceInfoToServer({required String name, required String? token}) {
@@ -385,7 +381,8 @@ mixin HomePageDataMixin on State<HomePage> {
 
   Future<void> _showNameInputDialog() async {
     final nameController = TextEditingController();
-    return showDialog<void>(
+    try {
+      return await showDialog<void>(
       context: context, barrierDismissible: false,
       builder: (BuildContext context) => AlertDialog(
         title: const Text('مرحباً بك!', textAlign: TextAlign.center),
@@ -411,12 +408,16 @@ mixin HomePageDataMixin on State<HomePage> {
           ),
         ],
       ),
-    );
+      );
+    } finally {
+      nameController.dispose();
+    }
   }
 
   Future<void> _showEditNameDialog() async {
     final nameController = TextEditingController(text: _userName);
-    return showDialog<void>(
+    try {
+      return await showDialog<void>(
       context: context,
       builder: (BuildContext context) => AlertDialog(
         title: const Text('تعديل اسمك', textAlign: TextAlign.center),
@@ -450,7 +451,10 @@ mixin HomePageDataMixin on State<HomePage> {
           ),
         ],
       ),
-    );
+      );
+    } finally {
+      nameController.dispose();
+    }
   }
 
   void _monitorUserStatus() async {
@@ -550,6 +554,24 @@ mixin HomePageDataMixin on State<HomePage> {
       else { daysRemaining = 'منتهي'; }
     }
 
+    String? newPlan;
+    if (data['subscriptionPlan'] != null) {
+      newPlan = data['subscriptionPlan'];
+    } else if (data['planId'] != null) {
+      newPlan = 'Premium (Plan ${data['planId']})';
+    } else {
+      newPlan = isSub ? 'Premium' : null;
+    }
+    final String? newImage = data['image_url'] ?? data['photoUrl'];
+
+    final bool hasChanges = !_initialStatusLoaded ||
+        _isSubscribed != isSub ||
+        _subscriptionExpiryDays != daysRemaining ||
+        _subscriptionPlan != newPlan ||
+        (newImage != null && newImage != _userProfileImage);
+
+    if (!_initialStatusLoaded) { _initialStatusLoaded = true; }
+
     if (mounted) {
       if (_initialStatusLoaded && !_isSubscribed && isSub) {
         debugPrint("Subscription ACTIVATED!");
@@ -562,15 +584,12 @@ mixin HomePageDataMixin on State<HomePage> {
           icon: Icons.workspace_premium_rounded,
         );
       }
+      if (!hasChanges) return;
       setState(() {
         _isSubscribed = isSub;
         _subscriptionExpiryDays = daysRemaining;
-        if (data['subscriptionPlan'] != null) { _subscriptionPlan = data['subscriptionPlan']; }
-        else if (data['planId'] != null) { _subscriptionPlan = 'Premium (Plan ${data['planId']})'; }
-        else { _subscriptionPlan = isSub ? 'Premium' : null; }
-        if (data['image_url'] != null) { _userProfileImage = data['image_url']; }
-        else if (data['photoUrl'] != null) { _userProfileImage = data['photoUrl']; }
-        _initialStatusLoaded = true;
+        _subscriptionPlan = newPlan;
+        if (newImage != null) { _userProfileImage = newImage; }
       });
     }
   }
@@ -662,10 +681,8 @@ mixin HomePageDataMixin on State<HomePage> {
             WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) { showTelegramDialog(context, userName: _userName, isSubscribed: _isSubscribed); } });
           }
         }
-      } else if (mounted) {
-        if (!(hideDialog && _isSubscribed)) {
-          showTelegramDialog(context, userName: _userName, isSubscribed: _isSubscribed);
-        }
+      } else {
+        debugPrint('Update check returned status: ${response.statusCode} (skipping dialogs)');
       }
     } catch (e) {
       if (e is http.ClientException || e.toString().contains('SocketException')) {

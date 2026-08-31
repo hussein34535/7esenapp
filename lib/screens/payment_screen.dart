@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:hesen/main.dart';
@@ -73,7 +73,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           // Insert Fawaterak Visa/Card
           _paymentMethods.insert(0, {
             'id': 'fawaterak_card',
-            'name': 'الدفع بالبطاقة البنكية (فيزا / ماستركارد)',
+            'name': 'Ø§Ù„Ø¯ÙØ¹ Ø¨Ø§Ù„Ø¨Ø·Ø§Ù‚Ø© Ø§Ù„Ø¨Ù†ÙƒÙŠØ© (ÙÙŠØ²Ø§ / Ù…Ø§Ø³ØªØ±ÙƒØ§Ø±Ø¯)',
             'image': null,
             'is_fawaterak': true,
             'fawaterak_type': 'card',
@@ -82,7 +82,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           // Insert Fawaterak Fawry
           _paymentMethods.insert(1, {
             'id': 'fawaterak_fawry',
-            'name': 'الدفع الفوري (فوري)',
+            'name': 'Ø§Ù„Ø¯ÙØ¹ Ø§Ù„ÙÙˆØ±ÙŠ (ÙÙˆØ±ÙŠ)',
             'image': null,
             'is_fawaterak': true,
             'fawaterak_type': 'fawry',
@@ -91,7 +91,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           // Insert Fawaterak Mobile Wallet
           _paymentMethods.insert(2, {
             'id': 'fawaterak_wallet',
-            'name': 'المحافظ الإلكترونية (فودافون كاش / اتصالات / إلخ)',
+            'name': 'Ø§Ù„Ù…Ø­Ø§ÙØ¸ Ø§Ù„Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠØ© (ÙÙˆØ¯Ø§ÙÙˆÙ† ÙƒØ§Ø´ / Ø§ØªØµØ§Ù„Ø§Øª / Ø¥Ù„Ø®)',
             'image': null,
             'is_fawaterak': true,
             'fawaterak_type': 'wallet',
@@ -100,7 +100,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           // Append "Other Ways" (Telegram Contact)
           _paymentMethods.add({
             'id': 'telegram_contact',
-            'name': 'طرق دفع أخرى',
+            'name': 'Ø·Ø±Ù‚ Ø¯ÙØ¹ Ø£Ø®Ø±Ù‰',
             'image': null, // Will use icon
             'is_telegram': true,
           });
@@ -170,7 +170,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       if (mounted) {
         InAppNotification.show(
           context: context,
-          message: 'يرجى رفع صورة الإيصال أولاً',
+          message: 'ÙŠØ±Ø¬Ù‰ Ø±ÙØ¹ ØµÙˆØ±Ø© Ø§Ù„Ø¥ÙŠØµØ§Ù„ Ø£ÙˆÙ„Ø§Ù‹',
           type: NotificationType.error,
           icon: Icons.error_outline,
         );
@@ -212,10 +212,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
           barrierDismissible: false,
           builder: (context) => AlertDialog(
             backgroundColor: const Color(0xFF1E1E1E),
-            title: const Text("تم استلام طلبك بنجاح",
+            title: const Text("ØªÙ… Ø§Ø³ØªÙ„Ø§Ù… Ø·Ù„Ø¨Ùƒ Ø¨Ù†Ø¬Ø§Ø­",
                 style: TextStyle(color: Colors.white)),
             content: const Text(
-              "سيقوم المسؤول بمراجعة الإيصال وتفعيل اشتراكك قريباً. شكراً لك!",
+              "Ø³ÙŠÙ‚ÙˆÙ… Ø§Ù„Ù…Ø³Ø¤ÙˆÙ„ Ø¨Ù…Ø±Ø§Ø¬Ø¹Ø© Ø§Ù„Ø¥ÙŠØµØ§Ù„ ÙˆØªÙØ¹ÙŠÙ„ Ø§Ø´ØªØ±Ø§ÙƒÙƒ Ù‚Ø±ÙŠØ¨Ø§Ù‹. Ø´ÙƒØ±Ø§Ù‹ Ù„Ùƒ!",
               style: TextStyle(color: Colors.white70),
             ),
             actions: [
@@ -225,7 +225,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   Navigator.pop(context); // Close PaymentScreen
                   Navigator.pop(context); // Close SubscriptionScreen (optional)
                 },
-                child: const Text("حسناً",
+                child: const Text("Ø­Ø³Ù†Ø§Ù‹",
                     style: TextStyle(color: Colors.purpleAccent)),
               )
             ],
@@ -237,7 +237,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       if (mounted) {
         InAppNotification.show(
           context: context,
-          message: 'حدث خطأ: $e',
+          message: 'Ø­Ø¯Ø« Ø®Ø·Ø£: $e',
           type: NotificationType.error,
           icon: Icons.error_outline,
         );
@@ -266,7 +266,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       final phone = _selectedMethodId == 'fawaterak_wallet' ? _walletPhoneController.text.trim() : null;
 
       if (_selectedMethodId == 'fawaterak_wallet' && (phone == null || phone.length < 11)) {
-        throw Exception("يرجى إدخال رقم محفظة صحيح مكون من 11 رقماً");
+        throw Exception("ÙŠØ±Ø¬Ù‰ Ø¥Ø¯Ø®Ø§Ù„ Ø±Ù‚Ù… Ù…Ø­ÙØ¸Ø© ØµØ­ÙŠØ­ Ù…ÙƒÙˆÙ† Ù…Ù† 11 Ø±Ù‚Ù…Ø§Ù‹");
       }
 
       final result = await ApiService.createFawaterakSession(
@@ -278,7 +278,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       );
 
       if (result['success'] != true) {
-        throw Exception(result['error'] ?? "فشل إنشاء الفاتورة من السيرفر");
+        throw Exception(result['error'] ?? "ÙØ´Ù„ Ø¥Ù†Ø´Ø§Ø¡ Ø§Ù„ÙØ§ØªÙˆØ±Ø© Ù…Ù† Ø§Ù„Ø³ÙŠØ±ÙØ±");
       }
 
       // Trigger fast polling on Windows to catch activation if paid
@@ -294,7 +294,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           if (await canLaunchUrl(url)) {
             await launchUrl(url, mode: LaunchMode.externalApplication);
           } else {
-            throw Exception("لا يمكن فتح رابط الدفع بالبطاقة البنكية");
+            throw Exception("Ù„Ø§ ÙŠÙ…ÙƒÙ† ÙØªØ­ Ø±Ø§Ø¨Ø· Ø§Ù„Ø¯ÙØ¹ Ø¨Ø§Ù„Ø¨Ø·Ø§Ù‚Ø© Ø§Ù„Ø¨Ù†ÙƒÙŠØ©");
           }
           // Do not pop payment screen; show real-time verification dialog
           _showFawaterakSuccessDialog(result, finalPrice);
@@ -307,7 +307,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       if (mounted) {
         InAppNotification.show(
           context: context,
-          message: 'حدث خطأ أثناء تهيئة الدفع: $e',
+          message: 'Ø­Ø¯Ø« Ø®Ø·Ø£ Ø£Ø«Ù†Ø§Ø¡ ØªÙ‡ÙŠØ¦Ø© Ø§Ù„Ø¯ÙØ¹: $e',
           type: NotificationType.error,
           icon: Icons.error_outline,
         );
@@ -334,7 +334,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
               backgroundColor: const Color(0xFF1E1E1E),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               title: Text(
-                method == 'wallet' ? "جاري تأكيد الدفع..." : "بانتظار إتمام الدفع بالبطاقة...",
+                method == 'wallet' ? "Ø¬Ø§Ø±ÙŠ ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø¯ÙØ¹..." : "Ø¨Ø§Ù†ØªØ¸Ø§Ø± Ø¥ØªÙ…Ø§Ù… Ø§Ù„Ø¯ÙØ¹ Ø¨Ø§Ù„Ø¨Ø·Ø§Ù‚Ø©...",
                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                 textAlign: TextAlign.center,
               ),
@@ -363,7 +363,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                            Navigator.of(context).pushReplacement(
                              MaterialPageRoute(
                                builder: (context) => PaymentSuccessScreen(
-                                 packageName: widget.package['name'] ?? 'باقة Premium',
+                                 packageName: widget.package['name'] ?? 'Ø¨Ø§Ù‚Ø© Premium',
                                  price: finalPrice,
                                  durationDays: int.tryParse(widget.package['duration_days']?.toString() ?? '30') ?? 30,
                                ),
@@ -382,21 +382,21 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       const SizedBox(height: 25),
                       Text(
                         method == 'wallet'
-                            ? "وصلتك رسالة على رقم المحفظة من مزود الخدمة فيها كل تفاصيل الدفع.\nأكّد العملية برقمك السري، وسيتم تفعيل اشتراكك تلقائياً."
-                            : "تم فتح صفحة الدفع في المتصفح. يرجى إدخال بيانات البطاقة وإكمال الدفع هناك.\n\nسيتم تفعيل حسابك تلقائياً فور نجاح العملية. لا تقم بإغلاق هذه النافذة.",
+                            ? "ÙˆØµÙ„ØªÙƒ Ø±Ø³Ø§Ù„Ø© Ø¹Ù„Ù‰ Ø±Ù‚Ù… Ø§Ù„Ù…Ø­ÙØ¸Ø© Ù…Ù† Ù…Ø²ÙˆØ¯ Ø§Ù„Ø®Ø¯Ù…Ø© ÙÙŠÙ‡Ø§ ÙƒÙ„ ØªÙØ§ØµÙŠÙ„ Ø§Ù„Ø¯ÙØ¹.\nØ£ÙƒÙ‘Ø¯ Ø§Ù„Ø¹Ù…Ù„ÙŠØ© Ø¨Ø±Ù‚Ù…Ùƒ Ø§Ù„Ø³Ø±ÙŠØŒ ÙˆØ³ÙŠØªÙ… ØªÙØ¹ÙŠÙ„ Ø§Ø´ØªØ±Ø§ÙƒÙƒ ØªÙ„Ù‚Ø§Ø¦ÙŠØ§Ù‹."
+                            : "ØªÙ… ÙØªØ­ ØµÙØ­Ø© Ø§Ù„Ø¯ÙØ¹ ÙÙŠ Ø§Ù„Ù…ØªØµÙØ­. ÙŠØ±Ø¬Ù‰ Ø¥Ø¯Ø®Ø§Ù„ Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø¨Ø·Ø§Ù‚Ø© ÙˆØ¥ÙƒÙ…Ø§Ù„ Ø§Ù„Ø¯ÙØ¹ Ù‡Ù†Ø§Ùƒ.\n\nØ³ÙŠØªÙ… ØªÙØ¹ÙŠÙ„ Ø­Ø³Ø§Ø¨Ùƒ ØªÙ„Ù‚Ø§Ø¦ÙŠØ§Ù‹ ÙÙˆØ± Ù†Ø¬Ø§Ø­ Ø§Ù„Ø¹Ù…Ù„ÙŠØ©. Ù„Ø§ ØªÙ‚Ù… Ø¨Ø¥ØºÙ„Ø§Ù‚ Ù‡Ø°Ù‡ Ø§Ù„Ù†Ø§ÙØ°Ø©.",
                         style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 20),
                       if (method == 'wallet' && paymentData['meezaReference'] != null && paymentData['meezaReference'].toString().isNotEmpty)
                         Text(
-                          "الرقم المرجعي: ${paymentData['meezaReference']}",
+                          "Ø§Ù„Ø±Ù‚Ù… Ø§Ù„Ù…Ø±Ø¬Ø¹ÙŠ: ${paymentData['meezaReference']}",
                           style: const TextStyle(color: Colors.grey, fontSize: 12),
                           textAlign: TextAlign.center,
                         )
                       else if (method != 'wallet')
                         const Text(
-                          "تأكد من عدم إغلاق هذه الصفحة حتى يتم تحويلك تلقائياً.",
+                          "ØªØ£ÙƒØ¯ Ù…Ù† Ø¹Ø¯Ù… Ø¥ØºÙ„Ø§Ù‚ Ù‡Ø°Ù‡ Ø§Ù„ØµÙØ­Ø© Ø­ØªÙ‰ ÙŠØªÙ… ØªØ­ÙˆÙŠÙ„Ùƒ ØªÙ„Ù‚Ø§Ø¦ÙŠØ§Ù‹.",
                           style: TextStyle(color: Colors.grey, fontSize: 12),
                           textAlign: TextAlign.center,
                         ),
@@ -410,7 +410,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   onPressed: () {
                     Navigator.pop(context); // Allow manual exit if it gets stuck
                   },
-                  child: const Text("إلغاء / الدفع لاحقاً", style: TextStyle(color: Colors.redAccent)),
+                  child: const Text("Ø¥Ù„ØºØ§Ø¡ / Ø§Ù„Ø¯ÙØ¹ Ù„Ø§Ø­Ù‚Ø§Ù‹", style: TextStyle(color: Colors.redAccent)),
                 ),
               ],
             ),
@@ -431,19 +431,19 @@ class _PaymentScreenState extends State<PaymentScreen> {
         List<Widget> extraDetails = [];
 
         if (method == 'fawry') {
-          title = "رقم الدفع عبر فوري";
-          codeLabel = "كود الدفع (Fawry Code)";
+          title = "Ø±Ù‚Ù… Ø§Ù„Ø¯ÙØ¹ Ø¹Ø¨Ø± ÙÙˆØ±ÙŠ";
+          codeLabel = "ÙƒÙˆØ¯ Ø§Ù„Ø¯ÙØ¹ (Fawry Code)";
           paymentCode = paymentData['fawryCode']?.toString() ?? '';
           final expireDate = paymentData['expireDate'] ?? '';
           
-          detailsText = "توجه إلى أقرب منفذ فوري أو كشك واطلب الدفع لخدمة (فواتيرك) باستخدام الكود الموضح أعلاه.";
+          detailsText = "ØªÙˆØ¬Ù‡ Ø¥Ù„Ù‰ Ø£Ù‚Ø±Ø¨ Ù…Ù†ÙØ° ÙÙˆØ±ÙŠ Ø£Ùˆ ÙƒØ´Ùƒ ÙˆØ§Ø·Ù„Ø¨ Ø§Ù„Ø¯ÙØ¹ Ù„Ø®Ø¯Ù…Ø© (ÙÙˆØ§ØªÙŠØ±Ùƒ) Ø¨Ø§Ø³ØªØ®Ø¯Ø§Ù… Ø§Ù„ÙƒÙˆØ¯ Ø§Ù„Ù…ÙˆØ¶Ø­ Ø£Ø¹Ù„Ø§Ù‡.";
           
           if (expireDate.isNotEmpty) {
             extraDetails.add(
               Padding(
                 padding: const EdgeInsets.only(top: 8.0),
                 child: Text(
-                  "تاريخ الصلاحية: $expireDate",
+                  "ØªØ§Ø±ÙŠØ® Ø§Ù„ØµÙ„Ø§Ø­ÙŠØ©: $expireDate",
                   style: const TextStyle(color: Colors.amberAccent, fontSize: 13, fontWeight: FontWeight.bold),
                 ),
               ),
@@ -493,7 +493,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         Clipboard.setData(ClipboardData(text: paymentCode));
                         InAppNotification.show(
                           context: context,
-                          message: 'تم نسخ كود الدفع بنجاح',
+                          message: 'ØªÙ… Ù†Ø³Ø® ÙƒÙˆØ¯ Ø§Ù„Ø¯ÙØ¹ Ø¨Ù†Ø¬Ø§Ø­',
                           type: NotificationType.success,
                           icon: Icons.check_circle_outline,
                         );
@@ -524,7 +524,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
               ),
-              child: const Text("حسناً، تم", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              child: const Text("Ø­Ø³Ù†Ø§Ù‹ØŒ ØªÙ…", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ],
         );
@@ -567,7 +567,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       backgroundColor: Colors.black,
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('إتمام الدفع',
+        title: const Text('Ø¥ØªÙ…Ø§Ù… Ø§Ù„Ø¯ÙØ¹',
             style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -608,7 +608,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       children: const [
                         CircularProgressIndicator(color: Colors.purpleAccent),
                         SizedBox(height: 20),
-                        Text("جاري رفع الإيصال وتأكيد الطلب...",
+                        Text("Ø¬Ø§Ø±ÙŠ Ø±ÙØ¹ Ø§Ù„Ø¥ÙŠØµØ§Ù„ ÙˆØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø·Ù„Ø¨...",
                             style: TextStyle(color: Colors.white))
                       ],
                     ),
@@ -625,7 +625,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
                         // Coupon Section
                         const Text(
-                          "لديك كود خصم؟",
+                          "Ù„Ø¯ÙŠÙƒ ÙƒÙˆØ¯ Ø®ØµÙ…ØŸ",
                           style: TextStyle(
                               color: Colors.white,
                               fontSize: 18,
@@ -637,7 +637,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
                         // Payment Methods
                         const Text(
-                          "اختر طريقة الدفع",
+                          "Ø§Ø®ØªØ± Ø·Ø±ÙŠÙ‚Ø© Ø§Ù„Ø¯ÙØ¹",
                           style: TextStyle(
                               color: Colors.white,
                               fontSize: 18,
@@ -649,7 +649,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                               child: CircularProgressIndicator(
                                   color: Colors.purpleAccent))
                         else if (_paymentMethods.isEmpty)
-                          const Text("لا توجد طرق دفع متاحة حالياً",
+                          const Text("Ù„Ø§ ØªÙˆØ¬Ø¯ Ø·Ø±Ù‚ Ø¯ÙØ¹ Ù…ØªØ§Ø­Ø© Ø­Ø§Ù„ÙŠØ§Ù‹",
                               style: TextStyle(color: Colors.grey))
                         else
                           ..._paymentMethods
@@ -659,7 +659,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         if (_selectedMethodId != null && !isFawaterak && !isTelegramContact) ...[
                           const SizedBox(height: 30),
                           const Text(
-                            "إثبات الدفع",
+                            "Ø¥Ø«Ø¨Ø§Øª Ø§Ù„Ø¯ÙØ¹",
                             style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 18,
@@ -707,7 +707,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                                           : Colors.white38),
                                   const SizedBox(width: 10),
                                   Text(
-                                    isFawaterak ? 'تأكيد الدفع' : 'إرسال الطلب',
+                                    isFawaterak ? 'ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø¯ÙØ¹' : 'Ø¥Ø±Ø³Ø§Ù„ Ø§Ù„Ø·Ù„Ø¨',
                                     style: TextStyle(
                                         color: canConfirm
                                             ? Colors.white
@@ -722,8 +722,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           const SizedBox(height: 10),
                           Text(
                             isFawaterak
-                                ? "اضغط لتوليد كود الدفع الخاص بـ فوري أو المحفظة."
-                                : "بعد التحويل، يرجى رفع صورة الإيصال لتفعيل اشتراكك.",
+                                ? "Ø§Ø¶ØºØ· Ù„ØªÙˆÙ„ÙŠØ¯ ÙƒÙˆØ¯ Ø§Ù„Ø¯ÙØ¹ Ø§Ù„Ø®Ø§Øµ Ø¨Ù€ ÙÙˆØ±ÙŠ Ø£Ùˆ Ø§Ù„Ù…Ø­ÙØ¸Ø©."
+                                : "Ø¨Ø¹Ø¯ Ø§Ù„ØªØ­ÙˆÙŠÙ„ØŒ ÙŠØ±Ø¬Ù‰ Ø±ÙØ¹ ØµÙˆØ±Ø© Ø§Ù„Ø¥ÙŠØµØ§Ù„ Ù„ØªÙØ¹ÙŠÙ„ Ø§Ø´ØªØ±Ø§ÙƒÙƒ.",
                             textAlign: TextAlign.center,
                             style: const TextStyle(color: Colors.grey, fontSize: 12),
                           ),
@@ -759,7 +759,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   Icon(Icons.cloud_upload_outlined,
                       size: 40, color: Colors.purpleAccent),
                   SizedBox(height: 10),
-                  Text("اضغط لرفع صورة الإيصال",
+                  Text("Ø§Ø¶ØºØ· Ù„Ø±ÙØ¹ ØµÙˆØ±Ø© Ø§Ù„Ø¥ÙŠØµØ§Ù„",
                       style: TextStyle(color: Colors.white70)),
                 ],
               ),
@@ -789,7 +789,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            pkg['name'] ?? 'باقة',
+            pkg['name'] ?? 'Ø¨Ø§Ù‚Ø©',
             style: const TextStyle(
                 color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
           ),
@@ -805,7 +805,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text("السعر الأصلي:", style: TextStyle(color: Colors.white54, fontSize: 14)),
+                const Text("Ø§Ù„Ø³Ø¹Ø± Ø§Ù„Ø£ØµÙ„ÙŠ:", style: TextStyle(color: Colors.white54, fontSize: 14)),
                 Text(
                   CurrencyService.format(original),
                   style: const TextStyle(
@@ -824,7 +824,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text("خصم الباقة:", style: TextStyle(color: Colors.greenAccent, fontSize: 13, fontWeight: FontWeight.bold)),
+                const Text("Ø®ØµÙ… Ø§Ù„Ø¨Ø§Ù‚Ø©:", style: TextStyle(color: Colors.greenAccent, fontSize: 13, fontWeight: FontWeight.bold)),
                 Text(
                   "- ${CurrencyService.format(original - salePriceVal)}",
                   style: const TextStyle(color: Colors.greenAccent, fontSize: 14, fontWeight: FontWeight.bold),
@@ -839,7 +839,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text("خصم كوبون (${_discountPercent.toStringAsFixed(0)}%):",
+                Text("Ø®ØµÙ… ÙƒÙˆØ¨ÙˆÙ† (${_discountPercent.toStringAsFixed(0)}%):",
                     style: const TextStyle(color: Colors.greenAccent, fontSize: 13, fontWeight: FontWeight.bold)),
                 Text(
                   "- ${CurrencyService.format(salePriceVal - finalPrice >= 0 ? (hasSale ? salePriceVal * (_discountPercent / 100) : original * (_discountPercent / 100)) : 0)}",
@@ -866,10 +866,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   const SizedBox(width: 6),
                   Text(
                     discountMonths == 1
-                        ? "خصم شهر كامل مجاناً"
+                        ? "Ø®ØµÙ… Ø´Ù‡Ø± ÙƒØ§Ù…Ù„ Ù…Ø¬Ø§Ù†Ø§Ù‹"
                         : discountMonths == 2
-                            ? "خصم شهرين مجاناً"
-                            : "خصم $discountMonths أشهر مجانية",
+                            ? "Ø®ØµÙ… Ø´Ù‡Ø±ÙŠÙ† Ù…Ø¬Ø§Ù†Ø§Ù‹"
+                            : "Ø®ØµÙ… $discountMonths Ø£Ø´Ù‡Ø± Ù…Ø¬Ø§Ù†ÙŠØ©",
                     style: const TextStyle(color: Colors.greenAccent, fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                 ],
@@ -884,7 +884,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              const Text("الإجمالي:", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              const Text("Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ:", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -897,7 +897,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        "وفّرت ${CurrencyService.format(savedAmount)} (${savedPercent.toStringAsFixed(0)}%)",
+                        "ÙˆÙÙ‘Ø±Øª ${CurrencyService.format(savedAmount)} (${savedPercent.toStringAsFixed(0)}%)",
                         style: const TextStyle(color: Colors.greenAccent, fontSize: 11, fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -925,7 +925,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
             controller: _couponController,
             style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
-              hintText: 'أدخل الكود هنا',
+              hintText: 'Ø£Ø¯Ø®Ù„ Ø§Ù„ÙƒÙˆØ¯ Ù‡Ù†Ø§',
               hintStyle: const TextStyle(color: Colors.white30),
               filled: true,
               fillColor: Colors.white.withValues(alpha: 0.05),
@@ -954,7 +954,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     height: 20,
                     child: CircularProgressIndicator(
                         strokeWidth: 2, color: Colors.white))
-                : const Text("تطبيق",
+                : const Text("ØªØ·Ø¨ÙŠÙ‚",
                     style: TextStyle(
                         color: Colors.white, fontWeight: FontWeight.bold)),
           ),
@@ -1073,7 +1073,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
                 Expanded(
                   child: Text(
-                    method['name'] ?? 'طريقة دفع',
+                    method['name'] ?? 'Ø·Ø±ÙŠÙ‚Ø© Ø¯ÙØ¹',
                     style: TextStyle(
                         color: isSelected ? Colors.white : Colors.white70,
                         fontWeight:
@@ -1098,7 +1098,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'للتواصل معنا وتفعيل اشتراكك عبر طرق دفع أخرى، اضغط الزر بالأسفل للتواصل عبر تيليجرام.',
+                        'Ù„Ù„ØªÙˆØ§ØµÙ„ Ù…Ø¹Ù†Ø§ ÙˆØªÙØ¹ÙŠÙ„ Ø§Ø´ØªØ±Ø§ÙƒÙƒ Ø¹Ø¨Ø± Ø·Ø±Ù‚ Ø¯ÙØ¹ Ø£Ø®Ø±Ù‰ØŒ Ø§Ø¶ØºØ· Ø§Ù„Ø²Ø± Ø¨Ø§Ù„Ø£Ø³ÙÙ„ Ù„Ù„ØªÙˆØ§ØµÙ„ Ø¹Ø¨Ø± ØªÙŠÙ„ÙŠØ¬Ø±Ø§Ù….',
                         style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
                       ),
                     ),
@@ -1116,7 +1116,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     }
                   },
                   icon: const FaIcon(FontAwesomeIcons.telegram, color: Colors.white, size: 18),
-                  label: const Text('تواصل معنا عبر تيليجرام',
+                  label: const Text('ØªÙˆØ§ØµÙ„ Ù…Ø¹Ù†Ø§ Ø¹Ø¨Ø± ØªÙŠÙ„ÙŠØ¬Ø±Ø§Ù…',
                       style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF0088CC),
@@ -1159,7 +1159,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
               TextField(
                 controller: _walletPhoneController,
                 decoration: InputDecoration(
-                  labelText: 'رقم المحفظة (الذي ستدفع منه)',
+                  labelText: 'Ø±Ù‚Ù… Ø§Ù„Ù…Ø­ÙØ¸Ø© (Ø§Ù„Ø°ÙŠ Ø³ØªØ¯ÙØ¹ Ù…Ù†Ù‡)',
                   labelStyle: const TextStyle(color: Colors.white70),
                   hintText: '01xxxxxxxxx',
                   hintStyle: const TextStyle(color: Colors.white30),
@@ -1186,7 +1186,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 controller: _paymentIdController,
                 decoration: InputDecoration(
                   labelText:
-                      method['input_label'] ?? 'رقم المحفظة / رقم العملية',
+                      method['input_label'] ?? 'Ø±Ù‚Ù… Ø§Ù„Ù…Ø­ÙØ¸Ø© / Ø±Ù‚Ù… Ø§Ù„Ø¹Ù…Ù„ÙŠØ©',
                   labelStyle: const TextStyle(color: Colors.white70),
                   hintText: '010xxxxxxx',
                   hintStyle: const TextStyle(color: Colors.white30),

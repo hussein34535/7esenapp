@@ -10,6 +10,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
   encrypt: ^5.0.3
   flutter_local_notifications: ^19.3.0
   firebase_messaging: ^16.0.0

@@ -27,7 +27,7 @@ class GoalsSection extends StatelessWidget {
     if (goalsArticles.isEmpty) {
       // Use CustomScrollView + SliverFillRemaining for centering + scrollability
       return CustomScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
         slivers: [
           SliverFillRemaining(
             hasScrollBody: false,
@@ -456,22 +456,23 @@ class _GoalBoxState extends State<GoalBox> {
                                   child: Builder(builder: (context) {
                                     if (imageUrl != null &&
                                         imageUrl.isNotEmpty) {
-                                        return CachedNetworkImage(
-                                          imageUrl: ImageProxy.resolveUrl(imageUrl),
-                                          fit: BoxFit.cover,
-                                        width: double.infinity,
-                                        height: double.infinity,
-                                        alignment: Alignment.center,
-                                        placeholder: (context, url) =>
-                                            Container(
-                                          color: Colors.black87,
-                                          child: const Center(
-                                              child:
-                                                  CircularProgressIndicator()),
-                                        ),
-                                        errorWidget: (context, url, error) =>
-                                            const Icon(Icons.error),
-                                      );
+                                         return CachedNetworkImage(
+                                           imageUrl: ImageProxy.resolveUrl(imageUrl),
+                                           fit: BoxFit.cover,
+                                         width: double.infinity,
+                                         height: double.infinity,
+                                         alignment: Alignment.center,
+                                         memCacheWidth: 720,
+                                         filterQuality: FilterQuality.medium,
+                                         fadeInDuration:
+                                             const Duration(milliseconds: 150),
+                                         placeholder: (context, url) =>
+                                             Container(
+                                           color: Colors.black87,
+                                         ),
+                                         errorWidget: (context, url, error) =>
+                                             const Icon(Icons.error),
+                                       );
                                     } else {
                                       // Fallback completely to an empty placeholder when no image from API
                                       return Container(

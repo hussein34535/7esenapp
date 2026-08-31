@@ -7,20 +7,75 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hesen/services/notification_service.dart';
 import 'package:hesen/widgets/in_app_notification.dart';
 import 'package:hesen/services/favorite_teams_service.dart';
-DateTime parseMatchTimeToLocal(String matchTime) {
-  final matchDateTime = DateFormat('HH:mm').parse(matchTime);
+import 'package:hesen/services/stream_ticket_service.dart';
+/// Cache for parsed "HH:mm" strings — parsing with DateFormat is expensive and
+/// runs on every rebuild of MatchesSection/MatchBox. The raw time string is
+/// stable per data load, so we parse each unique value once.
+final Map<String, DateTime> _parsedMatchTimeCache = <String, DateTime>{};
+
+DateTime _parseHHmm(String matchTime) {
+  var cached = _parsedMatchTimeCache[matchTime];
+  if (cached == null) {
+    cached = DateFormat('HH:mm').parse(matchTime);
+    if (_parsedMatchTimeCache.length > 500) _parsedMatchTimeCache.clear();
+    _parsedMatchTimeCache[matchTime] = cached;
+  }
   final now = DateTime.now();
   var matchDateTimeWithToday = DateTime(
     now.year, now.month, now.day,
-    matchDateTime.hour, matchDateTime.minute,
+    cached.hour, cached.minute,
   );
-  
+
   // معالجة المباريات التي تتخطى منتصف الليل
   if (matchDateTimeWithToday.isBefore(now) &&
       now.difference(matchDateTimeWithToday) > const Duration(minutes: 180)) {
     matchDateTimeWithToday = matchDateTimeWithToday.add(const Duration(days: 1));
   }
   return matchDateTimeWithToday;
+}
+
+DateTime parseMatchTimeToLocal(String matchTime) => _parseHHmm(matchTime);
+
+/// Memoised live/upcoming/finished ordering.
+/// Classifying + sorting ran on every rebuild; the result only changes when the
+/// match list itself changes or the clock moves to a new minute.
+List<Match>? _orderedCache;
+List<Match>? _orderedSource;
+int _orderedMinute = -1;
+
+List<Match> _orderedMatches(List<Match> matches) {
+  final int minuteBucket = DateTime.now().millisecondsSinceEpoch ~/ 60000;
+  if (_orderedCache != null &&
+      identical(_orderedSource, matches) &&
+      _orderedMinute == minuteBucket) {
+    return _orderedCache!;
+  }
+
+  final List<Match> live = [];
+  final List<Match> upcoming = [];
+  final List<Match> finished = [];
+  final now = DateTime.now();
+
+  for (final match in matches) {
+    final start = parseMatchTimeToLocal(match.matchTime);
+    if (start.isBefore(now) &&
+        now.isBefore(start.add(const Duration(minutes: 110)))) {
+      live.add(match);
+    } else if (start.isAfter(now)) {
+      upcoming.add(match);
+    } else {
+      finished.add(match);
+    }
+  }
+
+  upcoming.sort((a, b) => parseMatchTimeToLocal(a.matchTime)
+      .compareTo(parseMatchTimeToLocal(b.matchTime)));
+
+  final ordered = [...live, ...upcoming, ...finished];
+  _orderedSource = matches;
+  _orderedCache = ordered;
+  _orderedMinute = minuteBucket;
+  return ordered;
 }
 
 
@@ -56,36 +111,7 @@ class MatchesSection extends StatelessWidget {
       );
     }
 
-    List<Match> liveMatches = [];
-    List<Match> finishedMatches = [];
-    List<Match> upcomingMatches = [];
-
-    final now = DateTime.now();
-    for (var match in matches) {
-      final matchDateTimeWithToday = parseMatchTimeToLocal(match.matchTime);
-
-      if (matchDateTimeWithToday.isBefore(now) &&
-          now.isBefore(
-              matchDateTimeWithToday.add(const Duration(minutes: 110)))) {
-        liveMatches.add(match);
-      } else if (matchDateTimeWithToday.isAfter(now)) {
-        upcomingMatches.add(match);
-      } else {
-        finishedMatches.add(match);
-      }
-    }
-
-    upcomingMatches.sort((a, b) {
-      final matchTimeA = parseMatchTimeToLocal(a.matchTime);
-      final matchTimeB = parseMatchTimeToLocal(b.matchTime);
-      return matchTimeA.compareTo(matchTimeB);
-    });
-
-    final allMatches = [
-      ...liveMatches,
-      ...upcomingMatches,
-      ...finishedMatches
-    ];
+    final allMatches = _orderedMatches(matches);
 
     final bool isWideScreen = MediaQuery.of(context).size.width > 600;
 
@@ -100,21 +126,28 @@ class MatchesSection extends StatelessWidget {
         ),
         itemCount: allMatches.length,
         itemBuilder: (context, index) {
-          return MatchBox(
-            match: allMatches[index],
-            openVideo: openVideo,
+          // Isolated paint per card → smoother scrolling, especially on iOS web.
+          return RepaintBoundary(
+            child: MatchBox(
+              key: ValueKey(allMatches[index].id),
+              match: allMatches[index],
+              openVideo: openVideo,
+            ),
           );
         },
       );
     }
 
     return ListView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
+      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
       itemCount: allMatches.length,
       itemBuilder: (context, index) {
-        return MatchBox(
-          match: allMatches[index],
-          openVideo: openVideo,
+        return RepaintBoundary(
+          child: MatchBox(
+            key: ValueKey(allMatches[index].id),
+            match: allMatches[index],
+            openVideo: openVideo,
+          ),
         );
       },
     );
@@ -143,6 +176,67 @@ class _MatchBoxState extends State<MatchBox> {
   bool _isTeamBFavorite = false;
   int _teamAScore = 0;
   int _teamBScore = 0;
+
+  /// يطلب تذكرة بث (stream ticket) و يضيف tk/sid/dv على كل روابط 7esenlink
+  /// داخل [streams]. يرجع false عندما يجب منع التشغيل (حظر / اشتراك /
+  /// حد الجهاز / فشل الشبكة). روابط الأهداف/الملخصات المباشرة تمر بدون تغيير.
+  Future<bool> _applyStreamTicket(
+    List<Map<String, String>> streams, {
+    required String type,
+    required int? id,
+  }) async {
+    if (id == null) return true; // لا يوجد معرّف رقمي لطلب التذكرة
+
+    Map<String, dynamic> ticket;
+    try {
+      try {
+        ticket = await StreamTicketService.getTicket(type: type, id: id);
+      } on StreamTicketException catch (e) {
+        if (e.code != 'TOKEN-EXPIRED') rethrow;
+        // التوكن يتجدد كل 24 ساعة — إعادة المحاولة مرة واحدة بتذكرة جديدة
+        ticket = await StreamTicketService.getTicket(type: type, id: id);
+      }
+    } on StreamTicketException catch (e) {
+      if (!mounted) return false;
+      final message = switch (e.code) {
+        'ACCOUNT_BANNED' => 'تم حظر هذا الحساب',
+        'SUBSCRIPTION_REQUIRED' => 'هذه المباراة تحتاج اشتراك فعال',
+        'DEVICE_LIMIT_REACHED' =>
+          'تم الوصول للحد الأقصى للحسابات على هذا الجهاز',
+        'NOT_LOGGED_IN' => 'يرجى تسجيل الدخول للمشاهدة',
+        _ => 'تعذر تشغيل البث، حاول مرة أخرى',
+      };
+      InAppNotification.show(
+        context: context,
+        message: message,
+        type: NotificationType.error,
+        icon: Icons.error_outline_rounded,
+      );
+      return false;
+    } catch (_) {
+      if (!mounted) return false;
+      InAppNotification.show(
+        context: context,
+        message: 'تعذر تشغيل البث، حاول مرة أخرى',
+        type: NotificationType.error,
+        icon: Icons.wifi_off_rounded,
+      );
+      return false;
+    }
+
+    final deviceId = await StreamTicketService.getDeviceId();
+    for (final stream in streams) {
+      final url = stream['url'] ?? '';
+      if (url.isNotEmpty && StreamTicketService.isTicketedStreamUrl(url)) {
+        stream['url'] = StreamTicketService.ticketUrl(
+          url,
+          ticket: ticket,
+          deviceId: deviceId ?? '',
+        );
+      }
+    }
+    return true;
+  }
 
   @override
   void initState() {
@@ -332,11 +426,25 @@ class _MatchBoxState extends State<MatchBox> {
     // Adjusted for more vertical breathing room and closer metadata items.
 
     return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
+      onEnter: (_) { if (!_isHovered) setState(() => _isHovered = true); },
+      onExit: (_) { if (_isHovered) setState(() => _isHovered = false); },
       child: GestureDetector(
-        onTap: () {
+        onTap: () async {
           bool isPremium = widget.match.isPremium;
+
+          // روابط 7esenlink تحتاج تذكرة بث (tk/sid/dv)؛ المصادر الأخرى
+          // (youtube / ok.ru / mpd مباشر) تمر بدون تغيير. الأهداف والملخصات
+          // روابط فيديو مباشرة ولا تحتاج تذكرة.
+          if (streams.any((s) =>
+              StreamTicketService.isTicketedStreamUrl(s['url'] ?? ''))) {
+            final ticketed = await _applyStreamTicket(
+              streams,
+              type: 'match',
+              id: widget.match.id,
+            );
+            if (!ticketed || !context.mounted) return;
+          }
+
           String firstUrl = streams.isNotEmpty ? streams.first['url'] ?? '' : '';
 
           widget.openVideo(
@@ -662,6 +770,9 @@ class _MatchBoxState extends State<MatchBox> {
   }
 
   Widget _buildTeamLogo(String logoUrl, {double size = 60}) {
+    // Decode at ~3x the display size (retina-safe) instead of full resolution.
+    // Full-size decodes of team logos were the main scroll-jank source on web.
+    final int cacheDim = (size * 3).round();
     return SizedBox(
       width: size,
       height: size,
@@ -669,13 +780,12 @@ class _MatchBoxState extends State<MatchBox> {
           ? CachedNetworkImage(
               imageUrl: ImageProxy.resolveUrl(logoUrl),
               fit: BoxFit.contain, // Maintain aspect ratio
-              // Use memCacheHeight/Width to improve quality/performance relation
-              // If pixelation is the issue, we avoid resizing too small here.
-              // Actually, simply removing resize params ensures we get full quality,
-              // but we rely on 'fit' to scale down visually.
-              filterQuality: FilterQuality.high, // Ensure high quality scaling
-              placeholder: (context, url) =>
-                  Center(child: CircularProgressIndicator()),
+              memCacheWidth: cacheDim,
+              memCacheHeight: cacheDim,
+              filterQuality: FilterQuality.medium,
+              fadeInDuration: const Duration(milliseconds: 120),
+              // A static placeholder — animated spinners per logo cost frames.
+              placeholder: (context, url) => const SizedBox.shrink(),
               errorWidget: (context, url, error) => Image.asset(
                 'assets/no-image.png',
                 width: size * 0.8,

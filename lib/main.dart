@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:media_kit/media_kit.dart';
@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'package:hesen/web_utils.dart'
@@ -20,6 +21,7 @@ import 'package:hesen/services/data_processor.dart';
 import 'package:hesen/theme_customization_screen.dart';
 import 'package:hesen/screens/home_page.dart';
 import 'package:hesen/app.dart';
+import 'package:hesen/services/debug_logger.dart';
 import 'package:hesen/services/notification_service.dart';
 
 final GlobalKey<HomePageState> homeKey = GlobalKey<HomePageState>();
@@ -28,12 +30,24 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
 Future<void> main() async {
+  // Enable the on-device debug logger on web via ?debug=1 or a saved flag.
+  if (kIsWeb && shouldEnableDebugLogger()) {
+    DebugLogger.enable();
+  }
+
   // On web, SentryWidgetsFlutterBinding causes MissingPluginException
   // (internally uses path_provider which is not supported on web)
   if (kIsWeb) {
     WidgetsFlutterBinding.ensureInitialized();
   } else {
     SentryWidgetsFlutterBinding.ensureInitialized();
+  }
+
+  // Clean path URLs (e.g. /pricing, /terms, /privacy, /refund) on web instead
+  // of /#/pricing â€” required for Paddle payment-verification deep links.
+  // No-op on other platforms.
+  if (kIsWeb) {
+    usePathUrlStrategy();
   }
   await NotificationService.init();
 

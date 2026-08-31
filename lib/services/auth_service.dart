@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:hesen/web_utils.dart'
+    if (dart.library.io) 'package:hesen/web_utils_stub.dart';
 import 'package:hesen/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hesen/services/resend_service.dart';
@@ -521,10 +523,44 @@ class AuthService {
   Future<UserCredential?> signInWithGoogle() async {
     if (!isFirebaseInitialized) throw Exception("Firebase not initialized");
     try {
-      final googleProvider = GoogleAuthProvider();
+      final googleProvider = GoogleAuthProvider()
+        // Always show the Google account chooser instead of silently
+        // reusing whatever session Google remembers.
+        ..setCustomParameters({'prompt': 'select_account'});
       UserCredential cred;
       if (kIsWeb) {
-        cred = await _auth!.signInWithPopup(googleProvider);
+        final bool isApplePlatform =
+            defaultTargetPlatform == TargetPlatform.iOS ||
+                defaultTargetPlatform == TargetPlatform.macOS;
+        if (!isApplePlatform) {
+          cred = await _auth!.signInWithPopup(googleProvider);
+        } else if (isIosStandalonePwa) {
+          // Installed home-screen PWA on iOS: popups hang silently (window.open
+          // never resolves) — go straight to the redirect flow.
+          debugPrint('signInWithGoogle: iOS standalone PWA → redirect');
+          await _auth!.signInWithRedirect(googleProvider);
+          // Page reloads when Google returns; session restored on startup.
+          return null;
+        } else {
+          // Safari tab: popup shares the browser session → account list shows.
+          try {
+            cred = await _auth!.signInWithPopup(googleProvider);
+          } on FirebaseAuthException catch (e) {
+            const fallbackCodes = {
+              'popup-blocked',
+              'popup-closed-by-user',
+              'cancelled-popup-request',
+              'operation-not-supported-in-this-environment',
+            };
+            if (fallbackCodes.contains(e.code)) {
+              debugPrint(
+                  'signInWithGoogle: popup unavailable (${e.code}) → redirect');
+              await _auth!.signInWithRedirect(googleProvider);
+              return null;
+            }
+            rethrow;
+          }
+        }
       } else {
         cred = await _auth!.signInWithProvider(googleProvider);
       }

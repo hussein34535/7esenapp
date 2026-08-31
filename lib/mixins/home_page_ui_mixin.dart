@@ -48,7 +48,7 @@ mixin HomePageUIMixin on HomePageDataMixin {
     if (!_isSubscribed) {
       actions.add(
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 2.0),
           child: Container(
             decoration: BoxDecoration(
               gradient: const LinearGradient(
@@ -77,12 +77,13 @@ mixin HomePageUIMixin on HomePageDataMixin {
                     borderRadius: BorderRadius.circular(20)),
               ),
               icon: const Icon(Icons.workspace_premium_rounded,
-                  color: Colors.black87, size: 18),
-              label: const Text('اشترك الآن',
+                  color: Colors.black87, size: 17),
+              label: const Text('PRO',
                   style: TextStyle(
                       color: Colors.black87,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13)),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                      letterSpacing: 0.5)),
             ),
           ),
         ),
@@ -289,16 +290,15 @@ mixin HomePageUIMixin on HomePageDataMixin {
 
   @override
   Widget build(BuildContext context) {
-    if (_cachedSections == null || !_isTabSwitching) {
-      _cachedSections = [
-        _buildSectionContent(0),
-        _buildSectionContent(1),
-        _buildSectionContent(2),
-        _buildSectionContent(3),
-        _buildSectionContent(4),
-      ];
-    }
-    _isTabSwitching = false;
+    // Lazy tabs: a section is only built once the user opens it, then it stays
+    // mounted so switching back is instant and scroll position is preserved.
+    // This avoids loading/decoding the images of all five sections at startup —
+    // the main source of jank on iOS web.
+    _visitedTabs.add(_selectedIndex);
+    final List<Widget> sections = List<Widget>.generate(5, (int i) {
+      if (!_visitedTabs.contains(i)) return const SizedBox.shrink();
+      return RepaintBoundary(child: _buildSectionContent(i));
+    });
 
     if (kIsWeb && _isLoading) {
       return const Scaffold(
@@ -312,16 +312,7 @@ mixin HomePageUIMixin on HomePageDataMixin {
         preferredSize: Size.fromHeight(AppBar().preferredSize.height),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
-          decoration: BoxDecoration(
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
-                  spreadRadius: 1,
-                  blurRadius: 3,
-                  offset: const Offset(0, 1))
-            ],
-            color: Theme.of(context).appBarTheme.backgroundColor,
-          ),
+          color: Theme.of(context).appBarTheme.backgroundColor,
           child: AppBar(
             elevation: 0,
             leading: IconButton(
@@ -339,7 +330,10 @@ mixin HomePageUIMixin on HomePageDataMixin {
 
                     return Directionality(
                       textDirection: TextDirection.rtl,
-                      child: Container(
+                      // Cache the sheet's raster so the slide-in animation
+                      // doesn't repaint this whole tree every frame.
+                      child: RepaintBoundary(
+                        child: Container(
                         padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
                         decoration: BoxDecoration(
                           color: theme.cardColor,
@@ -689,7 +683,7 @@ mixin HomePageUIMixin on HomePageDataMixin {
                                       onTap: () async {
                                         Navigator.pop(context);
                                         final Uri telegramUri =
-                                            Uri.parse('https://t.me/he_s_en');
+                                            Uri.parse('https://t.me/tv_7esen');
                                         try {
                                           if (await canLaunchUrl(telegramUri)) {
                                             await launchUrl(telegramUri,
@@ -802,6 +796,7 @@ mixin HomePageUIMixin on HomePageDataMixin {
                           ),
                         ),
                       ),
+                      ),
                     );
                   },
                 );
@@ -813,45 +808,35 @@ mixin HomePageUIMixin on HomePageDataMixin {
                   child: Directionality(
                     textDirection: TextDirection.rtl,
                     child: _userName != null
-                        ? RichText(
-                            textAlign:
-                                Directionality.of(context) == TextDirection.rtl
-                                    ? TextAlign.right
-                                    : TextAlign.left,
-                            text: TextSpan(
-                              style: const TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white),
-                              children: [
-                                const TextSpan(text: 'أهلاً بك '),
-                                TextSpan(
-                                  text: _userName,
-                                  style: TextStyle(
-                                    fontSize: 22,
+                        ? Builder(builder: (context) {
+                            // Long names overflow the bar — greet by first name only.
+                            final String firstName = _userName!
+                                .trim()
+                                .split(RegExp(r'\s+'))
+                                .first;
+                            return RichText(
+                              // Anchor the greeting next to the menu (left edge).
+                              textAlign: TextAlign.left,
+                              text: TextSpan(
+                                style: const TextStyle(
+                                    fontSize: 19,
                                     fontWeight: FontWeight.bold,
-                                    foreground: _isDarkMode
-                                        ? (Paint()
-                                          ..shader = LinearGradient(
-                                            colors: [
-                                              Colors.blue.shade800,
-                                              Colors.deepPurple.shade700,
-                                              Colors.blue.shade500
-                                            ],
-                                            begin: Alignment.centerLeft,
-                                            end: Alignment.centerRight,
-                                          ).createShader(const Rect.fromLTWH(
-                                              0.0, 0.0, 200.0, 70.0)))
-                                        : null,
-                                    color: _isDarkMode
-                                        ? null
-                                        : const Color(0xFFF8F8F8),
-                                    overflow: TextOverflow.ellipsis,
+                                    color: Colors.white),
+                                children: [
+                                  const TextSpan(text: 'أهلاً بك '),
+                                  TextSpan(
+                                    text: firstName,
+                                    style: const TextStyle(
+                                      fontSize: 19,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFFB388FF),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          )
+                                ],
+                              ),
+                            );
+                          })
                         : const SizedBox.shrink(),
                   ),
                 ),
@@ -878,7 +863,7 @@ mixin HomePageUIMixin on HomePageDataMixin {
                       padding: const EdgeInsets.only(top: 10.0),
                       child: IndexedStack(
                         index: _selectedIndex,
-                        children: _cachedSections!,
+                        children: sections,
                       ),
                     ),
                   );
@@ -901,9 +886,9 @@ mixin HomePageUIMixin on HomePageDataMixin {
         index: _selectedIndex,
         onTap: (index) {
           if (!mounted) return;
-          _isTabSwitching = true;
           setState(() {
             _selectedIndex = index;
+            _visitedTabs.add(index);
           });
           SharedPreferences.getInstance().then((prefs) {
             prefs.setInt('last_selected_index', index);

@@ -43,12 +43,31 @@ class HomePage extends StatefulWidget {
 }
 
 class HomePageState extends State<HomePage> with WidgetsBindingObserver, HomePageDataMixin, HomePageUIMixin {
+  bool _assetsPrecached = false;
+
   @override
   void initState() {
     super.initState();
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     _isDarkMode = themeProvider.themeMode == ThemeMode.dark;
     _startInitializationSequence();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_assetsPrecached) return;
+    _assetsPrecached = true;
+    // Decode the nav-bar icons and fallback image up front so the first tab
+    // switch doesn't stutter while they load.
+    for (final String path in const [
+      'assets/replay.png',
+      'assets/goal.png',
+      'assets/table.png',
+      'assets/no-image.png',
+    ]) {
+      precacheImage(AssetImage(path), context).catchError((_) => null);
+    }
   }
 
   @override

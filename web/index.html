@@ -9,83 +9,20 @@
   <meta name="description" content="Watch Live TV and News">
   <meta name="referrer" content="no-referrer">
 
-  <!-- 🛡️ SMART CACHING & SELF-HEALING SYSTEM -->
-  <script>
-    // 1. One-time Cache & SW Purge on version update (to clean up old corrupted state)
-    const CACHE_CLEAN_VERSION = 'v3.1';
-    if (localStorage.getItem('cache_clean_version') !== CACHE_CLEAN_VERSION) {
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function (registrations) {
-          for (let registration of registrations) {
-            registration.unregister().then(function (boolean) {
-              console.log('[PWA] Old Service Worker Purged: ', boolean);
-            });
-          }
-        });
-      }
-      if ('caches' in window) {
-        caches.keys().then(function (names) {
-          for (let name of names) {
-            caches.delete(name);
-          }
-          console.log('[PWA] One-time Cache Storage Cleared');
-        });
-      }
-      localStorage.setItem('cache_clean_version', CACHE_CLEAN_VERSION);
-    } else {
-      // Clean up old custom service worker ONLY, keep Flutter's official one
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function (registrations) {
-          for (let registration of registrations) {
-            if (registration.active && 
-                registration.active.scriptURL.includes('service-worker.js') && 
-                !registration.active.scriptURL.includes('flutter_service_worker.js')) {
-              registration.unregister().then(function (boolean) {
-                console.log('[PWA] Unregistered deprecated custom service worker:', boolean);
-              });
-            }
-          }
-        });
-      }
-    }
+  <!-- Preconnect to font/CDN origins so first paint isn't blocked -->
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
 
-    // 2. Global Error Handler & Self-Healing Logic for Cache Mismatch / MIME Corruption
-    window.onerror = function(message, source, lineno, colno, error) {
-      console.error('[Global Error Intercepted]', {message, source, lineno, colno, error});
-      
-      const errorStr = String(message).toLowerCase();
-      // Detect critical loading failures (Unexpected token '<', MIME type errors, import failures)
-      if (
-        errorStr.includes('unexpected token') || 
-        errorStr.includes('mime') || 
-        errorStr.includes('failed to fetch') ||
-        errorStr.includes('typeerror')
-      ) {
-        console.warn('[PWA] Potential cache corruption detected. Performing self-healing factory reset...');
-        
-        // Reset everything
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.getRegistrations().then(function (registrations) {
-            for (let registration of registrations) {
-              registration.unregister();
-            }
-          });
-        }
-        if ('caches' in window) {
-          caches.keys().then(function (names) {
-            for (let name of names) {
-              caches.delete(name);
-            }
-          });
-        }
-        localStorage.removeItem('cache_clean_version'); // Reset cleanup flag
-        
-        // Force reload from server bypassing cache
-        setTimeout(() => {
-          window.location.reload(true);
-        }, 800);
+  <!-- Engine splash on FIRST load only — repeat visits go straight to the app intro -->
+  <style>
+    html[data-skip-engine-splash] #splash { display: none !important; }
+  </style>
+  <script>
+    try {
+      if (localStorage.getItem('engine_splash_seen') === '1') {
+        document.documentElement.setAttribute('data-skip-engine-splash', '1');
       }
-    };
+    } catch (e) {}
   </script>
 
   <!-- iOS meta tags & icons -->
@@ -99,6 +36,12 @@
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png">
 
+  <script>
+    // Capture the real entry path BEFORE the Flutter engine boots (the engine
+    // rewrites the URL to '/' during startup). Read later by Dart for deep
+    // links like /pricing, /terms, /privacy, /refund.
+    try { window.__hesenInitialPath = location.pathname; } catch (e) {}
+  </script>
   <title>Hesen TV</title>
   <link rel="manifest" href="manifest.json">
 
@@ -112,6 +55,13 @@
       -webkit-tap-highlight-color: transparent;
       -webkit-touch-callout: none;
       overscroll-behavior-y: none;
+      /* Kill the 300ms tap delay + double-tap zoom on iOS */
+      touch-action: manipulation;
+      /* Crisper text rendering in the canvas renderer */
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      /* Prevent iOS from resizing text on orientation change */
+      -webkit-text-size-adjust: 100%;
     }
   </style>
 
@@ -121,8 +71,8 @@
 
 
   <!-- Vidstack Player (v1.12.12 - Pinned stable version) -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@vidstack/cdn@1.12.12/player/theme.css" media="print" onload="this.media='all'" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@vidstack/cdn@1.12.12/player/video.css" media="print" onload="this.media='all'" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@vidstack/cdn@1.12.12/styles/player/default/theme.css" media="print" onload="this.media='all'" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@vidstack/cdn@1.12.12/styles/player/default/layouts/video.css" media="print" onload="this.media='all'" />
   <script type="module" src="https://cdn.jsdelivr.net/npm/@vidstack/cdn@1.12.12/player.js" defer></script>
   <!-- XHR Interceptor: Routes HLS segment requests through HTTPS proxy -->
   <script src="xhr_interceptor.js?v=2.1" defer></script>
@@ -241,6 +191,28 @@
     .dot-2 { animation: dotPulse 1.5s infinite 0.3s; }
     .dot-3 { animation: dotPulse 1.5s infinite 0.6s; }
 
+    /* Repeat visits: a single breathing logo instead of the full engine splash */
+    #miniSplash {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+      z-index: 9998;
+    }
+    html[data-skip-engine-splash] #miniSplash { display: flex; }
+    #miniSplash img {
+      width: 96px;
+      height: 96px;
+      border-radius: 24px;
+      animation: breathe 2.2s ease-in-out infinite;
+    }
+    @keyframes breathe {
+      0%, 100% { transform: scale(0.97); opacity: 0.82; }
+      50%      { transform: scale(1.02); opacity: 1; }
+    }
+
     /* Hide Flutter Default Loading */
     .loading {
       display: none !important;
@@ -262,12 +234,18 @@
     <div class="splash-timer" id="splashTimer">0 ثانية</div>
   </div>
 
+  <!-- Repeat visits: breathing logo (hidden on first visit) -->
+  <div id="miniSplash">
+    <img src="apple-touch-icon-v3.png" alt="">
+  </div>
+
   <!-- Flutter App Container -->
   <div id="flutter-app"></div>
 
   <script>
-    // ✅ Splash Timer + Status
+    // Splash Timer + Status (first visit only — repeat visitors see pure black → intro)
     (function() {
+      if (document.documentElement.hasAttribute('data-skip-engine-splash')) return;
       const statusEl = document.getElementById('splashStatus');
       const timerEl = document.getElementById('splashTimer');
       const startTime = Date.now();
@@ -293,20 +271,49 @@
       }, 1000);
     })();
 
-    // ✅ Remove Splash when Flutter is ready (Called from Dart)
+    // Remove Splash when Flutter is ready (Called from Dart)
     window.removeSplashFromWeb = function () {
       const splash = document.getElementById('splash');
       if (splash) {
         splash.classList.add('hidden');
       }
+      const mini = document.getElementById('miniSplash');
+      if (mini) {
+        mini.style.display = 'none';
+      }
+      const emergency = document.getElementById('emergencyReload');
+      if (emergency) {
+        emergency.remove();
+      }
+      window.__hesenAppReady = true;
+      // Engine has successfully loaded at least once → future visits skip this splash
+      try {
+        localStorage.setItem('engine_splash_seen', '1');
+      } catch (e) {}
     };
 
-    // 🚨 FAILSAFE: Force remove splash after 60 seconds if Flutter fails to load
+    // FAILSAFE: If Flutter is still not ready after 60 seconds, show a floating
+    // "Retry" button instead of leaving the user stuck on a dead screen.
     setTimeout(() => {
+      if (window.__hesenAppReady) return;
       const splash = document.getElementById('splash');
       if (splash && !splash.classList.contains('hidden')) {
         splash.classList.add('hidden');
       }
+      const statusEl = document.getElementById('splashStatus');
+      if (statusEl) {
+        statusEl.innerHTML = 'التحميل بطيء جداً — جرّب إعادة المحاولة';
+      }
+      const btn = document.createElement('button');
+      btn.id = 'emergencyReload';
+      btn.innerHTML = '↻ إعادة المحاولة';
+      btn.style.cssText =
+        'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);' +
+        'z-index:99999;padding:10px 24px;border-radius:24px;border:none;' +
+        'background:#7C52D8;color:#fff;font-size:15px;font-weight:bold;' +
+        'font-family:inherit;box-shadow:0 6px 20px rgba(0,0,0,0.5);cursor:pointer;';
+      btn.onclick = function () { window.location.reload(); };
+      document.body.appendChild(btn);
     }, 60000);
 
     // ✅ Service Worker Registration (DISABLED for iOS stability)

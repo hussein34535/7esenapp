@@ -165,7 +165,7 @@ void showTelegramDialog(BuildContext context, {String? userName, bool isSubscrib
                 flex: 2,
                 child: ElevatedButton.icon(
                   onPressed: () async {
-                    final telegramUrl = Uri.parse('https://t.me/he_s_en');
+                    final telegramUrl = Uri.parse('https://t.me/tv_7esen');
                     try {
                       if (await canLaunchUrl(telegramUrl)) {
                         await launchUrl(telegramUrl, mode: LaunchMode.externalApplication);

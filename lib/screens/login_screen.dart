@@ -1,3 +1,4 @@
+import 'dart:math' show pi;
 import 'package:flutter/material.dart';
 import 'package:hesen/services/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -5,7 +6,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 import 'package:hesen/services/cloudinary_service.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:hesen/widgets/in_app_notification.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -13,6 +13,59 @@ class LoginScreen extends StatefulWidget {
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
+}
+
+/// Official multicolor Google "G" drawn natively (no icon-font approximation).
+class _GoogleLogo extends StatelessWidget {
+  final double size;
+  const _GoogleLogo({this.size = 22});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(painter: _GoogleGPainter()),
+    );
+  }
+}
+
+class _GoogleGPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double s = size.shortestSide;
+    final double stroke = s * 0.235;
+    final double outerR = s * 0.5;
+    final double ringR = outerR - stroke / 2;
+    final Offset c = Offset(s / 2, s / 2);
+    final Rect ring = Rect.fromCircle(center: c, radius: ringR);
+
+    // Ring segments are split exactly at the diagonals (45°, 135°, 225°, 315°).
+    void segment(double startDeg, double sweepDeg, Color color) {
+      final Paint p = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = stroke
+        ..strokeCap = StrokeCap.butt
+        ..color = color;
+      canvas.drawArc(ring, startDeg * pi / 180, sweepDeg * pi / 180, false, p);
+    }
+
+    // Screen angles (y-down): East=0, South=90, West=180, North=270.
+    segment(315, 90, const Color(0xFF4285F4)); // right → blue (upper part)
+    segment(45, 90, const Color(0xFF34A853)); // bottom-right → green
+    segment(135, 90, const Color(0xFFFBBC05)); // bottom-left → yellow
+    segment(225, 90, const Color(0xFFEA4335)); // top → red
+
+    // Blue horizontal bar of the "G" from center to the outer edge.
+    final Paint barPaint = Paint()..color = const Color(0xFF4285F4);
+    canvas.drawRect(
+      Rect.fromLTWH(c.dx, c.dy - stroke / 2, ringR + stroke / 2, stroke),
+      barPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _LoginScreenState extends State<LoginScreen> {
@@ -182,6 +235,34 @@ class _LoginScreenState extends State<LoginScreen> {
       if (cred != null && mounted) {
         Navigator.of(context).pop();
       }
+    } on FirebaseAuthException catch (e) {
+      if (mounted) {
+        final Map<String, String> socialErrors = {
+          'popup-blocked': 'المتصفح منع نافذة جوجل — اسمح بالنوافذ المنبثقة',
+          'popup-closed-by-user': '',
+          'cancelled-popup-request': '',
+          'unauthorized-domain':
+              'الدومين غير مصرّح له في إعدادات Firebase (Authorized domains)',
+          'operation-not-allowed': 'تسجيل الدخول بجوجل غير مفعّل حالياً',
+          'network-request-failed': 'فشل الاتصال بالإنترنت',
+        };
+        final msg = socialErrors[e.code];
+        if (msg != null && msg.isNotEmpty) {
+          InAppNotification.show(
+            context: context,
+            message: msg,
+            type: NotificationType.error,
+            icon: Icons.error_outline,
+          );
+        } else if (msg == null) {
+          InAppNotification.show(
+            context: context,
+            message: 'فشل تسجيل الدخول (${e.code})',
+            type: NotificationType.error,
+            icon: Icons.error_outline,
+          );
+        }
+      }
     } catch (e) {
       if (mounted) {
         InAppNotification.show(
@@ -252,7 +333,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
+          padding: const EdgeInsets.fromLTRB(24.0, 20.0, 24.0, 32.0),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 400),
             child: Form(
@@ -283,7 +364,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       color: Colors.grey,
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 28),
 
                   // Profile Image Picker (Only for Signup)
                   if (!_isLogin && !_isForgotPassword) ...[
@@ -320,7 +401,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 22),
                   ],
 
                   // Name Field (Only for Signup & Not verifying)
@@ -522,7 +603,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   // Google Sign In Button
                   _buildSocialButton(
                     text: 'تسجيل الدخول بواسطة Google',
-                    iconWidget: const FaIcon(FontAwesomeIcons.google, color: Colors.redAccent, size: 22),
+                    iconWidget: const _GoogleLogo(size: 22),
                     backgroundColor: Colors.white,
                     foregroundColor: Colors.black87,
                     onPressed: () => _handleSocialLogin(AuthService().signInWithGoogle),

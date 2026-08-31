@@ -27,9 +27,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    // Prevent UI freeze on Web by delaying data fetch slightly
-    Future.delayed(Duration.zero, () {
-      _fetchUserData();
+    // Wait for the push transition to finish before touching cache/network,
+    // so the incoming setState() doesn't stutter the animation.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 320), () {
+        if (!mounted) return;
+        _fetchUserData();
+      });
     });
   }
 

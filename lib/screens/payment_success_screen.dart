@@ -482,7 +482,8 @@ class ConfettiParticle {
 class ConfettiPainter extends CustomPainter {
   final List<ConfettiParticle> particles;
 
-  ConfettiPainter(this.particles);
+  ConfettiPainter(this.particles, {required Listenable repaint})
+      : super(repaint: repaint);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -587,23 +588,21 @@ class _ConfettiCelebrationState extends State<ConfettiCelebration>
 
   void _updateParticles() {
     if (!mounted) return;
-    setState(() {
-      for (final p in _particles) {
-        p.vy += 0.08;
-        p.vx *= 0.99;
-        p.x += p.vx;
-        p.y += p.vy;
-        p.x += sin(p.y * 0.02 + p.swayOffset) * 0.6;
-        p.rotation += p.rotationSpeed;
+    for (final p in _particles) {
+      p.vy += 0.08;
+      p.vx *= 0.99;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.x += sin(p.y * 0.02 + p.swayOffset) * 0.6;
+      p.rotation += p.rotationSpeed;
 
-        if (p.y > MediaQuery.of(context).size.height + 20) {
-          p.y = -20;
-          p.x = _random.nextDouble() * MediaQuery.of(context).size.width;
-          p.vy = _random.nextDouble() * 4 + 2;
-          p.vx = _random.nextDouble() * 2 - 1;
-        }
+      if (p.y > MediaQuery.of(context).size.height + 20) {
+        p.y = -20;
+        p.x = _random.nextDouble() * MediaQuery.of(context).size.width;
+        p.vy = _random.nextDouble() * 4 + 2;
+        p.vx = _random.nextDouble() * 2 - 1;
       }
-    });
+    }
   }
 
   @override
@@ -612,7 +611,7 @@ class _ConfettiCelebrationState extends State<ConfettiCelebration>
       child: IgnorePointer(
         child: CustomPaint(
           size: Size.infinite,
-          painter: ConfettiPainter(_particles),
+          painter: ConfettiPainter(_particles, repaint: _confettiController),
         ),
       ),
     );

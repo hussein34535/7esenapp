@@ -15,7 +15,7 @@ class HighlightsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     if (highlights.isEmpty) {
       return CustomScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
         slivers: [
           SliverFillRemaining(
             hasScrollBody: false,
@@ -159,9 +159,11 @@ class _HighlightBoxState extends State<HighlightBox> {
                     width: double.infinity,
                     child: CachedNetworkImage(
                       imageUrl: ImageProxy.resolveUrl(imageUrl),
+                      memCacheWidth: 720,
+                      filterQuality: FilterQuality.medium,
+                      fadeInDuration: const Duration(milliseconds: 150),
                       placeholder: (context, url) => Container(
                         color: Colors.grey[900],
-                        child: const Center(child: CircularProgressIndicator()),
                       ),
                       errorWidget: (context, url, error) => _buildPlaceholder(),
                       fit: BoxFit.cover,
@@ -256,8 +258,8 @@ class _HighlightBoxState extends State<HighlightBox> {
     }
 
     return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
+      onEnter: (_) { if (!_isHovered) setState(() => _isHovered = true); },
+      onExit: (_) { if (_isHovered) setState(() => _isHovered = false); },
       child: GestureDetector(
         onTap: handleTap,
         child: AnimatedContainer(
@@ -284,8 +286,11 @@ class _HighlightBoxState extends State<HighlightBox> {
                 Expanded(
                   child: CachedNetworkImage(
                     imageUrl: ImageProxy.resolveUrl(imageUrl),
+                    memCacheWidth: 720,
+                    filterQuality: FilterQuality.medium,
+                    fadeInDuration: const Duration(milliseconds: 150),
                     placeholder: (context, url) =>
-                        const Center(child: CircularProgressIndicator()),
+                        Container(color: Colors.grey[900]),
                     errorWidget: (context, url, error) => _buildPlaceholder(),
                     width: double.infinity,
                     fit: BoxFit.cover,

@@ -155,7 +155,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           final uri = Uri.parse(finalUrl);
           rawTargetUrlForInterceptor = uri.queryParameters['url'] ?? finalUrl;
           debugPrint('[VIDSTACK] Extracted original URL for interceptor from proxy: $rawTargetUrlForInterceptor');
-        } catch (e) {}
+        } catch (e) { debugPrint('[VIDSTACK_IMPL] DOM operation failed (non-fatal): $e'); }
       } else {
         // 1. Handle 7esenlink (JSON resolution)
         String? sevenEsenUrl;
@@ -267,7 +267,30 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
       // If it's an MP4 or YouTube, the interceptor would try to parse binary/html as text and fail.
       bool shouldUseInterceptor = !isMp4 && !isYoutube && shouldProxy;
 
-      if (shouldUseInterceptor) {
+      final bool isIosWeb = defaultTargetPlatform == TargetPlatform.iOS;
+      if (isIosWeb && !isMp4 && !isYoutube) {
+        // iOS plays HLS natively (no MSE): the XHR interceptor never runs, and
+        // relative playlist segments resolve against the playlist's own host —
+        // so any proxy wrapper breaks playback. Always hand the player the true
+        // origin URL, swapping legacy IP hosts (untrusted self-signed cert)
+        // for the certificate-backed domain.
+        String direct = rawTargetUrlForInterceptor.isNotEmpty
+            ? rawTargetUrlForInterceptor
+            : rawStreamUrl;
+        try {
+          final Uri u = Uri.parse(direct);
+          if (u.host == '193.233.219.4') {
+            direct = Uri(
+              scheme: 'https',
+              host: 'live.7esentv.com',
+              path: u.path,
+              query: u.hasQuery ? u.query : null,
+            ).toString();
+          }
+        } catch (_) {}
+        sourceToUse = direct;
+        debugPrint('[VIDSTACK] iOS native HLS direct: $direct');
+      } else if (shouldUseInterceptor) {
         // Set global variables using js_interop for the interceptor
         // Use the proxied URL so the interceptor can fetch it bypass CORS
         web.window.setProperty('currentStreamUrl'.toJS, rawStreamUrl.toJS);
@@ -287,13 +310,13 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         (_currentPlayer as JSObject).setProperty('src'.toJS, srcMap.jsify());
         try {
           (_currentPlayer as JSObject).callMethod('play'.toJS, JSArray());
-        } catch (e) {}
+        } catch (e) { debugPrint('[VIDSTACK_IMPL] DOM operation failed (non-fatal): $e'); }
       } catch (e) {
         // Fallback setting attribute
         _currentPlayer!.setAttribute('src', sourceToUse);
         try {
           (_currentPlayer as JSObject).callMethod('play'.toJS, JSArray());
-        } catch (e) {}
+        } catch (e) { debugPrint('[VIDSTACK_IMPL] DOM operation failed (non-fatal): $e'); }
       }
       
       // 🏁 Set title and stream type (Live vs VOD)
@@ -408,7 +431,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           element.style.width = '100%';
           element.style.height = '100%';
           element.style.display = 'block';
-        } catch (e) {}
+        } catch (e) { debugPrint('[VIDSTACK_IMPL] DOM operation failed (non-fatal): $e'); }
 
         // --- CSS Styles ---
         final style =
@@ -545,7 +568,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           loader = rawLoader as web.HTMLDivElement;
           loader.className = 'vds-loader visible';
           element.append(loader);
-        } catch (e) {}
+        } catch (e) { debugPrint('[VIDSTACK_IMPL] DOM operation failed (non-fatal): $e'); }
 
         // OVERLAY HEADER
         web.HTMLDivElement? overlay;
@@ -553,7 +576,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           final rawOverlay = web.document.createElement('div');
           overlay = rawOverlay as web.HTMLDivElement;
           overlay.className = 'vds-overlay-header';
-        } catch (e) {}
+        } catch (e) { debugPrint('[VIDSTACK_IMPL] DOM operation failed (non-fatal): $e'); }
 
         // Back Button
         web.HTMLButtonElement? backBtn;
@@ -569,7 +592,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           backBtn.append(backSpan);
 
           if (overlay != null) overlay.append(backBtn);
-        } catch (e) {}
+        } catch (e) { debugPrint('[VIDSTACK_IMPL] DOM operation failed (non-fatal): $e'); }
 
         // Links Container
         web.HTMLDivElement? linksContainer;
@@ -578,7 +601,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           linksContainer = rawLC as web.HTMLDivElement;
           linksContainer.className = 'vds-links-container';
           if (overlay != null) overlay.append(linksContainer);
-        } catch (e) {}
+        } catch (e) { debugPrint('[VIDSTACK_IMPL] DOM operation failed (non-fatal): $e'); }
 
         try {
           if (overlay != null) {

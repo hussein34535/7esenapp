@@ -18,7 +18,7 @@ class NewsSection extends StatelessWidget {
     if (newsArticles.isEmpty) {
       // Use CustomScrollView + SliverFillRemaining for centering + scrollability
       return CustomScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
         slivers: [
           SliverFillRemaining(
               hasScrollBody: false,
@@ -77,7 +77,7 @@ class NewsSection extends StatelessWidget {
         Expanded(
           // Make ListView take remaining space
           child: ListView.builder(
-            physics: const AlwaysScrollableScrollPhysics(),
+            physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
             itemCount: newsArticles.length,
             itemBuilder: (context, index) {
               final article = newsArticles[index];
@@ -220,8 +220,11 @@ class _NewsBoxState extends State<NewsBox> {
               children: [
                 CachedNetworkImage(
                   imageUrl: ImageProxy.resolveUrl(imageUrl),
+                  memCacheWidth: 720,
+                  filterQuality: FilterQuality.medium,
+                  fadeInDuration: const Duration(milliseconds: 150),
                   placeholder: (context, url) =>
-                      Center(child: CircularProgressIndicator()),
+                      Container(color: Colors.grey[900]),
                   errorWidget: (context, url, error) => _buildPlaceholder(),
                   height: 180, // Reduced from 200 for better proportion
                   width: double.infinity,
@@ -273,8 +276,8 @@ class _NewsBoxState extends State<NewsBox> {
 
     // --- DESKTOP LAYOUT (Enhanced) ---
     return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
+      onEnter: (_) { if (!_isHovered) setState(() => _isHovered = true); },
+      onExit: (_) { if (_isHovered) setState(() => _isHovered = false); },
       child: GestureDetector(
         onTap: () {
           bool isPremium = widget.article['is_premium'] ?? false;
@@ -323,8 +326,11 @@ class _NewsBoxState extends State<NewsBox> {
                   Expanded(
                     child: CachedNetworkImage(
                       imageUrl: ImageProxy.resolveUrl(imageUrl),
+                      memCacheWidth: 720,
+                      filterQuality: FilterQuality.medium,
+                      fadeInDuration: const Duration(milliseconds: 150),
                       placeholder: (context, url) =>
-                          const Center(child: CircularProgressIndicator()),
+                          Container(color: Colors.grey[900]),
                       errorWidget: (context, url, error) => _buildPlaceholder(),
                       width: double.infinity,
                       fit: BoxFit.cover,

@@ -1,10 +1,31 @@
+﻿import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:hesen/navigation.dart';
 import 'package:hesen/screens/pwa_install_screen.dart';
 import 'package:hesen/screens/app_intro_screen.dart';
 import 'package:hesen/notification_page.dart';
+import 'package:hesen/privacy_policy_page.dart';
+import 'package:hesen/refund_policy_page.dart';
+import 'package:hesen/terms_of_service_page.dart';
+import 'package:hesen/screens/subscription_screen.dart';
 import 'package:hesen/theme_customization_screen.dart';
+import 'package:hesen/services/debug_logger.dart';
+import 'package:hesen/web_utils.dart' if (dart.library.io) 'package:hesen/web_utils_stub.dart';
+import 'package:hesen/widgets/debug_log_overlay.dart';
 import 'package:provider/provider.dart';
+
+/// Smooth, modern page transitions (fade + subtle forward slide) on every
+/// platform â€” lighter than the default zoom/slide transitions on web.
+const PageTransitionsTheme _pageTransitions = PageTransitionsTheme(
+  builders: {
+    TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
+    TargetPlatform.iOS: FadeForwardsPageTransitionsBuilder(),
+    TargetPlatform.linux: FadeForwardsPageTransitionsBuilder(),
+    TargetPlatform.macOS: FadeForwardsPageTransitionsBuilder(),
+    TargetPlatform.windows: FadeForwardsPageTransitionsBuilder(),
+    TargetPlatform.fuchsia: FadeForwardsPageTransitionsBuilder(),
+  },
+);
 
 class MyApp extends StatelessWidget {
   final Future<void> initFuture;
@@ -53,15 +74,6 @@ class MyApp extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      '7eSen TV',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
                     const SizedBox(height: 32),
                     const SizedBox(
                       width: 36,
@@ -79,12 +91,48 @@ class MyApp extends StatelessWidget {
         }
         return Consumer<ThemeProvider>(
           builder: (context, themeProvider, child) {
+            // Single source of truth for named routes: used both by `routes:`
+            // and by `onGenerateInitialRoutes` below. The intro screen is the
+            // '/' entry; `home:` cannot be used alongside
+            // `onGenerateInitialRoutes` (WidgetsApp assert).
+            final Map<String, WidgetBuilder> appRoutes = {
+              '/': (context) => AppIntroScreen(
+                    themeProvider: themeProvider,
+                    onThemeChanged: (isDarkMode) {
+                      themeProvider.setThemeMode(
+                        isDarkMode ? ThemeMode.dark : ThemeMode.light,
+                      );
+                    },
+                  ),
+              '/pwa_install': (context) => const PwaInstallScreen(),
+              '/Notification_screen': (context) => const NotificationPage(),
+              // Web deep links for Paddle payment verification.
+              '/pricing': (context) => const SubscriptionScreen(),
+              '/terms': (context) => const TermsOfServicePage(),
+              '/privacy': (context) => PrivacyPolicyPage(),
+              '/refund': (context) => const RefundPolicyPage(),
+            };
+
             return MaterialApp(
               title: '7eSen TV',
+              // Force the URL path as the initial route on web. The engine's
+              // defaultRouteName is unreliable here (reports '/' even for
+              // deep links), so read the path directly.
+              initialRoute: kIsWeb ? Uri.base.path : null,
               debugShowCheckedModeBanner: false,
+              // On-device debug overlay (web only, when enabled)
+              builder: kIsWeb && DebugLogger.enabled
+                  ? (context, appChild) => Stack(
+                        children: [
+                          if (appChild != null) appChild,
+                          const DebugLogOverlay(),
+                        ],
+                      )
+                  : null,
               themeMode: themeProvider.themeMode,
               theme: ThemeData(
                 brightness: Brightness.light,
+                pageTransitionsTheme: _pageTransitions,
                 primaryColor: themeProvider.getPrimaryColor(false),
                 scaffoldBackgroundColor:
                     themeProvider.getScaffoldBackgroundColor(false),
@@ -129,6 +177,7 @@ class MyApp extends StatelessWidget {
               ),
               darkTheme: ThemeData(
                 brightness: Brightness.dark,
+                pageTransitionsTheme: _pageTransitions,
                 primaryColor: themeProvider.getPrimaryColor(true),
                 scaffoldBackgroundColor:
                     themeProvider.getScaffoldBackgroundColor(true),
@@ -166,17 +215,39 @@ class MyApp extends StatelessWidget {
                   'sans-serif',
                 ],
               ),
-              home: AppIntroScreen(
-                themeProvider: themeProvider,
-                onThemeChanged: (isDarkMode) {
-                  themeProvider.setThemeMode(
-                    isDarkMode ? ThemeMode.dark : ThemeMode.light,
-                  );
-                },
-              ),
-              routes: {
-                '/pwa_install': (context) => const PwaInstallScreen(),
-                '/Notification_screen': (context) => const NotificationPage(),
+              // `home:` intentionally omitted â€” the '/' route above is the
+              // intro screen, exactly as before.
+              routes: appRoutes,
+              // Web deep links (e.g. /privacy opened directly) must start on
+              // the target page alone. The default initial-route generation
+              // would stack the deep-linked page ABOVE AppIntroScreen, whose
+              // unconditional pushReplacement(HomePage) after ~2.7s then
+              // replaces the deep-linked page with the home page.
+              onGenerateInitialRoutes: (String initialRouteName) {
+                // The engine rewrites the URL to '/' during startup, so read
+                // the entry path captured by index.html BEFORE Flutter booted.
+                // Falls back to '/' (normal entry) when unavailable.
+                final String initialPath =
+                    kIsWeb ? capturedInitialPath() : initialRouteName;
+                final WidgetBuilder? deepLinkBuilder =
+                    appRoutes[initialPath];
+                if (initialPath != '/' && deepLinkBuilder != null) {
+                  // Deep link: only the target page, no intro underneath.
+                  return <Route<dynamic>>[
+                    MaterialPageRoute<dynamic>(
+                      builder: deepLinkBuilder,
+                      settings: RouteSettings(name: initialPath),
+                    ),
+                  ];
+                }
+                // Normal entry ('/' and mobile/desktop): intro screen as
+                // before â€” ~2.7s animation then pushReplacement(HomePage).
+                return <Route<dynamic>>[
+                  MaterialPageRoute<dynamic>(
+                    builder: appRoutes['/']!,
+                    settings: const RouteSettings(name: '/'),
+                  ),
+                ];
               },
               navigatorKey: navigatorKey,
             );

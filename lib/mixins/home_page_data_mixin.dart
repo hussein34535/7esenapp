@@ -594,6 +594,32 @@ mixin HomePageDataMixin on State<HomePage> {
     }
   }
 
+  /// Navigates to the mandatory login gate. After a successful sign-in the
+  /// gate replacement takes the user back to HomePage.
+  void _goToLoginGate() {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    navigatorKey.currentState?.pushAndRemoveUntil(
+      MaterialPageRoute(
+          builder: (_) => LoginScreen(
+                isInitialGate: true,
+                onLoginSuccess: () {
+                  navigatorKey.currentState?.pushAndRemoveUntil(
+                    MaterialPageRoute(
+                        builder: (_) => HomePage(
+                              key: homeKey,
+                              onThemeChanged: (isDarkMode) =>
+                                  themeProvider.setThemeMode(isDarkMode
+                                      ? ThemeMode.dark
+                                      : ThemeMode.light),
+                            )),
+                    (route) => false,
+                  );
+                },
+              )),
+      (route) => false,
+    );
+  }
+
   void _handleDuplicateSession() async {
     _userSubscription?.cancel();
     await AuthService().signOut();
@@ -603,7 +629,7 @@ mixin HomePageDataMixin on State<HomePage> {
         builder: (context) => AlertDialog(
           title: const Text('تم تسجيل الخروج', style: TextStyle(color: Colors.orangeAccent)),
           content: const Text('تم تسجيل الدخول من جهاز آخر. لا يسمح بفتح الحساب من أكثر من جهاز في نفس الوقت.'),
-          actions: [TextButton(onPressed: () { Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginScreen()), (route) => false); }, child: const Text('حسناً'))],
+          actions: [TextButton(onPressed: () { _goToLoginGate(); }, child: const Text('حسناً'))],
         ),
       );
     }
@@ -618,7 +644,7 @@ mixin HomePageDataMixin on State<HomePage> {
         builder: (context) => AlertDialog(
           title: const Text('تم حظر الحساب', style: TextStyle(color: Colors.red)),
           content: const Text('تم حظر حسابك بسبب مخافة الشروط. يرجى التواصل مع الدعم الفني.'),
-          actions: [TextButton(onPressed: () { if (navigatorKey.currentState != null) { navigatorKey.currentState?.pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginScreen()), (route) => false); } }, child: const Text('موافق'))],
+          actions: [TextButton(onPressed: () { _goToLoginGate(); }, child: const Text('موافق'))],
         ),
       );
     }

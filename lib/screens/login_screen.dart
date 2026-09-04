@@ -9,7 +9,16 @@ import 'package:hesen/services/cloudinary_service.dart';
 import 'package:hesen/widgets/in_app_notification.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  /// When true, this screen is the app's entry gate (no route to pop back
+  /// to): the back button is hidden and a successful sign-in fires
+  /// [onLoginSuccess] instead of popping.
+  final bool isInitialGate;
+
+  /// Called after a successful sign-in/sign-up when [isInitialGate] is true.
+  /// Callers use it to navigate to HomePage (which needs their theme callback).
+  final VoidCallback? onLoginSuccess;
+
+  const LoginScreen({super.key, this.isInitialGate = false, this.onLoginSuccess});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -83,6 +92,17 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLogin = true; // Toggle between Login and Signup
   bool _isForgotPassword = false; // Forgot Password flow
 
+  /// Routes after a successful auth: gate mode goes to HomePage via the
+  /// caller's callback, otherwise pop back to the previous screen.
+  void _handleAuthSuccess() {
+    if (!mounted) return;
+    if (widget.onLoginSuccess != null) {
+      widget.onLoginSuccess!();
+    } else if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
+  }
+
   Future<void> _pickImage() async {
     if (!mounted) return;
     final XFile? pickedFile =
@@ -127,7 +147,7 @@ class _LoginScreenState extends State<LoginScreen> {
           password: _passwordController.text.trim(),
           deviceId: deviceId,
         );
-        if (mounted) Navigator.of(context).pop();
+        _handleAuthSuccess();
         return;
       }
 
@@ -168,7 +188,7 @@ class _LoginScreenState extends State<LoginScreen> {
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.of(context).pop();
+        _handleAuthSuccess();
       }
     } catch (e) {
       String message = 'حدث خطأ غير متوقع، برجاء المحاولة لاحقاً';
@@ -232,8 +252,8 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
     try {
       final cred = await loginMethod();
-      if (cred != null && mounted) {
-        Navigator.of(context).pop();
+      if (cred != null) {
+        _handleAuthSuccess();
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) {
@@ -326,10 +346,14 @@ class _LoginScreenState extends State<LoginScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        // Gate mode is the root route — there is nowhere to go back to.
+        automaticallyImplyLeading: !widget.isInitialGate,
+        leading: widget.isInitialGate
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
       ),
       body: Center(
         child: SingleChildScrollView(

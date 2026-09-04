@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:hesen/navigation.dart';
+import 'package:hesen/main.dart' show homeKey;
 import 'package:hesen/web_utils.dart'
     if (dart.library.io) 'package:hesen/web_utils_stub.dart';
 import 'package:hesen/firebase_api.dart';

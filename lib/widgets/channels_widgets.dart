@@ -733,8 +733,12 @@ class _ChannelTileState extends State<ChannelTile> {
         onTapCancel: () => setState(() => _isPressed = false),
         onTap: () async {
           widget.onChannelTap(channelId);
+          // Drop entries without a URL: the extractor adds them with an empty
+          // url, and opening the player with '' only flashes an error.
           final List<Map<String, String>> streams =
-              _extractStreamLinks(streamLinks);
+              _extractStreamLinks(streamLinks)
+                  .where((s) => (s['url'] ?? '').isNotEmpty)
+                  .toList();
 
           if (streams.isEmpty && !isPremium) {
             InAppNotification.show(

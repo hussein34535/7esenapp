@@ -1,9 +1,9 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:hesen/screens/login_screen.dart';
 import 'package:hesen/screens/home_page.dart';
 import 'package:hesen/navigation.dart';
+import 'package:hesen/services/auth_service.dart';
 import 'package:hesen/theme_customization_screen.dart';
 import 'package:hesen/main.dart' show homeKey;
 
@@ -66,14 +66,34 @@ class _AppIntroScreenState extends State<AppIntroScreen>
 
     _controller.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
-        // WEB LOGIN GATE: on web, opening the app requires an account.
-        final bool needsLogin = kIsWeb &&
-            (FirebaseAuth.instance.currentUser == null);
+        // MANDATORY LOGIN GATE (all platforms): opening the app requires an
+        // account — no guest mode. If Firebase failed to initialize, fall
+        // through to HomePage since login cannot work anyway.
+        bool needsLogin = false;
+        try {
+          needsLogin = AuthService.isFirebaseInitialized &&
+              FirebaseAuth.instance.currentUser == null;
+        } catch (_) {
+          needsLogin = false;
+        }
         navigatorKey.currentState?.pushReplacement(
           PageRouteBuilder(
             pageBuilder: (context, animation, secondaryAnimation) {
               if (needsLogin) {
-                return const LoginScreen();
+                return LoginScreen(
+                  isInitialGate: true,
+                  onLoginSuccess: () {
+                    navigatorKey.currentState?.pushAndRemoveUntil(
+                      MaterialPageRoute(
+                        builder: (_) => HomePage(
+                          key: homeKey,
+                          onThemeChanged: widget.onThemeChanged,
+                        ),
+                      ),
+                      (route) => false,
+                    );
+                  },
+                );
               }
               return HomePage(
                 key: homeKey,

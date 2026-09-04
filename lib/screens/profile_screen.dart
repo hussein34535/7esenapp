@@ -4,8 +4,13 @@ import 'package:flutter/services.dart';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:provider/provider.dart';
+import 'package:hesen/theme_customization_screen.dart';
+import 'package:hesen/navigation.dart';
+import 'package:hesen/main.dart' show homeKey;
 import 'package:hesen/services/auth_service.dart';
 import 'package:hesen/screens/login_screen.dart';
+import 'package:hesen/screens/home_page.dart';
 import 'package:intl/intl.dart';
 import 'package:hesen/screens/subscription_screen.dart';
 import 'package:image_picker/image_picker.dart';
@@ -76,9 +81,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _signOut() async {
     await _authService.signOut();
     if (!mounted) return;
-    // Navigate back to Login or Home (which will redirect)
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    // Login is mandatory: go to the gate, then back to HomePage on sign-in.
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      MaterialPageRoute(
+          builder: (_) => LoginScreen(
+                isInitialGate: true,
+                onLoginSuccess: () {
+                  navigatorKey.currentState?.pushAndRemoveUntil(
+                    MaterialPageRoute(
+                        builder: (_) => HomePage(
+                              key: homeKey,
+                              onThemeChanged: (isDarkMode) =>
+                                  themeProvider.setThemeMode(isDarkMode
+                                      ? ThemeMode.dark
+                                      : ThemeMode.light),
+                            )),
+                    (route) => false,
+                  );
+                },
+              )),
       (route) => false,
     );
   }

@@ -445,6 +445,20 @@ class _MatchBoxState extends State<MatchBox> {
             if (!ticketed || !context.mounted) return;
           }
 
+          // Streams here are pre-filtered to valid URLs; if none remain and
+          // the match isn't premium (unlock flow fetches links), don't open
+          // a player that can only error out.
+          if (streams.isEmpty && !isPremium) {
+            if (!context.mounted) return;
+            InAppNotification.show(
+              context: context,
+              message: 'لا يوجد بث متاح لهذه المباراة',
+              type: NotificationType.error,
+              icon: Icons.videocam_off_rounded,
+            );
+            return;
+          }
+
           String firstUrl = streams.isNotEmpty ? streams.first['url'] ?? '' : '';
 
           widget.openVideo(

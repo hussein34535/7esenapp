@@ -70,6 +70,14 @@ mixin HomePageDataMixin on State<HomePage> {
 
         token = await user.getIdToken();
 
+        // Heal missing backend user records (e.g. accounts created while the
+        // register call was broken): register is idempotent upsert server-side
+        // and swallows its own errors, so this is safe fire-and-forget.
+        // Without a backend row, stream-ticket 403s and channels never play.
+        if (user.email != null) {
+          ApiService.registerUser(user.uid, user.email!);
+        }
+
         if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
           debugPrint("Windows: Small delay for Firestore safety...");
           await Future.delayed(const Duration(milliseconds: 600));

@@ -409,10 +409,20 @@ class ApiService {
   }
 
   /// Fetches current user status from the backend.
+  /// The backend requires a Firebase ID token — without it the call 401s.
   static Future<Map<String, dynamic>?> fetchUserStatus(String uid) async {
     final url = '$baseUrl/user-status?uid=$uid';
     try {
-      final response = await _safeGet(url).timeout(const Duration(seconds: 5));
+      String? authToken;
+      try {
+        final u = FirebaseAuth.instance.currentUser;
+        if (u != null) authToken = await u.getIdToken();
+      } catch (_) {}
+      final response = await _safeGet(
+        url,
+        headers:
+            authToken != null ? {'Authorization': 'Bearer $authToken'} : null,
+      ).timeout(const Duration(seconds: 5));
 
       debugPrint("ApiService: fetchUserStatus status: ${response.statusCode}");
 

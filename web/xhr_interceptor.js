@@ -37,7 +37,9 @@
                     url = PROXY_PREFIX + encodeURIComponent(rawPart) + '&ua=VLC%2F3.0.18%20LibVLC%2F3.0.18';
                 }
 
-                if (url.includes('ipwho.is') || url.includes('exchangerate-api.com') || url.includes('7esentvbackend.vercel.app') || url.includes('7esentv-match.vercel.app') || url.includes('okru-api.vercel.app') || url.includes('ok.ru')) {
+                // NOTE: ipwho.is + exchangerate-api.com send CORS headers natively —
+                // routing them through the worker only burns quota and 429s.
+                if (url.includes('7esentvbackend.vercel.app') || url.includes('7esentv-match.vercel.app') || url.includes('okru-api.vercel.app') || url.includes('ok.ru')) {
                     if (!url.startsWith(PROXY_PREFIX)) {
                         console.log('[XHR Interceptor] Proxying Service (open):', url);
                         url = PROXY_PREFIX + encodeURIComponent(url) + '&ua=VLC%2F3.0.18%20LibVLC%2F3.0.18';
@@ -200,7 +202,9 @@
             return originalFetch(PROXY_PREFIX + encodeURIComponent(url) + '&ua=VLC%2F3.0.18%20LibVLC%2F3.0.18', init);
         }
 
-        if (url && (url.includes('ipwho.is') || url.includes('exchangerate-api.com') || url.includes('7esentvbackend.vercel.app') || url.includes('7esentv-match.vercel.app') || url.includes('okru-api.vercel.app') || url.includes('ok.ru'))) {
+        // ipwho.is + exchangerate-api.com are CORS-friendly: fetch directly
+        // instead of burning Cloudflare Worker quota (was causing 429s).
+        if (url && (url.includes('7esentvbackend.vercel.app') || url.includes('7esentv-match.vercel.app') || url.includes('okru-api.vercel.app') || url.includes('ok.ru'))) {
             if (!url.startsWith(PROXY_PREFIX)) {
                 console.log('[Fetch Interceptor] Proxying Service:', url);
                 return originalFetch(PROXY_PREFIX + encodeURIComponent(url) + '&ua=VLC%2F3.0.18%20LibVLC%2F3.0.18', init);

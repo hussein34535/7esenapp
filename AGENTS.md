@@ -14,10 +14,18 @@
 
 ### Web WASM Build & Deploy
 - Build: `flutter build web --wasm --release` with `--dart-define` for API keys
+- **IMPORTANT: after every build, regenerate `build/web/version.json`** (used by the PWA update splash):
+  ```powershell
+  $sha = (git rev-parse --short HEAD).Trim()
+  $ver = (Get-Date).ToUniversalTime().ToString("yyyyMMdd-HHmmss") + "-" + $sha
+  Set-Content -Path "build/web/version.json" -Value ('{"version":"' + $ver + '"}') -Encoding Ascii
+  ```
 - Deploy: `sudo chown ubuntu:ubuntu /var/www/hesen -R` → `scp -r build/web/. ubuntu@141.147.40.102:/var/www/hesen` → `sudo chown www-data:www-data /var/www/hesen -R`
+- SSH key: `C:\Users\husso\Downloads\ssh-key-2025-10-30 (1).key` (use `-i` + `-o IdentitiesOnly=yes`; `~/.ssh/id_ed25519` is NOT authorized on this server)
 - Nginx site config at `/etc/nginx/sites-available/hesen_app`
-- WASM needs headers: COEP=require-corp, COOP=same-origin
+- WASM needs headers: COOP=same-origin-allow-popups (Firebase popup requires checking window.closed; strict same-origin breaks Google sign-in)
 - Service Worker is disabled in web/index.html for faster PWA startup
+- Splash policy (web/index.html): the loader shows ONLY when `version.json` differs from `localStorage['hesen_app_version']` (i.e. a new build), on first visit, or if boot exceeds ~5s. Cached up-to-date launches skip it entirely. `removeWebSplash()` (called from Dart) saves the booted version.
 
 ### Common Pitfalls
 - `MediaQuery.of(context)` inside `AnimatedBuilder` builder must have MaterialApp ancestor

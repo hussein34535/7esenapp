@@ -13,18 +13,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
 
-  <!-- Engine splash on FIRST load only — repeat visits go straight to the app intro -->
-  <style>
-    html[data-skip-engine-splash] #splash { display: none !important; }
-  </style>
-  <script>
-    try {
-      if (localStorage.getItem('engine_splash_seen') === '1') {
-        document.documentElement.setAttribute('data-skip-engine-splash', '1');
-      }
-    } catch (e) {}
-  </script>
-
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -90,17 +78,22 @@
       overflow: hidden;
     }
 
-    /* Custom Splash Screen */
+    /* Custom Splash Screen — hidden by default; the boot script below shows
+       it ONLY when a new build is being downloaded, on first visit, or when
+       booting takes unusually long. Cached, up-to-date launches skip it. */
     #splash {
       position: fixed;
       inset: 0;
-      display: flex;
+      display: none;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       background: linear-gradient(135deg, #000 0%, #1a1a2e 100%);
       z-index: 9999;
       transition: opacity 0.5s ease-out;
+    }
+    html[data-show-splash] #splash {
+      display: flex;
     }
 
     #splash.hidden {
@@ -191,28 +184,6 @@
     .dot-2 { animation: dotPulse 1.5s infinite 0.3s; }
     .dot-3 { animation: dotPulse 1.5s infinite 0.6s; }
 
-    /* Repeat visits: a single breathing logo instead of the full engine splash */
-    #miniSplash {
-      position: fixed;
-      inset: 0;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      background: #000;
-      z-index: 9998;
-    }
-    html[data-skip-engine-splash] #miniSplash { display: flex; }
-    #miniSplash img {
-      width: 96px;
-      height: 96px;
-      border-radius: 24px;
-      animation: breathe 2.2s ease-in-out infinite;
-    }
-    @keyframes breathe {
-      0%, 100% { transform: scale(0.97); opacity: 0.82; }
-      50%      { transform: scale(1.02); opacity: 1; }
-    }
-
     /* Hide Flutter Default Loading */
     .loading {
       display: none !important;
@@ -234,41 +205,85 @@
     <div class="splash-timer" id="splashTimer">0 ثانية</div>
   </div>
 
-  <!-- Repeat visits: breathing logo (hidden on first visit) -->
-  <div id="miniSplash">
-    <img src="apple-touch-icon-v3.png" alt="">
-  </div>
-
   <!-- Flutter App Container -->
   <div id="flutter-app"></div>
 
   <script>
-    // Splash Timer + Status (first visit only — repeat visitors see pure black → intro)
+    // Boot splash policy: the loader appears ONLY when the app actually needs
+    // to download a new build (server version differs from the last booted
+    // one), on first visit, or if booting takes unusually long (evicted cache,
+    // slow device/network). Cached, up-to-date launches go straight to the
+    // Flutter intro with no splash at all.
     (function() {
-      if (document.documentElement.hasAttribute('data-skip-engine-splash')) return;
-      const statusEl = document.getElementById('splashStatus');
-      const timerEl = document.getElementById('splashTimer');
-      const startTime = Date.now();
-      const messages = [
-        { after: 0, text: 'جاري تحميل المحرك' },
-        { after: 10, text: 'جاري تجهيز التطبيق' },
-        { after: 30, text: 'قد يستغرق التحميل دقيقة' },
-        { after: 50, text: 'مرة واحدة فقط عند التحديث' },
-      ];
-      let lastMsgIdx = -1;
+      var SLOW_BOOT_MS = 5000;
+      var splashShown = false;
+      var timerStarted = false;
 
-      setInterval(function() {
-        const elapsed = Math.floor((Date.now() - startTime) / 1000);
-        timerEl.textContent = elapsed + ' ثانية';
-
-        for (let i = messages.length - 1; i >= 0; i--) {
-          if (elapsed >= messages[i].after && lastMsgIdx !== i) {
-            statusEl.innerHTML = messages[i].text + '<span class="dot-1">.</span><span class="dot-2">.</span><span class="dot-3">.</span>';
-            lastMsgIdx = i;
-            break;
+      function dots() {
+        return '<span class="dot-1">.</span><span class="dot-2">.</span><span class="dot-3">.</span>';
+      }
+      function setStatus(html) {
+        var el = document.getElementById('splashStatus');
+        if (el) el.innerHTML = html;
+      }
+      function startSplashTimer() {
+        if (timerStarted) return;
+        timerStarted = true;
+        var timerEl = document.getElementById('splashTimer');
+        var startTime = Date.now();
+        var messages = [
+          { after: 0, text: 'جاري تحميل المحرك' },
+          { after: 10, text: 'جاري تجهيز التطبيق' },
+          { after: 30, text: 'قد يستغرق التحميل دقيقة' },
+          { after: 50, text: 'مرة واحدة فقط عند التحديث' },
+        ];
+        var lastMsgIdx = -1;
+        setInterval(function() {
+          var elapsed = Math.floor((Date.now() - startTime) / 1000);
+          if (timerEl) timerEl.textContent = elapsed + ' ثانية';
+          for (var i = messages.length - 1; i >= 0; i--) {
+            if (elapsed >= messages[i].after && lastMsgIdx !== i) {
+              setStatus(messages[i].text + dots());
+              lastMsgIdx = i;
+              break;
+            }
           }
+        }, 1000);
+      }
+      function showSplash(updating) {
+        if (splashShown) return;
+        splashShown = true;
+        if (updating) {
+          setStatus('جاري تحميل التحديث الجديد' + dots());
         }
-      }, 1000);
+        document.documentElement.setAttribute('data-show-splash', '1');
+        startSplashTimer();
+      }
+
+      // 1) Version check against the last successfully booted build.
+      try {
+        fetch('version.json', { cache: 'no-store' }).then(function(res) {
+          if (!res.ok) throw new Error('version fetch failed: ' + res.status);
+          return res.json();
+        }).then(function(data) {
+          var serverVersion = (data && data.version) ? String(data.version) : null;
+          window.__hesenServerVersion = serverVersion;
+          var lastVersion = null;
+          try { lastVersion = localStorage.getItem('hesen_app_version'); } catch (e) {}
+          if (!lastVersion || !serverVersion || lastVersion !== serverVersion) {
+            showSplash(!!(lastVersion && serverVersion));
+          }
+        }).catch(function() {
+          showSplash(false); // Safe default: show the loader.
+        });
+      } catch (e) {
+        showSplash(false);
+      }
+
+      // 2) Slow-boot safety net: genuinely slow for another reason → show it.
+      setTimeout(function() {
+        if (!window.__hesenAppReady) showSplash(false);
+      }, SLOW_BOOT_MS);
     })();
 
     // Remove Splash when Flutter is ready (Called from Dart)
@@ -277,28 +292,27 @@
       if (splash) {
         splash.classList.add('hidden');
       }
-      const mini = document.getElementById('miniSplash');
-      if (mini) {
-        mini.style.display = 'none';
-      }
       const emergency = document.getElementById('emergencyReload');
       if (emergency) {
         emergency.remove();
       }
       window.__hesenAppReady = true;
-      // Engine has successfully loaded at least once → future visits skip this splash
+      // Remember the booted version so the next launch can skip the splash.
       try {
-        localStorage.setItem('engine_splash_seen', '1');
+        if (window.__hesenServerVersion) {
+          localStorage.setItem('hesen_app_version', window.__hesenServerVersion);
+        }
       } catch (e) {}
     };
 
-    // FAILSAFE: If Flutter is still not ready after 60 seconds, show a floating
-    // "Retry" button instead of leaving the user stuck on a dead screen.
+    // FAILSAFE: If Flutter is still not ready after 60 seconds, make sure the
+    // loader is visible and offer a retry button instead of a dead screen.
     setTimeout(() => {
       if (window.__hesenAppReady) return;
+      document.documentElement.setAttribute('data-show-splash', '1');
       const splash = document.getElementById('splash');
-      if (splash && !splash.classList.contains('hidden')) {
-        splash.classList.add('hidden');
+      if (splash) {
+        splash.classList.remove('hidden');
       }
       const statusEl = document.getElementById('splashStatus');
       if (statusEl) {

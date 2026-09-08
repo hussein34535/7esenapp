@@ -571,6 +571,40 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
           rethrow;
         }
 
+        // 🖤 Force the <video> letterbox area to black. Vidstack renders the
+        // video inside its SHADOW DOM, so the light-DOM stylesheet injected
+        // above can never reach it — iOS Safari then paints the letterbox
+        // bars WHITE as soon as playback starts. Inject a style into the
+        // shadow root itself, and re-apply whenever the provider re-attaches
+        // (the video element is recreated per provider).
+        void paintVideoBlack() {
+          try {
+            final root = (player as JSObject).getProperty('shadowRoot'.toJS)
+                as JSObject?;
+            if (root != null) {
+              final existing = root
+                  .callMethod('querySelector'.toJS, '#hesen-video-bg'.toJS);
+              if (existing == null) {
+                final styleEl =
+                    web.document.createElement('style') as web.HTMLStyleElement;
+                styleEl.id = 'hesen-video-bg';
+                styleEl.textContent =
+                    'video, media-video video { background-color:#000 !important; }';
+                root.callMethod('appendChild'.toJS, (styleEl as JSObject));
+              }
+            }
+            // Light-DOM fallback (harmless if absent).
+            final vid = player.querySelector('video');
+            if (vid != null) {
+              (vid as web.HTMLElement).style
+                  .setProperty('background-color', '#000', 'important');
+            }
+          } catch (e) {
+            debugPrint('[VIDSTACK_IMPL] paintVideoBlack failed: $e');
+          }
+        }
+        paintVideoBlack();
+
         // LOADER
         web.HTMLDivElement? loader;
         try {
@@ -766,6 +800,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
                 (web.Event event) {
                   setLoader(false);
                   _playbackStarted = true;
+                  paintVideoBlack(); // Re-apply in case the video was re-created
                   debugPrint('[VIDSTACK] Playing started.');
                   // iOS: Unmute after autoplay starts (muted autoplay workaround)
                   try {
@@ -820,7 +855,9 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             player.addEventListener(
                 'provider-change',
                 (web.Event event) {
-                  // Provider changed - no action needed
+                  // The provider (hls.js/native) re-creates the <video>
+                  // element — re-paint its letterbox black after the swap.
+                  Future.delayed(const Duration(milliseconds: 50), paintVideoBlack);
                 }.toJS);
 
             player.addEventListener(

@@ -38,6 +38,9 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
   int _loadRequestId = 0; // Prevent race conditions in async load
   bool _isPlayerInitializing = false; // NEW: Track initialization state
   Timer? _retryTimer; // To cancel pending retries
+  // True once the current source actually fired its 'playing' event. Used to
+  // distinguish "user paused" from "still buffering" (both report paused=true).
+  bool _playbackStarted = false;
 
   @override
   void initState() {
@@ -100,7 +103,10 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
         ((_currentPlayer as JSObject).getProperty('paused'.toJS) as JSBoolean?)
                 ?.toDart ??
             false;
-    if (isPaused == true) return;
+    // Block auto-hide ONLY when the user actually paused mid-playback.
+    // During initial buffering the element reports paused==true too, and the
+    // old early-return left the buttons stuck on screen forever.
+    if (isPaused == true && _playbackStarted) return;
 
     _controlsVisible = false;
     _currentPlayer?.classList.remove('controls-visible');
@@ -134,6 +140,7 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
     _loadRequestId++; // New request invalidates older ones
     final myRequestId = _loadRequestId;
     _retryTimer?.cancel(); // Cancel any pending retry
+    _playbackStarted = false; // New source → buffering state until 'playing'
 
     // CANCEL PREVIOUS SAFETY TIMER
     _safetyTimer?.cancel();
@@ -457,6 +464,9 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
             object-position: center !important;
             width: 100% !important;
             height: 100% !important;
+            /* iOS Safari paints letterbox bars WHITE unless the video element
+               has an explicit black background (landscape rotation bug). */
+            background-color: #000 !important;
           }
           media-icon { width: 28px; height: 28px; }
           
@@ -746,12 +756,16 @@ class _VidstackPlayerImplState extends State<VidstackPlayerImpl> {
                 'waiting',
                 (web.Event event) {
                   setLoader(true);
+                  // Keep trying to auto-hide while buffering (the 4s timer
+                  // may have already fired and been blocked earlier).
+                  _startHideTimer();
                 }.toJS);
 
             player.addEventListener(
                 'playing',
                 (web.Event event) {
                   setLoader(false);
+                  _playbackStarted = true;
                   debugPrint('[VIDSTACK] Playing started.');
                   // iOS: Unmute after autoplay starts (muted autoplay workaround)
                   try {
